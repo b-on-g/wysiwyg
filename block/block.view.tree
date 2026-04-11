@@ -2,15 +2,27 @@ $bog_wysiwyg_block $mol_view
 	html? \
 	type? \paragraph
 	level? 1
+	menu_open false
 	on_enter?event null
 	on_remove?event null
 	on_slash?event null
+	on_menu_key?event null
+	bold_exec?event null
+	italic_exec?event null
+	underline_exec?event null
 	attr *
 		^
 		contenteditable \true
 		bog_wysiwyg_block_type <= type?
 		bog_wysiwyg_block_level <= level?
 		bog_wysiwyg_block_empty <= is_empty false
+	plugins /
+		<= Hotkey_format $mol_hotkey
+			mod_ctrl true
+			key *
+				B?event <=> bold_exec?event
+				I?event <=> italic_exec?event
+				U?event <=> underline_exec?event
 	event *
 		^
 		input?event <=> input_event?event null

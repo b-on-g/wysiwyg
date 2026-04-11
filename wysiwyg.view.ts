@@ -21,6 +21,22 @@ namespace $.$$ {
 			return next ?? ''
 		}
 
+		focus_block( id: string ) {
+			setTimeout( () => {
+				try {
+					const node = this.Block( id ).dom_node() as HTMLElement
+					node.focus()
+					const sel = window.getSelection()
+					if( sel ) {
+						sel.selectAllChildren( node )
+						sel.collapseToEnd()
+					}
+				} catch( e ) {
+					$mol_fail_log( e )
+				}
+			}, 0 )
+		}
+
 		block_enter( id: string, event?: Event ) {
 			if( !event ) return null
 
@@ -53,19 +69,7 @@ namespace $.$$ {
 			this.block_ids( ids )
 
 			const prev_id = ids[ Math.max( 0, index - 1 ) ]
-			setTimeout( () => {
-				try {
-					const node = this.Block( prev_id ).dom_node() as HTMLElement
-					node.focus()
-					const sel = window.getSelection()
-					if( sel ) {
-						sel.selectAllChildren( node )
-						sel.collapseToEnd()
-					}
-				} catch( e ) {
-					$mol_fail_log( e )
-				}
-			}, 0 )
+			this.focus_block( prev_id )
 
 			return event
 		}
@@ -81,9 +85,46 @@ namespace $.$$ {
 
 			this.menu_pos_y( block_rect.bottom - editor_rect.top )
 			this.menu_pos_x( block_rect.left - editor_rect.left )
+			this.menu_index( 0 )
 			this.menu_showed( true )
 
 			return event
+		}
+
+		block_menu_key( id: string, event?: KeyboardEvent ) {
+			if( !event ) return null
+
+			if( event.key === 'Escape' ) {
+				this.menu_showed( false )
+				return event
+			}
+
+			// Any printable character: close menu, let character through
+			if( event.key.length === 1 && !event.ctrlKey && !event.metaKey ) {
+				this.menu_showed( false )
+				return event
+			}
+
+			// Delegate arrow/enter to menu
+			this.menu_handle_key( event )
+			return event
+		}
+
+		apply_menu_command( cmd: string ) {
+			const id = this.active_block_id()
+			if( !id ) return
+
+			if( cmd.startsWith( 'heading' ) ) {
+				const level = parseInt( cmd.replace( 'heading', '' ) ) || 1
+				this.block_type( id, 'heading' )
+				this.block_level( id, level )
+			} else {
+				this.block_type( id, cmd )
+			}
+
+			this.menu_showed( false )
+			this.block_html( id, '' )
+			this.focus_block( id )
 		}
 
 		@ $mol_mem
@@ -91,28 +132,7 @@ namespace $.$$ {
 			const val = next ?? ''
 			if( !val ) return val
 
-			const id = this.active_block_id()
-			if( !id ) return val
-
-			if( val.startsWith( 'heading' ) ) {
-				const level = parseInt( val.replace( 'heading', '' ) ) || 1
-				this.block_type( id, 'heading' )
-				this.block_level( id, level )
-			} else {
-				this.block_type( id, val )
-			}
-
-			this.menu_showed( false )
-			this.block_html( id, '' )
-
-			setTimeout( () => {
-				try {
-					const node = this.Block( id ).dom_node() as HTMLElement
-					node.focus()
-				} catch( e ) {
-					$mol_fail_log( e )
-				}
-			}, 0 )
+			this.apply_menu_command( val )
 
 			return val
 		}

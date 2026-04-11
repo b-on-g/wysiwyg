@@ -23,10 +23,43 @@ namespace $.$$ {
 			return this.commands().find( c => c.id === id )?.title ?? ''
 		}
 
+		option_active( id: string ) {
+			const cmds = this.commands()
+			const idx = this.index()
+			return cmds[ idx ]?.id === id
+		}
+
 		option_click( id: string, event?: Event ) {
 			if( !event ) return null
 			this.picked( id )
 			this.showed( false )
+			return event
+		}
+
+		handle_key( event?: KeyboardEvent ) {
+			if( !event ) return null
+
+			const cmds = this.commands()
+
+			if( event.key === 'ArrowDown' ) {
+				this.index( Math.min( this.index() + 1, cmds.length - 1 ) )
+				return event
+			}
+
+			if( event.key === 'ArrowUp' ) {
+				this.index( Math.max( this.index() - 1, 0 ) )
+				return event
+			}
+
+			if( event.key === 'Enter' ) {
+				const cmd = cmds[ this.index() ]
+				if( cmd ) {
+					this.picked( cmd.id )
+					this.showed( false )
+				}
+				return event
+			}
+
 			return event
 		}
 

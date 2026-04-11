@@ -11,17 +11,14 @@ namespace $.$$ {
 			return !this.html()?.replace( /<[^>]*>/g, '' ).trim()
 		}
 
-		// Prevent $mol from managing DOM children — contenteditable manages its own
 		override sub() {
 			return null as any
 		}
 
-		// Sync HTML content to DOM after render
 		override auto() {
 			const node = this.dom_node() as HTMLElement
 			const doc = this.$.$mol_dom_context.document
 
-			// Only update innerHTML when not actively editing
 			if( node !== doc.activeElement ) {
 				const html = this.html()
 				if( node.innerHTML !== html ) {
@@ -37,10 +34,48 @@ namespace $.$$ {
 			return event
 		}
 
+		bold_exec( event?: KeyboardEvent ) {
+			if( !event ) return null
+			event.preventDefault()
+			document.execCommand( 'bold' )
+			this.html( ( this.dom_node() as HTMLElement ).innerHTML )
+			return event
+		}
+
+		italic_exec( event?: KeyboardEvent ) {
+			if( !event ) return null
+			event.preventDefault()
+			document.execCommand( 'italic' )
+			this.html( ( this.dom_node() as HTMLElement ).innerHTML )
+			return event
+		}
+
+		underline_exec( event?: KeyboardEvent ) {
+			if( !event ) return null
+			event.preventDefault()
+			document.execCommand( 'underline' )
+			this.html( ( this.dom_node() as HTMLElement ).innerHTML )
+			return event
+		}
+
 		keydown_event( event?: KeyboardEvent ) {
 			if( !event ) return null
 
 			const node = event.target as HTMLElement
+
+			// When menu is open, delegate navigation keys
+			if( this.menu_open() ) {
+				if( [ 'ArrowDown', 'ArrowUp', 'Enter', 'Escape' ].includes( event.key ) ) {
+					event.preventDefault()
+					this.on_menu_key( event )
+					return event
+				}
+				// Any printable character: close menu and let character through
+				if( event.key.length === 1 && !event.ctrlKey && !event.metaKey ) {
+					this.on_menu_key( event )
+					return event
+				}
+			}
 
 			// Enter: create new block
 			if( event.key === 'Enter' && !event.shiftKey ) {
@@ -60,30 +95,6 @@ namespace $.$$ {
 			if( event.key === '/' && !node.textContent?.trim() ) {
 				event.preventDefault()
 				this.on_slash( event )
-				return event
-			}
-
-			// Bold: Ctrl/Cmd + B
-			if( ( event.ctrlKey || event.metaKey ) && event.key === 'b' ) {
-				event.preventDefault()
-				document.execCommand( 'bold' )
-				this.html( node.innerHTML )
-				return event
-			}
-
-			// Italic: Ctrl/Cmd + I
-			if( ( event.ctrlKey || event.metaKey ) && event.key === 'i' ) {
-				event.preventDefault()
-				document.execCommand( 'italic' )
-				this.html( node.innerHTML )
-				return event
-			}
-
-			// Underline: Ctrl/Cmd + U
-			if( ( event.ctrlKey || event.metaKey ) && event.key === 'u' ) {
-				event.preventDefault()
-				document.execCommand( 'underline' )
-				this.html( node.innerHTML )
 				return event
 			}
 
