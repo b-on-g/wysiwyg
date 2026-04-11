@@ -1,0 +1,62 @@
+[bog_wysiwyg_block][bog_wysiwyg_block_empty]::before {
+	content: "Нажми / для выбора блока...";
+	color: var(--mol_theme_shade);
+	pointer-events: none;
+	position: absolute;
+}
+
+[bog_wysiwyg_block]:hover {
+	background: color-mix(in srgb, var(--mol_theme_hover) 50%, transparent);
+}
+
+[bog_wysiwyg_block]:focus {
+	background: var(--mol_theme_hover);
+}
+
+[bog_wysiwyg_block_type="heading"][bog_wysiwyg_block_level="1"] {
+	font-size: 2rem;
+	font-weight: 700;
+	line-height: 1.2;
+	margin-top: 1rem;
+}
+
+[bog_wysiwyg_block_type="heading"][bog_wysiwyg_block_level="2"] {
+	font-size: 1.5rem;
+	font-weight: 700;
+	line-height: 1.3;
+	margin-top: 0.75rem;
+}
+
+[bog_wysiwyg_block_type="heading"][bog_wysiwyg_block_level="3"] {
+	font-size: 1.25rem;
+	font-weight: 600;
+	line-height: 1.4;
+	margin-top: 0.5rem;
+}
+
+[bog_wysiwyg_block_type="code"] {
+	font-family: monospace;
+	background: var(--mol_theme_card);
+	padding: 1rem;
+	border-radius: 0.5rem;
+	white-space: pre-wrap;
+}
+
+[bog_wysiwyg_block_type="quote"] {
+	border-left: 3px solid var(--mol_theme_focus);
+	padding-left: 1rem;
+	color: var(--mol_theme_shade);
+	font-style: italic;
+}
+
+[bog_wysiwyg_block_type="divider"] {
+	border-top: 1px solid var(--mol_theme_line);
+	min-height: 0;
+	padding: 0;
+	margin: 0.5rem 0;
+	pointer-events: none;
+}
+
+[bog_wysiwyg_block_type="divider"][contenteditable] {
+	contenteditable: false;
+}

@@ -1,0 +1,16 @@
+$bog_wysiwyg_menu $mol_view
+	showed? false
+	picked?val \
+	pos_y? 0
+	pos_x? 0
+	Option* $mol_button_minor
+		title <= option_title* \
+		click?event <=> option_click*?event null
+	sub <= option_rows /
+	attr *
+		^
+		bog_wysiwyg_menu_showed <= showed?
+	style *
+		^
+		top <= pos_y_str \0px
+		left <= pos_x_str \0px

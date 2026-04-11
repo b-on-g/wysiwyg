@@ -1,0 +1,6 @@
+$bog_wysiwyg_app $mol_page
+	title \WYSIWYG Редактор
+	plugins /
+		<= Theme $mol_theme_auto
+	body /
+		<= Editor $bog_wysiwyg

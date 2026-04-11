@@ -1,0 +1,17 @@
+$bog_wysiwyg $mol_view
+	block_ids? /
+	Block* $bog_wysiwyg_block
+		html <=> block_html*? \
+		type <=> block_type*? \paragraph
+		level <=> block_level*? 1
+		on_enter?event <=> block_enter*?event null
+		on_remove?event <=> block_remove*?event null
+		on_slash?event <=> block_slash*?event null
+	sub /
+		<= Block_list $mol_list
+			rows <= block_views /
+		<= Menu $bog_wysiwyg_menu
+			showed? <=> menu_showed? false
+			picked?val <=> menu_picked?val \
+			pos_y <= menu_pos_y? 0
+			pos_x <= menu_pos_x? 0

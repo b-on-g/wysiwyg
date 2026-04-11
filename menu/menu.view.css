@@ -1,0 +1,7 @@
+[bog_wysiwyg_menu]:not([bog_wysiwyg_menu_showed]) {
+	display: none;
+}
+
+[bog_wysiwyg_menu] {
+	box-shadow: 0 0.25rem 1rem 0 #00000026;
+}
