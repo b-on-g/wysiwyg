@@ -3766,6 +3766,9 @@ var $;
 			if(next !== undefined) return next;
 			return null;
 		}
+		option_active(id){
+			return false;
+		}
 		option_rows(){
 			return [];
 		}
@@ -3783,6 +3786,14 @@ var $;
 			if(next !== undefined) return next;
 			return "";
 		}
+		index(next){
+			if(next !== undefined) return next;
+			return 0;
+		}
+		handle_key(next){
+			if(next !== undefined) return next;
+			return null;
+		}
 		pos_y(next){
 			if(next !== undefined) return next;
 			return 0;
@@ -3795,6 +3806,7 @@ var $;
 			const obj = new this.$.$mol_button_minor();
 			(obj.title) = () => ((this.option_title(id)));
 			(obj.click) = (next) => ((this.option_click(id, next)));
+			(obj.attr) = () => ({...(this.$.$mol_button_minor.prototype.attr.call(obj)), "bog_wysiwyg_menu_option_active": (this.option_active(id))});
 			return obj;
 		}
 		sub(){
@@ -3814,6 +3826,8 @@ var $;
 	($mol_mem_key(($.$bog_wysiwyg_menu.prototype), "option_click"));
 	($mol_mem(($.$bog_wysiwyg_menu.prototype), "showed"));
 	($mol_mem(($.$bog_wysiwyg_menu.prototype), "picked"));
+	($mol_mem(($.$bog_wysiwyg_menu.prototype), "index"));
+	($mol_mem(($.$bog_wysiwyg_menu.prototype), "handle_key"));
 	($mol_mem(($.$bog_wysiwyg_menu.prototype), "pos_y"));
 	($mol_mem(($.$bog_wysiwyg_menu.prototype), "pos_x"));
 	($mol_mem_key(($.$bog_wysiwyg_menu.prototype), "Option"));
@@ -3973,11 +3987,38 @@ var $;
             option_title(id) {
                 return this.commands().find(c => c.id === id)?.title ?? '';
             }
+            option_active(id) {
+                const cmds = this.commands();
+                const idx = this.index();
+                return cmds[idx]?.id === id;
+            }
             option_click(id, event) {
                 if (!event)
                     return null;
                 this.picked(id);
                 this.showed(false);
+                return event;
+            }
+            handle_key(event) {
+                if (!event)
+                    return null;
+                const cmds = this.commands();
+                if (event.key === 'ArrowDown') {
+                    this.index(Math.min(this.index() + 1, cmds.length - 1));
+                    return event;
+                }
+                if (event.key === 'ArrowUp') {
+                    this.index(Math.max(this.index() - 1, 0));
+                    return event;
+                }
+                if (event.key === 'Enter') {
+                    const cmd = cmds[this.index()];
+                    if (cmd) {
+                        this.picked(cmd.id);
+                        this.showed(false);
+                    }
+                    return event;
+                }
                 return event;
             }
             pos_y_str() {
@@ -3989,13 +4030,6 @@ var $;
         }
         $$.$bog_wysiwyg_menu = $bog_wysiwyg_menu;
     })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_attach("bog/wysiwyg/menu/menu.view.css", "[bog_wysiwyg_menu]:not([bog_wysiwyg_menu_showed]) {\n\tdisplay: none;\n}\n\n[bog_wysiwyg_menu] {\n\tbox-shadow: 0 0.25rem 1rem 0 #00000026;\n}\n");
 })($ || ($ = {}));
 
 ;
@@ -4017,13 +4051,121 @@ var $;
         flex: {
             direction: 'column',
         },
+        box: {
+            shadow: [
+                {
+                    inset: false,
+                    x: 0,
+                    y: '0.25rem',
+                    blur: '1rem',
+                    spread: 0,
+                    color: '#00000026',
+                },
+            ],
+        },
+        ':not([bog_wysiwyg_menu_showed])': {
+            display: 'none',
+        },
+        Option: {
+            '[bog_wysiwyg_menu_option_active]': {
+                'true': {
+                    background: {
+                        color: $mol_theme.hover,
+                    },
+                },
+            },
+        },
     });
 })($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $mol_plugin extends $mol_view {
+        dom_node_external(next) {
+            return next ?? $mol_owning_get(this).host.dom_node();
+        }
+        render() {
+            this.dom_node_actual();
+        }
+    }
+    $.$mol_plugin = $mol_plugin;
+})($ || ($ = {}));
+
+;
+	($.$mol_hotkey) = class $mol_hotkey extends ($.$mol_plugin) {
+		keydown(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		event(){
+			return {...(super.event()), "keydown": (next) => (this.keydown(next))};
+		}
+		key(){
+			return {};
+		}
+		mod_ctrl(){
+			return false;
+		}
+		mod_alt(){
+			return false;
+		}
+		mod_shift(){
+			return false;
+		}
+	};
+	($mol_mem(($.$mol_hotkey.prototype), "keydown"));
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        class $mol_hotkey extends $.$mol_hotkey {
+            key() {
+                return super.key();
+            }
+            keydown(event) {
+                if (!event)
+                    return;
+                if (event.defaultPrevented)
+                    return;
+                let name = $mol_keyboard_code[event.keyCode];
+                if (this.mod_ctrl() !== (event.ctrlKey || event.metaKey))
+                    return;
+                if (this.mod_alt() !== event.altKey)
+                    return;
+                if (this.mod_shift() !== event.shiftKey)
+                    return;
+                const handle = this.key()[name];
+                if (handle)
+                    handle(event);
+            }
+        }
+        $$.$mol_hotkey = $mol_hotkey;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
 
 ;
 	($.$bog_wysiwyg_block) = class $bog_wysiwyg_block extends ($.$mol_view) {
 		is_empty(){
 			return false;
+		}
+		Hotkey_format(){
+			const obj = new this.$.$mol_hotkey();
+			(obj.mod_ctrl) = () => (true);
+			(obj.key) = () => ({
+				"B": (next) => (this.bold_exec(next)), 
+				"I": (next) => (this.italic_exec(next)), 
+				"U": (next) => (this.underline_exec(next))
+			});
+			return obj;
 		}
 		input_event(next){
 			if(next !== undefined) return next;
@@ -4045,6 +4187,9 @@ var $;
 			if(next !== undefined) return next;
 			return 1;
 		}
+		menu_open(){
+			return false;
+		}
 		on_enter(next){
 			if(next !== undefined) return next;
 			return null;
@@ -4057,6 +4202,22 @@ var $;
 			if(next !== undefined) return next;
 			return null;
 		}
+		on_menu_key(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		bold_exec(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		italic_exec(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		underline_exec(next){
+			if(next !== undefined) return next;
+			return null;
+		}
 		attr(){
 			return {
 				...(super.attr()), 
@@ -4065,6 +4226,9 @@ var $;
 				"bog_wysiwyg_block_level": (this.level()), 
 				"bog_wysiwyg_block_empty": (this.is_empty())
 			};
+		}
+		plugins(){
+			return [(this.Hotkey_format())];
 		}
 		event(){
 			return {
@@ -4077,6 +4241,7 @@ var $;
 			return [];
 		}
 	};
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "Hotkey_format"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "input_event"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "keydown_event"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "html"));
@@ -4085,6 +4250,10 @@ var $;
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_enter"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_remove"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_slash"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_menu_key"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "bold_exec"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "italic_exec"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "underline_exec"));
 
 
 ;
@@ -4123,10 +4292,45 @@ var $;
                 this.html(node.innerHTML);
                 return event;
             }
+            bold_exec(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                document.execCommand('bold');
+                this.html(this.dom_node().innerHTML);
+                return event;
+            }
+            italic_exec(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                document.execCommand('italic');
+                this.html(this.dom_node().innerHTML);
+                return event;
+            }
+            underline_exec(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                document.execCommand('underline');
+                this.html(this.dom_node().innerHTML);
+                return event;
+            }
             keydown_event(event) {
                 if (!event)
                     return null;
                 const node = event.target;
+                if (this.menu_open()) {
+                    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
+                        event.preventDefault();
+                        this.on_menu_key(event);
+                        return event;
+                    }
+                    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+                        this.on_menu_key(event);
+                        return event;
+                    }
+                }
                 if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
                     this.on_enter(event);
@@ -4140,24 +4344,6 @@ var $;
                 if (event.key === '/' && !node.textContent?.trim()) {
                     event.preventDefault();
                     this.on_slash(event);
-                    return event;
-                }
-                if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
-                    event.preventDefault();
-                    document.execCommand('bold');
-                    this.html(node.innerHTML);
-                    return event;
-                }
-                if ((event.ctrlKey || event.metaKey) && event.key === 'i') {
-                    event.preventDefault();
-                    document.execCommand('italic');
-                    this.html(node.innerHTML);
-                    return event;
-                }
-                if ((event.ctrlKey || event.metaKey) && event.key === 'u') {
-                    event.preventDefault();
-                    document.execCommand('underline');
-                    this.html(node.innerHTML);
                     return event;
                 }
                 return event;
@@ -4174,14 +4360,8 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    $mol_style_attach("bog/wysiwyg/block/block.view.css", "[bog_wysiwyg_block][bog_wysiwyg_block_empty]::before {\n\tcontent: \"Нажми / для выбора блока...\";\n\tcolor: var(--mol_theme_shade);\n\tpointer-events: none;\n\tposition: absolute;\n}\n\n[bog_wysiwyg_block]:hover {\n\tbackground: color-mix(in srgb, var(--mol_theme_hover) 50%, transparent);\n}\n\n[bog_wysiwyg_block]:focus {\n\tbackground: var(--mol_theme_hover);\n}\n\n[bog_wysiwyg_block_type=\"heading\"][bog_wysiwyg_block_level=\"1\"] {\n\tfont-size: 2rem;\n\tfont-weight: 700;\n\tline-height: 1.2;\n\tmargin-top: 1rem;\n}\n\n[bog_wysiwyg_block_type=\"heading\"][bog_wysiwyg_block_level=\"2\"] {\n\tfont-size: 1.5rem;\n\tfont-weight: 700;\n\tline-height: 1.3;\n\tmargin-top: 0.75rem;\n}\n\n[bog_wysiwyg_block_type=\"heading\"][bog_wysiwyg_block_level=\"3\"] {\n\tfont-size: 1.25rem;\n\tfont-weight: 600;\n\tline-height: 1.4;\n\tmargin-top: 0.5rem;\n}\n\n[bog_wysiwyg_block_type=\"code\"] {\n\tfont-family: monospace;\n\tbackground: var(--mol_theme_card);\n\tpadding: 1rem;\n\tborder-radius: 0.5rem;\n\twhite-space: pre-wrap;\n}\n\n[bog_wysiwyg_block_type=\"quote\"] {\n\tborder-left: 3px solid var(--mol_theme_focus);\n\tpadding-left: 1rem;\n\tcolor: var(--mol_theme_shade);\n\tfont-style: italic;\n}\n\n[bog_wysiwyg_block_type=\"divider\"] {\n\tborder-top: 1px solid var(--mol_theme_line);\n\tmin-height: 0;\n\tpadding: 0;\n\tmargin: 0.5rem 0;\n\tpointer-events: none;\n}\n\n[bog_wysiwyg_block_type=\"divider\"][contenteditable] {\n\tcontenteditable: false;\n}\n");
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
     $mol_style_define($bog_wysiwyg_block, {
+        display: 'block',
         outline: 'none',
         padding: {
             top: '0.25rem',
@@ -4194,22 +4374,92 @@ var $;
         borderRadius: '0.25rem',
         cursor: 'text',
         position: 'relative',
+        overflowWrap: 'break-word',
+        ':hover': {
+            background: {
+                color: $mol_theme.hover,
+            },
+        },
+        ':focus': {
+            outline: 'none',
+            background: {
+                color: $mol_theme.hover,
+            },
+        },
+        '[bog_wysiwyg_block_empty]': {
+            'true': {
+                '::before': {
+                    content: '"Нажми / для выбора блока..."',
+                    color: $mol_theme.shade,
+                    pointerEvents: 'none',
+                    position: 'absolute',
+                },
+            },
+        },
+        '[bog_wysiwyg_block_type]': {
+            heading: {
+                '[bog_wysiwyg_block_level]': {
+                    '1': {
+                        font: { size: '2rem', weight: 700 },
+                        lineHeight: '1.2',
+                        margin: { top: '1rem' },
+                    },
+                    '2': {
+                        font: { size: '1.5rem', weight: 700 },
+                        lineHeight: '1.3',
+                        margin: { top: '0.75rem' },
+                    },
+                    '3': {
+                        font: { size: '1.25rem', weight: 600 },
+                        lineHeight: '1.4',
+                        margin: { top: '0.5rem' },
+                    },
+                },
+            },
+            code: {
+                font: { family: 'monospace' },
+                background: { color: $mol_theme.card },
+                padding: {
+                    top: '1rem',
+                    bottom: '1rem',
+                    left: '1rem',
+                    right: '1rem',
+                },
+                borderRadius: '0.5rem',
+                whiteSpace: 'pre-wrap',
+            },
+            quote: {
+                border: {
+                    left: {
+                        width: '3px',
+                        style: 'solid',
+                        color: $mol_theme.focus,
+                    },
+                },
+                padding: { left: '1rem' },
+                color: $mol_theme.shade,
+                font: { style: 'italic' },
+            },
+            divider: {
+                border: {
+                    top: {
+                        width: '1px',
+                        style: 'solid',
+                        color: $mol_theme.line,
+                    },
+                },
+                minHeight: 0,
+                padding: {
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                },
+                margin: { top: '0.5rem', bottom: '0.5rem' },
+                pointerEvents: 'none',
+            },
+        },
     });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    class $mol_plugin extends $mol_view {
-        dom_node_external(next) {
-            return next ?? $mol_owning_get(this).host.dom_node();
-        }
-        render() {
-            this.dom_node_actual();
-        }
-    }
-    $.$mol_plugin = $mol_plugin;
 })($ || ($ = {}));
 
 ;
@@ -4226,6 +4476,10 @@ var $;
 			if(next !== undefined) return next;
 			return 1;
 		}
+		menu_showed(next){
+			if(next !== undefined) return next;
+			return false;
+		}
 		block_enter(id, next){
 			if(next !== undefined) return next;
 			return null;
@@ -4238,6 +4492,10 @@ var $;
 			if(next !== undefined) return next;
 			return null;
 		}
+		block_menu_key(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
 		block_views(){
 			return [];
 		}
@@ -4246,13 +4504,17 @@ var $;
 			(obj.rows) = () => ((this.block_views()));
 			return obj;
 		}
-		menu_showed(next){
-			if(next !== undefined) return next;
-			return false;
-		}
 		menu_picked(next){
 			if(next !== undefined) return next;
 			return "";
+		}
+		menu_index(next){
+			if(next !== undefined) return next;
+			return 0;
+		}
+		menu_handle_key(next){
+			if(next !== undefined) return next;
+			return null;
 		}
 		menu_pos_y(next){
 			if(next !== undefined) return next;
@@ -4266,6 +4528,8 @@ var $;
 			const obj = new this.$.$bog_wysiwyg_menu();
 			(obj.showed) = (next) => ((this.menu_showed(next)));
 			(obj.picked) = (next) => ((this.menu_picked(next)));
+			(obj.index) = (next) => ((this.menu_index(next)));
+			(obj.handle_key) = (next) => ((this.menu_handle_key(next)));
 			(obj.pos_y) = () => ((this.menu_pos_y()));
 			(obj.pos_x) = () => ((this.menu_pos_x()));
 			return obj;
@@ -4279,9 +4543,11 @@ var $;
 			(obj.html) = (next) => ((this.block_html(id, next)));
 			(obj.type) = (next) => ((this.block_type(id, next)));
 			(obj.level) = (next) => ((this.block_level(id, next)));
+			(obj.menu_open) = () => ((this.menu_showed()));
 			(obj.on_enter) = (next) => ((this.block_enter(id, next)));
 			(obj.on_remove) = (next) => ((this.block_remove(id, next)));
 			(obj.on_slash) = (next) => ((this.block_slash(id, next)));
+			(obj.on_menu_key) = (next) => ((this.block_menu_key(id, next)));
 			return obj;
 		}
 		sub(){
@@ -4291,12 +4557,15 @@ var $;
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_html"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_type"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_level"));
+	($mol_mem(($.$bog_wysiwyg.prototype), "menu_showed"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_enter"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_remove"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_slash"));
+	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_menu_key"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "Block_list"));
-	($mol_mem(($.$bog_wysiwyg.prototype), "menu_showed"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "menu_picked"));
+	($mol_mem(($.$bog_wysiwyg.prototype), "menu_index"));
+	($mol_mem(($.$bog_wysiwyg.prototype), "menu_handle_key"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "menu_pos_y"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "menu_pos_x"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "Menu"));
@@ -4325,6 +4594,22 @@ var $;
             }
             active_block_id(next) {
                 return next ?? '';
+            }
+            focus_block(id) {
+                setTimeout(() => {
+                    try {
+                        const node = this.Block(id).dom_node();
+                        node.focus();
+                        const sel = window.getSelection();
+                        if (sel) {
+                            sel.selectAllChildren(node);
+                            sel.collapseToEnd();
+                        }
+                    }
+                    catch (e) {
+                        $mol_fail_log(e);
+                    }
+                }, 0);
             }
             block_enter(id, event) {
                 if (!event)
@@ -4355,20 +4640,7 @@ var $;
                 ids.splice(index, 1);
                 this.block_ids(ids);
                 const prev_id = ids[Math.max(0, index - 1)];
-                setTimeout(() => {
-                    try {
-                        const node = this.Block(prev_id).dom_node();
-                        node.focus();
-                        const sel = window.getSelection();
-                        if (sel) {
-                            sel.selectAllChildren(node);
-                            sel.collapseToEnd();
-                        }
-                    }
-                    catch (e) {
-                        $mol_fail_log(e);
-                    }
-                }, 0);
+                this.focus_block(prev_id);
                 return event;
             }
             block_slash(id, event) {
@@ -4381,35 +4653,45 @@ var $;
                 const editor_rect = editor_node.getBoundingClientRect();
                 this.menu_pos_y(block_rect.bottom - editor_rect.top);
                 this.menu_pos_x(block_rect.left - editor_rect.left);
+                this.menu_index(0);
                 this.menu_showed(true);
                 return event;
+            }
+            block_menu_key(id, event) {
+                if (!event)
+                    return null;
+                if (event.key === 'Escape') {
+                    this.menu_showed(false);
+                    return event;
+                }
+                if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+                    this.menu_showed(false);
+                    return event;
+                }
+                this.menu_handle_key(event);
+                return event;
+            }
+            apply_menu_command(cmd) {
+                const id = this.active_block_id();
+                if (!id)
+                    return;
+                if (cmd.startsWith('heading')) {
+                    const level = parseInt(cmd.replace('heading', '')) || 1;
+                    this.block_type(id, 'heading');
+                    this.block_level(id, level);
+                }
+                else {
+                    this.block_type(id, cmd);
+                }
+                this.menu_showed(false);
+                this.block_html(id, '');
+                this.focus_block(id);
             }
             menu_picked(next) {
                 const val = next ?? '';
                 if (!val)
                     return val;
-                const id = this.active_block_id();
-                if (!id)
-                    return val;
-                if (val.startsWith('heading')) {
-                    const level = parseInt(val.replace('heading', '')) || 1;
-                    this.block_type(id, 'heading');
-                    this.block_level(id, level);
-                }
-                else {
-                    this.block_type(id, val);
-                }
-                this.menu_showed(false);
-                this.block_html(id, '');
-                setTimeout(() => {
-                    try {
-                        const node = this.Block(id).dom_node();
-                        node.focus();
-                    }
-                    catch (e) {
-                        $mol_fail_log(e);
-                    }
-                }, 0);
+                this.apply_menu_command(val);
                 return val;
             }
         }

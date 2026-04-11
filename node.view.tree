@@ -47,11 +47,16 @@ $mol_button_minor $mol_button_typed
 $bog_wysiwyg_menu $mol_view
 	showed? false
 	picked?val \
+	index? 0
+	handle_key?event null
 	pos_y? 0
 	pos_x? 0
 	Option* $mol_button_minor
 		title <= option_title* \
 		click?event <=> option_click*?event null
+		attr *
+			^
+			bog_wysiwyg_menu_option_active <= option_active* false
 	sub <= option_rows /
 	attr *
 		^
@@ -61,19 +66,40 @@ $bog_wysiwyg_menu $mol_view
 		top <= pos_y_str \0px
 		left <= pos_x_str \0px
 
+$mol_hotkey $mol_plugin
+	event *
+		^
+		keydown?event <=> keydown?event null
+	key *
+	mod_ctrl false
+	mod_alt false
+	mod_shift false
+
 $bog_wysiwyg_block $mol_view
 	html? \
 	type? \paragraph
 	level? 1
+	menu_open false
 	on_enter?event null
 	on_remove?event null
 	on_slash?event null
+	on_menu_key?event null
+	bold_exec?event null
+	italic_exec?event null
+	underline_exec?event null
 	attr *
 		^
 		contenteditable \true
 		bog_wysiwyg_block_type <= type?
 		bog_wysiwyg_block_level <= level?
 		bog_wysiwyg_block_empty <= is_empty false
+	plugins /
+		<= Hotkey_format $mol_hotkey
+			mod_ctrl true
+			key *
+				B?event <=> bold_exec?event
+				I?event <=> italic_exec?event
+				U?event <=> underline_exec?event
 	event *
 		^
 		input?event <=> input_event?event null
@@ -86,15 +112,19 @@ $bog_wysiwyg $mol_view
 		html? <=> block_html*? \
 		type? <=> block_type*? \paragraph
 		level? <=> block_level*? 1
+		menu_open <= menu_showed? false
 		on_enter?event <=> block_enter*?event null
 		on_remove?event <=> block_remove*?event null
 		on_slash?event <=> block_slash*?event null
+		on_menu_key?event <=> block_menu_key*?event null
 	sub /
 		<= Block_list $mol_list
 			rows <= block_views /
 		<= Menu $bog_wysiwyg_menu
 			showed? <=> menu_showed? false
 			picked?val <=> menu_picked?val \
+			index? <=> menu_index? 0
+			handle_key?event <=> menu_handle_key?event null
 			pos_y <= menu_pos_y? 0
 			pos_x <= menu_pos_x? 0
 

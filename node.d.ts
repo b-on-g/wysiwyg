@@ -779,7 +779,7 @@ declare namespace $ {
 }
 
 declare namespace $ {
-    let $mol_gap: Record<"text" | "blur" | "page" | "block" | "space" | "round" | "emoji", $mol_style_func<"var", unknown>>;
+    let $mol_gap: Record<"text" | "space" | "blur" | "page" | "block" | "round" | "emoji", $mol_style_func<"var", unknown>>;
 }
 
 declare namespace $ {
@@ -1442,14 +1442,24 @@ declare namespace $ {
 		,
 		ReturnType< $mol_button_minor['click'] >
 	>
+	type $mol_button_minor__attr_bog_wysiwyg_menu_3 = $mol_type_enforce<
+		({ 
+			'bog_wysiwyg_menu_option_active': ReturnType< $bog_wysiwyg_menu['option_active'] >,
+		})  & ReturnType< $mol_button_minor['attr'] >
+		,
+		ReturnType< $mol_button_minor['attr'] >
+	>
 	export class $bog_wysiwyg_menu extends $mol_view {
 		option_title( id: any): string
 		option_click( id: any, next?: any ): any
+		option_active( id: any): boolean
 		option_rows( ): readonly(any)[]
 		pos_y_str( ): string
 		pos_x_str( ): string
 		showed( next?: boolean ): boolean
 		picked( next?: string ): string
+		index( next?: number ): number
+		handle_key( next?: any ): any
 		pos_y( next?: number ): number
 		pos_x( next?: number ): number
 		Option( id: any): $mol_button_minor
@@ -1474,7 +1484,9 @@ declare namespace $.$$ {
         }[];
         option_rows(): $mol_button_minor[];
         option_title(id: string): string;
+        option_active(id: string): boolean;
         option_click(id: string, event?: Event): Event | null;
+        handle_key(event?: KeyboardEvent): KeyboardEvent | null;
         pos_y_str(): string;
         pos_x_str(): string;
     }
@@ -1484,26 +1496,74 @@ declare namespace $ {
 }
 
 declare namespace $ {
+    class $mol_plugin extends $mol_view {
+        dom_node_external(next?: Element): Element;
+        render(): void;
+    }
 }
 
 declare namespace $ {
 
+	export class $mol_hotkey extends $mol_plugin {
+		keydown( next?: any ): any
+		event( ): ({ 
+			keydown( next?: ReturnType< $mol_hotkey['keydown'] > ): ReturnType< $mol_hotkey['keydown'] >,
+		})  & ReturnType< $mol_plugin['event'] >
+		key( ): Record<string, any>
+		mod_ctrl( ): boolean
+		mod_alt( ): boolean
+		mod_shift( ): boolean
+	}
+	
+}
+
+//# sourceMappingURL=hotkey.view.tree.d.ts.map
+declare namespace $.$$ {
+    class $mol_hotkey extends $.$mol_hotkey {
+        key(): { [key in keyof typeof $mol_keyboard_code]?: (event: KeyboardEvent) => void; };
+        keydown(event?: KeyboardEvent): void;
+    }
+}
+
+declare namespace $ {
+
+	type $mol_hotkey__mod_ctrl_bog_wysiwyg_block_1 = $mol_type_enforce<
+		boolean
+		,
+		ReturnType< $mol_hotkey['mod_ctrl'] >
+	>
+	type $mol_hotkey__key_bog_wysiwyg_block_2 = $mol_type_enforce<
+		({ 
+			B( next?: ReturnType< $bog_wysiwyg_block['bold_exec'] > ): ReturnType< $bog_wysiwyg_block['bold_exec'] >,
+			I( next?: ReturnType< $bog_wysiwyg_block['italic_exec'] > ): ReturnType< $bog_wysiwyg_block['italic_exec'] >,
+			U( next?: ReturnType< $bog_wysiwyg_block['underline_exec'] > ): ReturnType< $bog_wysiwyg_block['underline_exec'] >,
+		}) 
+		,
+		ReturnType< $mol_hotkey['key'] >
+	>
 	export class $bog_wysiwyg_block extends $mol_view {
 		is_empty( ): boolean
+		Hotkey_format( ): $mol_hotkey
 		input_event( next?: any ): any
 		keydown_event( next?: any ): any
 		html( next?: string ): string
 		type( next?: string ): string
 		level( next?: number ): number
+		menu_open( ): boolean
 		on_enter( next?: any ): any
 		on_remove( next?: any ): any
 		on_slash( next?: any ): any
+		on_menu_key( next?: any ): any
+		bold_exec( next?: any ): any
+		italic_exec( next?: any ): any
+		underline_exec( next?: any ): any
 		attr( ): ({ 
 			'contenteditable': string,
 			'bog_wysiwyg_block_type': ReturnType< $bog_wysiwyg_block['type'] >,
 			'bog_wysiwyg_block_level': ReturnType< $bog_wysiwyg_block['level'] >,
 			'bog_wysiwyg_block_empty': ReturnType< $bog_wysiwyg_block['is_empty'] >,
 		})  & ReturnType< $mol_view['attr'] >
+		plugins( ): readonly(any)[]
 		event( ): ({ 
 			input( next?: ReturnType< $bog_wysiwyg_block['input_event'] > ): ReturnType< $bog_wysiwyg_block['input_event'] >,
 			keydown( next?: ReturnType< $bog_wysiwyg_block['keydown_event'] > ): ReturnType< $bog_wysiwyg_block['keydown_event'] >,
@@ -1521,21 +1581,14 @@ declare namespace $.$$ {
         sub(): any;
         auto(): void;
         input_event(event?: Event): Event | null;
+        bold_exec(event?: KeyboardEvent): KeyboardEvent | null;
+        italic_exec(event?: KeyboardEvent): KeyboardEvent | null;
+        underline_exec(event?: KeyboardEvent): KeyboardEvent | null;
         keydown_event(event?: KeyboardEvent): KeyboardEvent | null;
     }
 }
 
 declare namespace $ {
-}
-
-declare namespace $ {
-}
-
-declare namespace $ {
-    class $mol_plugin extends $mol_view {
-        dom_node_external(next?: Element): Element;
-        render(): void;
-    }
 }
 
 declare namespace $ {
@@ -1555,57 +1608,80 @@ declare namespace $ {
 		,
 		ReturnType< $bog_wysiwyg_menu['picked'] >
 	>
-	type $bog_wysiwyg_menu__pos_y_bog_wysiwyg_4 = $mol_type_enforce<
+	type $bog_wysiwyg_menu__index_bog_wysiwyg_4 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg['menu_index'] >
+		,
+		ReturnType< $bog_wysiwyg_menu['index'] >
+	>
+	type $bog_wysiwyg_menu__handle_key_bog_wysiwyg_5 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg['menu_handle_key'] >
+		,
+		ReturnType< $bog_wysiwyg_menu['handle_key'] >
+	>
+	type $bog_wysiwyg_menu__pos_y_bog_wysiwyg_6 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_pos_y'] >
 		,
 		ReturnType< $bog_wysiwyg_menu['pos_y'] >
 	>
-	type $bog_wysiwyg_menu__pos_x_bog_wysiwyg_5 = $mol_type_enforce<
+	type $bog_wysiwyg_menu__pos_x_bog_wysiwyg_7 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_pos_x'] >
 		,
 		ReturnType< $bog_wysiwyg_menu['pos_x'] >
 	>
-	type $bog_wysiwyg_block__html_bog_wysiwyg_6 = $mol_type_enforce<
+	type $bog_wysiwyg_block__html_bog_wysiwyg_8 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_html'] >
 		,
 		ReturnType< $bog_wysiwyg_block['html'] >
 	>
-	type $bog_wysiwyg_block__type_bog_wysiwyg_7 = $mol_type_enforce<
+	type $bog_wysiwyg_block__type_bog_wysiwyg_9 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_type'] >
 		,
 		ReturnType< $bog_wysiwyg_block['type'] >
 	>
-	type $bog_wysiwyg_block__level_bog_wysiwyg_8 = $mol_type_enforce<
+	type $bog_wysiwyg_block__level_bog_wysiwyg_10 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_level'] >
 		,
 		ReturnType< $bog_wysiwyg_block['level'] >
 	>
-	type $bog_wysiwyg_block__on_enter_bog_wysiwyg_9 = $mol_type_enforce<
+	type $bog_wysiwyg_block__menu_open_bog_wysiwyg_11 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg['menu_showed'] >
+		,
+		ReturnType< $bog_wysiwyg_block['menu_open'] >
+	>
+	type $bog_wysiwyg_block__on_enter_bog_wysiwyg_12 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_enter'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_enter'] >
 	>
-	type $bog_wysiwyg_block__on_remove_bog_wysiwyg_10 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_remove_bog_wysiwyg_13 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_remove'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_remove'] >
 	>
-	type $bog_wysiwyg_block__on_slash_bog_wysiwyg_11 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_slash_bog_wysiwyg_14 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_slash'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_slash'] >
+	>
+	type $bog_wysiwyg_block__on_menu_key_bog_wysiwyg_15 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg['block_menu_key'] >
+		,
+		ReturnType< $bog_wysiwyg_block['on_menu_key'] >
 	>
 	export class $bog_wysiwyg extends $mol_view {
 		block_html( id: any, next?: string ): string
 		block_type( id: any, next?: string ): string
 		block_level( id: any, next?: number ): number
+		menu_showed( next?: boolean ): boolean
 		block_enter( id: any, next?: any ): any
 		block_remove( id: any, next?: any ): any
 		block_slash( id: any, next?: any ): any
+		block_menu_key( id: any, next?: any ): any
 		block_views( ): readonly(any)[]
 		Block_list( ): $mol_list
-		menu_showed( next?: boolean ): boolean
 		menu_picked( next?: string ): string
+		menu_index( next?: number ): number
+		menu_handle_key( next?: any ): any
 		menu_pos_y( next?: number ): number
 		menu_pos_x( next?: number ): number
 		Menu( ): $bog_wysiwyg_menu
@@ -1623,9 +1699,12 @@ declare namespace $.$$ {
         block_ids(next?: readonly string[]): readonly string[];
         block_views(): $.$bog_wysiwyg_block[];
         active_block_id(next?: string): string;
+        focus_block(id: string): void;
         block_enter(id: string, event?: Event): Event | null;
         block_remove(id: string, event?: Event): Event | null;
         block_slash(id: string, event?: Event): Event | null;
+        block_menu_key(id: string, event?: KeyboardEvent): KeyboardEvent | null;
+        apply_menu_command(cmd: string): void;
         menu_picked(next?: string): string;
     }
 }

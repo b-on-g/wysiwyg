@@ -145,6 +145,7 @@
     "$mol_type_error",
     "$mol_style_sheet",
     "$bog_wysiwyg_block",
+    "$mol_hotkey",
     "$mol_offline_install",
     "$mol_offline",
     "$mol_page",
