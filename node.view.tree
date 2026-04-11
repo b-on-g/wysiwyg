@@ -1,0 +1,146 @@
+$mol_list $mol_view
+	render_visible_only true
+	render_over 0.1
+	sub <= rows /$mol_view
+		<= Gap_before $mol_view style * paddingTop <= gap_before 0
+		<= Empty $mol_view
+		<= Gap_after $mol_view style * paddingTop <= gap_after 0
+	item_height_min* 1
+	item_width_min* 1
+	view_window_shift? 0
+	view_window /
+		0
+		0
+
+$mol_speck $mol_view
+	theme \$mol_theme_accent
+	sub /
+		<= value null
+
+$mol_button $mol_view
+	enabled true
+	click?event null
+	event_click?event null
+	status? /
+	event *
+		^
+		click?event <=> activate?event <=> event_activate?event null
+		dblclick?event <=> clicks?event null
+		keydown?event <=> key_press?event <=> event_key_press?event null
+	attr *
+		^
+		disabled <= disabled false
+		role \button
+		tabindex <= tab_index 0
+		title <= hint_safe <= hint \
+	sub /$mol_view_content
+		<= title
+	Speck $mol_speck
+		value <= error \
+
+$mol_button_typed $mol_button
+	minimal_height 40
+	minimal_width 40
+
+$mol_button_minor $mol_button_typed
+
+$bog_wysiwyg_menu $mol_view
+	showed? false
+	picked?val \
+	pos_y? 0
+	pos_x? 0
+	Option* $mol_button_minor
+		title <= option_title* \
+		click?event <=> option_click*?event null
+	sub <= option_rows /
+	attr *
+		^
+		bog_wysiwyg_menu_showed <= showed?
+	style *
+		^
+		top <= pos_y_str \0px
+		left <= pos_x_str \0px
+
+$bog_wysiwyg_block $mol_view
+	html? \
+	type? \paragraph
+	level? 1
+	on_enter?event null
+	on_remove?event null
+	on_slash?event null
+	attr *
+		^
+		contenteditable \true
+		bog_wysiwyg_block_type <= type?
+		bog_wysiwyg_block_level <= level?
+		bog_wysiwyg_block_empty <= is_empty false
+	event *
+		^
+		input?event <=> input_event?event null
+		keydown?event <=> keydown_event?event null
+	sub /
+
+$bog_wysiwyg $mol_view
+	block_ids? /
+	Block* $bog_wysiwyg_block
+		html? <=> block_html*? \
+		type? <=> block_type*? \paragraph
+		level? <=> block_level*? 1
+		on_enter?event <=> block_enter*?event null
+		on_remove?event <=> block_remove*?event null
+		on_slash?event <=> block_slash*?event null
+	sub /
+		<= Block_list $mol_list
+			rows <= block_views /
+		<= Menu $bog_wysiwyg_menu
+			showed? <=> menu_showed? false
+			picked?val <=> menu_picked?val \
+			pos_y <= menu_pos_y? 0
+			pos_x <= menu_pos_x? 0
+
+$mol_scroll $mol_view
+	scroll_top? 0
+	scroll_left? 0
+	attr *
+		^
+		tabindex <= tabindex -1
+	event *
+		^
+		scroll?event <=> event_scroll?event null
+
+$mol_page $mol_view
+	dom_name \article
+	attr *
+		^
+		tabIndex <= tabindex -1
+	sub /
+		<= Head $mol_view
+			minimal_height 64
+			dom_name \header
+			sub <= head /
+				<= Title $mol_view
+					dom_name \h1
+					sub <= title_content /
+						<= Logo null
+						<= title
+				<= Tools $mol_view
+					sub <= tools /$mol_view_content
+		<= Body $mol_scroll
+			scroll_top? => body_scroll_top?
+			sub <= body_content /
+				<= Body_content $mol_view
+					sub <= body /$mol_view
+		<= Foot $mol_view
+			dom_name \footer
+			sub <= foot /$mol_view
+
+$mol_theme_auto $mol_plugin
+	light \$mol_theme_light
+	attr * mol_theme <= theme <= dark \$mol_theme_dark
+
+$bog_wysiwyg_app $mol_page
+	title \WYSIWYG Редактор
+	plugins /
+		<= Theme $mol_theme_auto
+	body /
+		<= Editor $bog_wysiwyg
