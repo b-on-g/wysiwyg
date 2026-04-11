@@ -1,61 +1,27 @@
-name: Deploy to GitHub Pages
+name: $bog_wysiwyg_app
+
+permissions: write-all
 
 on:
-  push:
-    branches: [master, main]
+    workflow_dispatch:
+    push:
+    pull_request:
+    delete:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    build:
+        runs-on: ubuntu-latest
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+        steps:
+            - uses: hyoo-ru/mam_build@master2
+              with:
+                  package: "bog/wysiwyg"
+                  modules: 'app'
 
-      - name: Setup MAM workspace
-        run: |
-          WORKSPACE=$(mktemp -d)
-          mkdir -p $WORKSPACE/bog/wysiwyg
-          cp -r . $WORKSPACE/bog/wysiwyg/
-          cd $WORKSPACE
-          npm init -y
-          npm install mam
-          echo "WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
 
-      - name: Build
-        run: |
-          cd $WORKSPACE
-          npx mam bog/wysiwyg/app
+            - uses: hyoo-ru/gh-deploy@v4.4.1
+              if: github.ref == 'refs/heads/main'
+              with:
+                  folder: "bog/wysiwyg/app/-"
 
-      - name: Prepare pages
-        run: |
-          cp $WORKSPACE/bog/wysiwyg/app/-/test.html $WORKSPACE/bog/wysiwyg/app/-/index.html
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ${{ env.WORKSPACE }}/bog/wysiwyg/app/-/
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
