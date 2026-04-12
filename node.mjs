@@ -20972,6 +20972,9 @@ var $;
                 grow: 1,
             },
             minWidth: 0,
+            overflow: {
+                x: 'hidden',
+            },
         },
         Block_comment: {
             flex: {
@@ -22919,6 +22922,7 @@ var $;
                 grow: 1,
             },
             overflow: {
+                x: 'hidden',
                 y: 'auto',
             },
             minWidth: 0,
