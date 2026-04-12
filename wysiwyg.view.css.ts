@@ -22,6 +22,40 @@ namespace $ {
 				direction: 'row',
 			},
 			alignItems: 'flex-start',
+
+			'@': {
+				'bog_wysiwyg_dragging': {
+					'true': {
+						opacity: 0.5,
+					},
+				},
+				'bog_wysiwyg_drag_over': {
+					'true': {
+						'@': {
+							'bog_wysiwyg_drag_pos': {
+								'before': {
+									border: {
+										top: {
+											width: '2px',
+											style: 'solid',
+											color: $mol_theme.focus,
+										},
+									},
+								},
+								'after': {
+									border: {
+										bottom: {
+											width: '2px',
+											style: 'solid',
+											color: $mol_theme.focus,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 
 		Drag_handle: {
@@ -38,6 +72,10 @@ namespace $ {
 			userSelect: 'none',
 			fontSize: '1rem',
 			lineHeight: '1.6',
+
+			':active': {
+				cursor: 'grabbing',
+			},
 		},
 
 		Block: {
@@ -54,5 +92,13 @@ namespace $ {
 			alignSelf: 'center',
 		},
 	} )
+
+	// Hover rules using child combinators — not expressible in $mol_style_define
+	$mol_style_attach( 'bog_wysiwyg_hover', `
+		.bog_wysiwyg_block_row:hover > .bog_wysiwyg_drag_handle,
+		.bog_wysiwyg_block_row:hover > .bog_wysiwyg_comment .bog_wysiwyg_comment_comment_button {
+			opacity: 1;
+		}
+	` )
 
 }
