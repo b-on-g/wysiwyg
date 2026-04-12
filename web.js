@@ -26426,7 +26426,9 @@ var $;
             background: {
                 color: $mol_theme.hover,
             },
-            borderRadius: '0.25rem',
+            border: {
+                radius: $mol_gap.round,
+            },
         },
         Comment_author: {
             font: {
@@ -26464,6 +26466,9 @@ var $;
 	($.$bog_wysiwyg_comment) = class $bog_wysiwyg_comment extends ($.$mol_pop) {
 		panel_open(next){
 			if(next !== undefined) return next;
+			return false;
+		}
+		has_comments(){
 			return false;
 		}
 		Comment_icon(){
@@ -26531,6 +26536,9 @@ var $;
 		align(){
 			return "right_center";
 		}
+		attr(){
+			return {...(super.attr()), "bog_wysiwyg_comment_has_comments": (this.has_comments())};
+		}
 		Anchor(){
 			return (this.Comment_button());
 		}
@@ -26566,6 +26574,9 @@ var $;
                 const count = this.Thread().comment_count();
                 return count > 0 ? String(count) : '';
             }
+            has_comments() {
+                return this.Thread().comment_count() > 0;
+            }
             toggle(event) {
                 if (!event)
                     return null;
@@ -26582,6 +26593,9 @@ var $;
         __decorate([
             $mol_mem
         ], $bog_wysiwyg_comment.prototype, "comment_count_text", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_comment.prototype, "has_comments", null);
         $$.$bog_wysiwyg_comment = $bog_wysiwyg_comment;
     })($$ = $.$$ || ($.$$ = {}));
 })($ || ($ = {}));
@@ -26595,6 +26609,8 @@ var $;
             opacity: 0.4,
             transition: 'opacity 0.15s',
             cursor: 'pointer',
+            minWidth: '1.5rem',
+            minHeight: '1.5rem',
             padding: {
                 top: '0.25rem',
                 bottom: '0.25rem',
@@ -26614,6 +26630,7 @@ var $;
                 direction: 'column',
             },
             width: '20rem',
+            maxWidth: '20rem',
             maxHeight: '24rem',
             background: {
                 color: $mol_theme.card,
@@ -26654,195 +26671,36 @@ var $;
             },
             overflow: 'auto',
         },
-    });
-})($ || ($ = {}));
-
-;
-	($.$bog_wysiwyg_collab) = class $bog_wysiwyg_collab extends ($.$mol_view) {
-		sync_status(){
-			return "offline";
-		}
-		sync_label(){
-			return "";
-		}
-		Sync_icon(){
-			const obj = new this.$.$mol_view();
-			(obj.attr) = () => ({"bog_wysiwyg_collab_status": (this.sync_status())});
-			(obj.sub) = () => ([(this.sync_label())]);
-			return obj;
-		}
-		peer_views(){
-			return [];
-		}
-		Peers(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ((this.peer_views()));
-			return obj;
-		}
-		peer_title(id){
-			return "";
-		}
-		peer_short(id){
-			return "";
-		}
-		page_land_link(){
-			return "";
-		}
-		sub(){
-			return [(this.Sync_icon()), (this.Peers())];
-		}
-		Peer(id){
-			const obj = new this.$.$mol_view();
-			(obj.attr) = () => ({"title": (this.peer_title(id))});
-			(obj.sub) = () => ([(this.peer_short(id))]);
-			return obj;
-		}
-	};
-	($mol_mem(($.$bog_wysiwyg_collab.prototype), "Sync_icon"));
-	($mol_mem(($.$bog_wysiwyg_collab.prototype), "Peers"));
-	($mol_mem_key(($.$bog_wysiwyg_collab.prototype), "Peer"));
-
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        class $bog_wysiwyg_collab extends $.$bog_wysiwyg_collab {
-            page_land() {
-                const link = this.page_land_link();
-                if (!link)
-                    return null;
-                return this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
-            }
-            sync_status() {
-                const land = this.page_land();
-                if (!land)
-                    return 'offline';
-                try {
-                    const yard = this.$.$giper_baza_glob.yard();
-                    const master = yard.master();
-                    return master ? 'online' : 'offline';
-                }
-                catch (error) {
-                    if (error instanceof Promise)
-                        $mol_fail_hidden(error);
-                    return 'offline';
-                }
-            }
-            sync_label() {
-                const status = this.sync_status();
-                if (status === 'online')
-                    return '\u25CF';
-                return '\u25CB';
-            }
-            peer_ids() {
-                const land = this.page_land();
-                if (!land)
-                    return [];
-                const lords = [];
-                for (const [lord_str] of land._gift) {
-                    if (!lord_str)
-                        continue;
-                    lords.push(lord_str);
-                }
-                return lords;
-            }
-            peer_views() {
-                return this.peer_ids().map(id => this.Peer(id));
-            }
-            peer_short(id) {
-                return id.slice(0, 4);
-            }
-            peer_title(id) {
-                return id;
-            }
-        }
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_collab.prototype, "sync_status", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_collab.prototype, "sync_label", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_collab.prototype, "peer_ids", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_collab.prototype, "peer_views", null);
-        $$.$bog_wysiwyg_collab = $bog_wysiwyg_collab;
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_attach("bog/wysiwyg/collab/collab.view.css", "[bog_wysiwyg_collab_status=\"online\"] {\n\tcolor: #4caf50;\n}\n\n[bog_wysiwyg_collab_status=\"offline\"] {\n\tcolor: #9e9e9e;\n}\n");
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_define($bog_wysiwyg_collab, {
-        flex: {
-            direction: 'row',
-            shrink: 0,
-        },
-        alignItems: 'center',
-        gap: '0.5rem',
-        padding: {
-            top: 0,
-            bottom: '0.75rem',
-            left: 0,
-            right: 0,
-        },
-        Sync_icon: {
-            flex: {
-                shrink: 0,
+        '@': {
+            'bog_wysiwyg_comment_has_comments': {
+                'true': {
+                    Comment_button: {
+                        opacity: 1,
+                        color: $mol_theme.focus,
+                    },
+                },
             },
-            fontSize: '0.75rem',
-            cursor: 'default',
-        },
-        Peers: {
-            flex: {
-                direction: 'row',
-                wrap: 'wrap',
-            },
-            gap: '0.25rem',
-            alignItems: 'center',
-        },
-        Peer: {
-            width: '1.75rem',
-            height: '1.75rem',
-            border: {
-                radius: '50%',
-            },
-            background: {
-                color: $mol_theme.card,
-            },
-            color: $mol_theme.text,
-            fontSize: '0.7rem',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            lineHeight: '1.75rem',
-            cursor: 'default',
-            overflow: 'hidden',
-            justifyContent: 'center',
-            alignItems: 'center',
         },
     });
 })($ || ($ = {}));
 
 ;
 	($.$bog_wysiwyg_links) = class $bog_wysiwyg_links extends ($.$mol_list) {
+		header_text(){
+			return "Backlinks";
+		}
+		Header(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.header_text())]);
+			return obj;
+		}
 		link_views(){
 			return [];
+		}
+		Links(){
+			const obj = new this.$.$mol_list();
+			(obj.rows) = () => ((this.link_views()));
+			return obj;
 		}
 		link_page_id(id){
 			return "";
@@ -26857,7 +26715,7 @@ var $;
 			return [];
 		}
 		rows(){
-			return (this.link_views());
+			return [(this.Header()), (this.Links())];
 		}
 		Link(id){
 			const obj = new this.$.$mol_link();
@@ -26866,6 +26724,8 @@ var $;
 			return obj;
 		}
 	};
+	($mol_mem(($.$bog_wysiwyg_links.prototype), "Header"));
+	($mol_mem(($.$bog_wysiwyg_links.prototype), "Links"));
 	($mol_mem_key(($.$bog_wysiwyg_links.prototype), "Link"));
 
 
@@ -26891,6 +26751,16 @@ var $;
                     return page.blocks_html.some((html) => html.includes(pattern));
                 });
             }
+            rows() {
+                const links = this.backlink_pages();
+                if (!links.length)
+                    return [];
+                return [this.Header(), this.Links()];
+            }
+            header_text() {
+                const count = this.backlink_pages().length;
+                return `Backlinks (${count})`;
+            }
             link_views() {
                 return this.backlink_pages().map(page => this.Link(page.id));
             }
@@ -26908,6 +26778,12 @@ var $;
         ], $bog_wysiwyg_links.prototype, "backlink_pages", null);
         __decorate([
             $mol_mem
+        ], $bog_wysiwyg_links.prototype, "rows", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_links.prototype, "header_text", null);
+        __decorate([
+            $mol_mem
         ], $bog_wysiwyg_links.prototype, "link_views", null);
         $$.$bog_wysiwyg_links = $bog_wysiwyg_links;
     })($$ = $.$$ || ($.$$ = {}));
@@ -26919,8 +26795,8 @@ var $;
 (function ($) {
     $mol_style_define($bog_wysiwyg_links, {
         padding: {
-            top: '1rem',
-            bottom: '1rem',
+            top: $mol_gap.block,
+            bottom: $mol_gap.block,
             left: 0,
             right: 0,
         },
@@ -26932,19 +26808,32 @@ var $;
             },
         },
         margin: {
-            top: '2rem',
+            top: $mol_gap.block,
         },
-        gap: '0.25rem',
+        gap: $mol_gap.text,
+        Header: {
+            font: {
+                weight: 'bold',
+                size: '0.875rem',
+            },
+            color: $mol_theme.shade,
+            padding: {
+                left: $mol_gap.text,
+                right: $mol_gap.text,
+            },
+        },
         Link: {
             padding: {
-                top: '0.25rem',
-                bottom: '0.25rem',
-                left: '0.5rem',
-                right: '0.5rem',
+                top: $mol_gap.text,
+                bottom: $mol_gap.text,
+                left: $mol_gap.text,
+                right: $mol_gap.text,
             },
             color: $mol_theme.focus,
             cursor: 'pointer',
-            borderRadius: '0.25rem',
+            border: {
+                radius: $mol_gap.round,
+            },
         },
     });
 })($ || ($ = {}));
@@ -27862,10 +27751,10 @@ var $;
 			return false;
 		}
 		Version(id){
-			const obj = new this.$.$mol_button_minor();
+			const obj = new this.$.$bog_wysiwyg_history_version();
 			(obj.title) = () => ((this.version_title(id)));
 			(obj.click) = (next) => ((this.version_click(id, next)));
-			(obj.attr) = () => ({...(this.$.$mol_button_minor.prototype.attr.call(obj)), "bog_wysiwyg_history_active": (this.version_active(id))});
+			(obj.active) = () => ((this.version_active(id)));
 			return obj;
 		}
 		sub(){
@@ -27881,6 +27770,14 @@ var $;
 	($mol_mem(($.$bog_wysiwyg_history.prototype), "Version_list"));
 	($mol_mem(($.$bog_wysiwyg_history.prototype), "showed"));
 	($mol_mem_key(($.$bog_wysiwyg_history.prototype), "Version"));
+	($.$bog_wysiwyg_history_version) = class $bog_wysiwyg_history_version extends ($.$mol_button_minor) {
+		active(){
+			return false;
+		}
+		attr(){
+			return {...(super.attr()), "bog_wysiwyg_history_version_active": (this.active())};
+		}
+	};
 
 
 ;
@@ -27954,18 +27851,36 @@ var $;
             save_version(event) {
                 if (!event)
                     return null;
-                const land = this.page_land();
-                if (!land)
+                const src_data = this.page_data();
+                if (!src_data)
                     return null;
-                const fork = land.fork();
-                const data = this.page_data();
-                if (!data)
-                    return null;
-                const versions = data.Versions('auto');
+                const snap_land = this.$.$giper_baza_glob.land_grab();
+                const snap_data = snap_land.Data($bog_wysiwyg_model_page);
+                const title_val = src_data.Title()?.val() ?? '';
+                if (title_val) {
+                    snap_data.Title('auto')?.val(title_val);
+                }
+                const src_blocks = src_data.Blocks();
+                if (src_blocks) {
+                    const blocks = src_blocks.remote_list() ?? [];
+                    const snap_blocks = snap_data.Blocks('auto');
+                    if (snap_blocks) {
+                        for (const block of blocks) {
+                            const snap_block = snap_blocks.make(null);
+                            const type_val = block.Type()?.val() ?? '';
+                            const level_val = block.Level()?.val() ?? 0;
+                            const content_val = block.Content()?.val() ?? '';
+                            snap_block.Type('auto')?.val(type_val);
+                            snap_block.Level('auto')?.val(level_val);
+                            snap_block.Content('auto')?.val(content_val);
+                        }
+                    }
+                }
+                const versions = src_data.Versions('auto');
                 if (!versions)
                     return null;
                 const current = versions.items_vary() ?? [];
-                versions.items_vary([fork.link(), ...current]);
+                versions.items_vary([snap_land.link(), ...current]);
                 return event;
             }
             version_rows() {
@@ -27982,16 +27897,43 @@ var $;
                     ? `#${num} — ${title}`
                     : `${label} #${num}`;
             }
+            current_version(next) {
+                return next ?? null;
+            }
             version_active(link) {
-                return false;
+                return this.current_version() === link;
             }
             version_click(link, event) {
                 if (!event)
                     return null;
-                const land = this.page_land();
-                if (!land)
+                const dst_data = this.page_data();
+                if (!dst_data)
                     return null;
-                land.Tine().items_vary([new $giper_baza_link(link)]);
+                const snap_land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
+                const snap_data = snap_land.Data($bog_wysiwyg_model_page);
+                const snap_title = snap_data.Title()?.val() ?? '';
+                if (snap_title) {
+                    dst_data.Title('auto')?.val(snap_title);
+                }
+                const dst_blocks = dst_data.Blocks('auto');
+                const snap_blocks = snap_data.Blocks();
+                if (dst_blocks && snap_blocks) {
+                    const src_list = snap_blocks.remote_list() ?? [];
+                    const existing = dst_blocks.remote_list() ?? [];
+                    for (const block of existing) {
+                        dst_blocks.cut(block.link());
+                    }
+                    for (const block of src_list) {
+                        const new_block = dst_blocks.make(null);
+                        const type_val = block.Type()?.val() ?? '';
+                        const level_val = block.Level()?.val() ?? 0;
+                        const content_val = block.Content()?.val() ?? '';
+                        new_block.Type('auto')?.val(type_val);
+                        new_block.Level('auto')?.val(level_val);
+                        new_block.Content('auto')?.val(content_val);
+                    }
+                }
+                this.current_version(link);
                 return event;
             }
         }
@@ -28004,6 +27946,12 @@ var $;
         __decorate([
             $mol_mem
         ], $bog_wysiwyg_history.prototype, "version_rows", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_history.prototype, "current_version", null);
+        __decorate([
+            $mol_action
+        ], $bog_wysiwyg_history.prototype, "version_click", null);
         $$.$bog_wysiwyg_history = $bog_wysiwyg_history;
     })($$ = $.$$ || ($.$$ = {}));
 })($ || ($ = {}));
@@ -28022,13 +27970,20 @@ var $;
             left: '0.5rem',
             right: '0.5rem',
         },
-        gap: '0.25rem',
+        gap: '0.5rem',
         ':not([bog_wysiwyg_history_showed])': {
             display: 'none',
         },
         Save_button: {
             justifyContent: 'center',
             fontWeight: 'bold',
+            background: {
+                color: $mol_theme.control,
+            },
+            color: $mol_theme.back,
+            border: {
+                radius: $mol_gap.round,
+            },
         },
         Version_list: {
             flex: {
@@ -28037,10 +27992,20 @@ var $;
             gap: '0.125rem',
         },
         Version: {
-            '[bog_wysiwyg_history_active]': {
+            border: {
+                radius: $mol_gap.round,
+            },
+        },
+    });
+    $mol_style_define($bog_wysiwyg_history_version, {
+        '@': {
+            'bog_wysiwyg_history_version_active': {
                 'true': {
                     background: {
                         color: $mol_theme.hover,
+                    },
+                    font: {
+                        weight: 'bold',
                     },
                 },
             },
@@ -28733,9 +28698,8 @@ var $;
 			(obj.panel_open) = (next) => ((this.block_comment_open(id, next)));
 			return obj;
 		}
-		Collab_bar(){
-			const obj = new this.$.$bog_wysiwyg_collab();
-			(obj.page_land_link) = () => ((this.page_land_link()));
+		Status(){
+			const obj = new this.$.$giper_baza_status();
 			return obj;
 		}
 		block_row_views(){
@@ -28886,7 +28850,7 @@ var $;
 		}
 		sub(){
 			return [
-				(this.Collab_bar()), 
+				(this.Status()), 
 				(this.Block_list()), 
 				(this.Backlinks()), 
 				(this.Menu()), 
@@ -28914,7 +28878,7 @@ var $;
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "Drag_handle"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_comment_open"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "Block_comment"));
-	($mol_mem(($.$bog_wysiwyg.prototype), "Collab_bar"));
+	($mol_mem(($.$bog_wysiwyg.prototype), "Status"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "Block_list"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "Backlinks"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "menu_picked"));
@@ -29514,7 +29478,7 @@ var $;
             },
             width: '1.5rem',
             cursor: 'grab',
-            opacity: 0,
+            opacity: 0.4,
             transition: 'opacity 0.15s',
             alignSelf: 'center',
             textAlign: 'center',
@@ -29623,18 +29587,619 @@ var $;
 })($ || ($ = {}));
 
 ;
+	($.$mol_icon_history) = class $mol_icon_history extends ($.$mol_icon) {
+		path(){
+			return "M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3";
+		}
+	};
+
+
+;
+"use strict";
+
+;
+	($.$mol_icon_graph) = class $mol_icon_graph extends ($.$mol_icon) {
+		path(){
+			return "M19.5 17C19.37 17 19.24 17 19.11 17.04L17.5 13.79C17.95 13.34 18.25 12.71 18.25 12C18.25 10.62 17.13 9.5 15.75 9.5C15.62 9.5 15.5 9.5 15.36 9.54L13.73 6.29C14.21 5.84 14.5 5.21 14.5 4.5C14.5 3.12 13.38 2 12 2S9.5 3.12 9.5 4.5C9.5 5.21 9.79 5.84 10.26 6.29L8.64 9.54C8.5 9.5 8.38 9.5 8.25 9.5C6.87 9.5 5.75 10.62 5.75 12C5.75 12.71 6.05 13.34 6.5 13.79L4.89 17.04C4.76 17 4.63 17 4.5 17C3.12 17 2 18.12 2 19.5C2 20.88 3.12 22 4.5 22S7 20.88 7 19.5C7 18.8 6.71 18.16 6.24 17.71L7.86 14.46C8 14.5 8.12 14.5 8.25 14.5C8.38 14.5 8.5 14.5 8.64 14.46L10.27 17.71C9.8 18.16 9.5 18.8 9.5 19.5C9.5 20.88 10.62 22 12 22S14.5 20.88 14.5 19.5C14.5 18.12 13.38 17 12 17C11.87 17 11.74 17 11.61 17.04L10 13.79C10.46 13.34 10.75 12.71 10.75 12S10.46 10.66 10 10.21L11.61 6.96C11.74 7 11.87 7 12 7S12.26 7 12.39 6.96L14 10.21C13.55 10.66 13.25 11.3 13.25 12C13.25 13.38 14.37 14.5 15.75 14.5C15.88 14.5 16 14.5 16.14 14.46L17.77 17.71C17.3 18.16 17 18.8 17 19.5C17 20.88 18.12 22 19.5 22S22 20.88 22 19.5C22 18.12 20.88 17 19.5 17Z";
+		}
+	};
+
+
+;
+"use strict";
+
+;
+	($.$mol_icon_graph_outline) = class $mol_icon_graph_outline extends ($.$mol_icon) {
+		path(){
+			return "M19.5 17C19.36 17 19.24 17 19.11 17.04L17.5 13.8C17.95 13.35 18.25 12.71 18.25 12C18.25 10.62 17.13 9.5 15.75 9.5C15.61 9.5 15.5 9.5 15.35 9.54L13.74 6.3C14.21 5.84 14.5 5.21 14.5 4.5C14.5 3.12 13.38 2 12 2S9.5 3.12 9.5 4.5C9.5 5.2 9.79 5.84 10.26 6.29L8.65 9.54C8.5 9.5 8.39 9.5 8.25 9.5C6.87 9.5 5.75 10.62 5.75 12C5.75 12.71 6.04 13.34 6.5 13.79L4.89 17.04C4.76 17 4.64 17 4.5 17C3.12 17 2 18.12 2 19.5C2 20.88 3.12 22 4.5 22S7 20.88 7 19.5C7 18.8 6.71 18.16 6.24 17.71L7.86 14.46C8 14.5 8.12 14.5 8.25 14.5C8.38 14.5 8.5 14.5 8.63 14.46L10.26 17.71C9.79 18.16 9.5 18.8 9.5 19.5C9.5 20.88 10.62 22 12 22S14.5 20.88 14.5 19.5C14.5 18.12 13.38 17 12 17C11.87 17 11.74 17 11.61 17.04L10 13.8C10.45 13.35 10.75 12.71 10.75 12C10.75 11.3 10.46 10.67 10 10.21L11.61 6.96C11.74 7 11.87 7 12 7C12.13 7 12.26 7 12.39 6.96L14 10.21C13.54 10.66 13.25 11.3 13.25 12C13.25 13.38 14.37 14.5 15.75 14.5C15.88 14.5 16 14.5 16.13 14.46L17.76 17.71C17.29 18.16 17 18.8 17 19.5C17 20.88 18.12 22 19.5 22S22 20.88 22 19.5C22 18.12 20.88 17 19.5 17M4.5 20.5C3.95 20.5 3.5 20.05 3.5 19.5S3.95 18.5 4.5 18.5 5.5 18.95 5.5 19.5 5.05 20.5 4.5 20.5M13 19.5C13 20.05 12.55 20.5 12 20.5S11 20.05 11 19.5 11.45 18.5 12 18.5 13 18.95 13 19.5M7.25 12C7.25 11.45 7.7 11 8.25 11S9.25 11.45 9.25 12 8.8 13 8.25 13 7.25 12.55 7.25 12M11 4.5C11 3.95 11.45 3.5 12 3.5S13 3.95 13 4.5 12.55 5.5 12 5.5 11 5.05 11 4.5M14.75 12C14.75 11.45 15.2 11 15.75 11S16.75 11.45 16.75 12 16.3 13 15.75 13 14.75 12.55 14.75 12M19.5 20.5C18.95 20.5 18.5 20.05 18.5 19.5S18.95 18.5 19.5 18.5 20.5 18.95 20.5 19.5 20.05 20.5 19.5 20.5Z";
+		}
+	};
+
+
+;
+"use strict";
+
+;
+	($.$mol_icon_brightness_4) = class $mol_icon_brightness_4 extends ($.$mol_icon) {
+		path(){
+			return "M12,18C11.11,18 10.26,17.8 9.5,17.45C11.56,16.5 13,14.42 13,12C13,9.58 11.56,7.5 9.5,6.55C10.26,6.2 11.11,6 12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18M20,8.69V4H15.31L12,0.69L8.69,4H4V8.69L0.69,12L4,15.31V20H8.69L12,23.31L15.31,20H20V15.31L23.31,12L20,8.69Z";
+		}
+	};
+
+
+;
+"use strict";
+
+;
+	($.$mol_lights_toggle) = class $mol_lights_toggle extends ($.$mol_check_icon) {
+		Lights_icon(){
+			const obj = new this.$.$mol_icon_brightness_4();
+			return obj;
+		}
+		lights(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		Icon(){
+			return (this.Lights_icon());
+		}
+		hint(){
+			return (this.$.$mol_locale.text("$mol_lights_toggle_hint"));
+		}
+		checked(next){
+			return (this.lights(next));
+		}
+	};
+	($mol_mem(($.$mol_lights_toggle.prototype), "Lights_icon"));
+	($mol_mem(($.$mol_lights_toggle.prototype), "lights"));
+
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        class $mol_lights_toggle extends $.$mol_lights_toggle {
+            lights(next) {
+                return this.$.$mol_lights(next);
+            }
+        }
+        $$.$mol_lights_toggle = $mol_lights_toggle;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+	($.$bog_wysiwyg_graph) = class $bog_wysiwyg_graph extends ($.$mol_view) {
+		content(){
+			return [];
+		}
+		canvas_width(){
+			return 0;
+		}
+		canvas_height(){
+			return 0;
+		}
+		empty_message(){
+			return "No pages yet";
+		}
+		pages(){
+			return [];
+		}
+		current_page_id(){
+			return "";
+		}
+		on_navigate(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		sub(){
+			return (this.content());
+		}
+		Canvas(){
+			const obj = new this.$.$mol_view();
+			(obj.dom_name) = () => ("canvas");
+			(obj.attr) = () => ({"width": (this.canvas_width()), "height": (this.canvas_height())});
+			return obj;
+		}
+		Empty(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.empty_message())]);
+			return obj;
+		}
+	};
+	($mol_mem(($.$bog_wysiwyg_graph.prototype), "on_navigate"));
+	($mol_mem(($.$bog_wysiwyg_graph.prototype), "Canvas"));
+	($mol_mem(($.$bog_wysiwyg_graph.prototype), "Empty"));
+
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        const wiki_link_re = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+        class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
+            content() {
+                return this.pages().length > 0
+                    ? [this.Canvas()]
+                    : [this.Empty()];
+            }
+            canvas_width() {
+                return Math.ceil((this.view_rect()?.width ?? 600) * (this.$.$mol_dom_context.devicePixelRatio || 1));
+            }
+            canvas_height() {
+                return Math.ceil((this.view_rect()?.height ?? 400) * (this.$.$mol_dom_context.devicePixelRatio || 1));
+            }
+            logical_width() {
+                return this.canvas_width() / (this.$.$mol_dom_context.devicePixelRatio || 1);
+            }
+            logical_height() {
+                return this.canvas_height() / (this.$.$mol_dom_context.devicePixelRatio || 1);
+            }
+            nodes() {
+                const pages = this.pages();
+                const w = this.logical_width();
+                const h = this.logical_height();
+                const cx = w / 2;
+                const cy = h / 2;
+                const r = Math.min(w, h) * 0.3;
+                return pages.map((page, i) => ({
+                    id: page.id(),
+                    title: page.title() || page.id().slice(0, 8),
+                    x: cx + r * Math.cos(2 * Math.PI * i / Math.max(pages.length, 1)),
+                    y: cy + r * Math.sin(2 * Math.PI * i / Math.max(pages.length, 1)),
+                    vx: 0,
+                    vy: 0,
+                }));
+            }
+            edges() {
+                const pages = this.pages();
+                const page_ids = new Set(pages.map(p => p.id()));
+                const result = [];
+                for (const page of pages) {
+                    const seen = new Set();
+                    for (const bid of page.block_ids()) {
+                        const html = page.block_html(bid) ?? '';
+                        let match;
+                        wiki_link_re.lastIndex = 0;
+                        while ((match = wiki_link_re.exec(html)) !== null) {
+                            const target = match[1].trim();
+                            if (page_ids.has(target) && target !== page.id() && !seen.has(target)) {
+                                seen.add(target);
+                                result.push({ source: page.id(), target });
+                            }
+                        }
+                    }
+                }
+                return result;
+            }
+            sim_nodes() {
+                return this.nodes().map(n => ({ ...n }));
+            }
+            sim_tick() {
+                const nodes = this.sim_nodes();
+                const edges = this.edges();
+                if (nodes.length === 0)
+                    return;
+                const node_map = new Map(nodes.map(n => [n.id, n]));
+                const w = this.logical_width();
+                const h = this.logical_height();
+                const cx = w / 2;
+                const cy = h / 2;
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        const a = nodes[i];
+                        const b = nodes[j];
+                        let dx = b.x - a.x;
+                        let dy = b.y - a.y;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 1) {
+                            dx = 1;
+                            dy = 1;
+                            dist = 1.41;
+                        }
+                        const force = 5000 / (dist * dist);
+                        const fx = dx / dist * force;
+                        const fy = dy / dist * force;
+                        a.vx -= fx;
+                        a.vy -= fy;
+                        b.vx += fx;
+                        b.vy += fy;
+                    }
+                }
+                for (const edge of edges) {
+                    const a = node_map.get(edge.source);
+                    const b = node_map.get(edge.target);
+                    if (!a || !b)
+                        continue;
+                    const dx = b.x - a.x;
+                    const dy = b.y - a.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 1)
+                        continue;
+                    const force = (dist - 120) * 0.02;
+                    const fx = dx / dist * force;
+                    const fy = dy / dist * force;
+                    a.vx += fx;
+                    a.vy += fy;
+                    b.vx -= fx;
+                    b.vy -= fy;
+                }
+                for (const n of nodes) {
+                    n.vx += (cx - n.x) * 0.005;
+                    n.vy += (cy - n.y) * 0.005;
+                }
+                for (const n of nodes) {
+                    n.vx *= 0.85;
+                    n.vy *= 0.85;
+                    n.x += n.vx;
+                    n.y += n.vy;
+                    n.x = Math.max(40, Math.min(w - 40, n.x));
+                    n.y = Math.max(40, Math.min(h - 40, n.y));
+                }
+            }
+            drag_id(next) {
+                return next ?? null;
+            }
+            _events_bound = false;
+            bind_events() {
+                if (this._events_bound)
+                    return;
+                this._events_bound = true;
+                const canvas = this.Canvas().dom_node();
+                canvas.addEventListener('mousedown', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const node = this.node_at(e.clientX - rect.left, e.clientY - rect.top);
+                    if (node)
+                        this.drag_id(node.id);
+                });
+                canvas.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const id = this.drag_id();
+                    if (!id) {
+                        canvas.style.cursor = this.node_at(x, y) ? 'pointer' : 'default';
+                        return;
+                    }
+                    const node = this.sim_nodes().find(n => n.id === id);
+                    if (!node)
+                        return;
+                    node.x = x;
+                    node.y = y;
+                    node.vx = 0;
+                    node.vy = 0;
+                });
+                canvas.addEventListener('mouseup', () => {
+                    this.drag_id(null);
+                });
+                canvas.addEventListener('click', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const node = this.node_at(e.clientX - rect.left, e.clientY - rect.top);
+                    if (node)
+                        this.on_navigate(node.id);
+                });
+            }
+            node_at(x, y) {
+                const nodes = this.sim_nodes();
+                for (let i = nodes.length - 1; i >= 0; i--) {
+                    const n = nodes[i];
+                    const dx = n.x - x;
+                    const dy = n.y - y;
+                    if (dx * dx + dy * dy < 24 * 24)
+                        return n;
+                }
+                return null;
+            }
+            read_theme_colors() {
+                try {
+                    const el = this.dom_node();
+                    const style = this.$.$mol_dom_context.getComputedStyle(el);
+                    return {
+                        focus: style.getPropertyValue('--mol_theme_focus').trim() || '#3b82f6',
+                        card: style.getPropertyValue('--mol_theme_card').trim() || '#ffffff',
+                        line: style.getPropertyValue('--mol_theme_line').trim() || '#cccccc',
+                        text: style.getPropertyValue('--mol_theme_text').trim() || '#333333',
+                        shade: style.getPropertyValue('--mol_theme_shade').trim() || '#888888',
+                    };
+                }
+                catch {
+                    return { focus: '#3b82f6', card: '#ffffff', line: '#cccccc', text: '#333333', shade: '#888888' };
+                }
+            }
+            _anim_id = 0;
+            _running = false;
+            start_sim() {
+                if (this._running)
+                    return;
+                this._running = true;
+                this.tick_loop();
+            }
+            tick_loop() {
+                if (!this._running)
+                    return;
+                this.sim_tick();
+                this.render_canvas();
+                this._anim_id = requestAnimationFrame(() => this.tick_loop());
+            }
+            stop_sim() {
+                this._running = false;
+                if (this._anim_id)
+                    cancelAnimationFrame(this._anim_id);
+                this._anim_id = 0;
+            }
+            auto() {
+                if (this.pages().length === 0) {
+                    this.stop_sim();
+                    return;
+                }
+                this.bind_events();
+                this.start_sim();
+            }
+            render_canvas() {
+                const canvas = this.Canvas().dom_node();
+                const ctx = canvas.getContext('2d');
+                if (!ctx)
+                    return;
+                const dpr = this.$.$mol_dom_context.devicePixelRatio || 1;
+                const w = this.logical_width();
+                const h = this.logical_height();
+                ctx.save();
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.clearRect(0, 0, w, h);
+                const nodes = this.sim_nodes();
+                const edges = this.edges();
+                const node_map = new Map(nodes.map(n => [n.id, n]));
+                const current = this.current_page_id();
+                const colors = this.read_theme_colors();
+                ctx.strokeStyle = colors.shade + '66';
+                ctx.lineWidth = 1.5;
+                for (const edge of edges) {
+                    const a = node_map.get(edge.source);
+                    const b = node_map.get(edge.target);
+                    if (!a || !b)
+                        continue;
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                    ctx.stroke();
+                    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+                    const ax = b.x - 20 * Math.cos(angle);
+                    const ay = b.y - 20 * Math.sin(angle);
+                    ctx.beginPath();
+                    ctx.moveTo(ax, ay);
+                    ctx.lineTo(ax - 8 * Math.cos(angle - 0.4), ay - 8 * Math.sin(angle - 0.4));
+                    ctx.lineTo(ax - 8 * Math.cos(angle + 0.4), ay - 8 * Math.sin(angle + 0.4));
+                    ctx.closePath();
+                    ctx.fillStyle = colors.shade + '66';
+                    ctx.fill();
+                }
+                for (const n of nodes) {
+                    const is_current = n.id === current;
+                    const radius = is_current ? 20 : 16;
+                    ctx.beginPath();
+                    ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = is_current ? colors.focus : colors.card;
+                    ctx.fill();
+                    ctx.strokeStyle = is_current ? colors.focus : colors.line;
+                    ctx.lineWidth = is_current ? 2.5 : 1.5;
+                    ctx.stroke();
+                    ctx.fillStyle = colors.text;
+                    ctx.font = is_current ? 'bold 12px system-ui' : '11px system-ui';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    const label = n.title.length > 18 ? n.title.slice(0, 16) + '..' : n.title;
+                    ctx.fillText(label, n.x, n.y + radius + 4);
+                }
+                ctx.restore();
+            }
+            destructor() {
+                this.stop_sim();
+                super.destructor();
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "canvas_width", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "canvas_height", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "nodes", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "edges", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "sim_nodes", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "drag_id", null);
+        $$.$bog_wysiwyg_graph = $bog_wysiwyg_graph;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_define($bog_wysiwyg_graph, {
+        flex: {
+            direction: 'column',
+            grow: 1,
+        },
+        position: 'relative',
+        minHeight: '24rem',
+        minWidth: '100%',
+        overflow: 'hidden',
+        border: {
+            radius: $mol_gap.round,
+        },
+        background: {
+            color: $mol_theme.card,
+        },
+        Canvas: {
+            flex: {
+                grow: 1,
+            },
+            width: '100%',
+            height: '100%',
+        },
+        Empty: {
+            flex: {
+                grow: 1,
+            },
+            align: {
+                items: 'center',
+                self: 'center',
+            },
+            justify: {
+                content: 'center',
+            },
+            color: $mol_theme.shade,
+            font: {
+                size: '1rem',
+            },
+        },
+    });
+})($ || ($ = {}));
+
+;
 	($.$bog_wysiwyg_app) = class $bog_wysiwyg_app extends ($.$mol_page) {
 		Theme(){
 			const obj = new this.$.$mol_theme_auto();
 			return obj;
 		}
+		History_icon(){
+			const obj = new this.$.$mol_icon_history();
+			return obj;
+		}
+		history_showed(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		History_toggle(){
+			const obj = new this.$.$mol_check_icon();
+			(obj.Icon) = () => ((this.History_icon()));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_History_toggle_hint")));
+			(obj.checked) = (next) => ((this.history_showed(next)));
+			return obj;
+		}
+		Graph_icon(){
+			const obj = new this.$.$mol_icon_graph_outline();
+			return obj;
+		}
+		graph_showed(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		Graph_toggle(){
+			const obj = new this.$.$mol_check_icon();
+			(obj.Icon) = () => ((this.Graph_icon()));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Graph_toggle_hint")));
+			(obj.checked) = (next) => ((this.graph_showed(next)));
+			return obj;
+		}
+		Lights(){
+			const obj = new this.$.$mol_lights_toggle();
+			return obj;
+		}
+		Sidebar_title(){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Sidebar_title_title")));
+			return obj;
+		}
+		page_create(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		New_page(){
+			const obj = new this.$.$mol_button_minor();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_New_page_title")));
+			(obj.click) = (next) => ((this.page_create(next)));
+			return obj;
+		}
+		Sidebar_head(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Sidebar_title()), (this.New_page())]);
+			return obj;
+		}
+		page_rows(){
+			return [];
+		}
+		Page_list(){
+			const obj = new this.$.$mol_list();
+			(obj.rows) = () => ((this.page_rows()));
+			return obj;
+		}
+		Sidebar(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Sidebar_head()), (this.Page_list())]);
+			return obj;
+		}
 		page_land_link(){
 			return "";
+		}
+		all_pages_info(){
+			return [];
 		}
 		Editor(){
 			const obj = new this.$.$bog_wysiwyg();
 			(obj.page_land_link) = () => ((this.page_land_link()));
+			(obj.all_pages) = () => ((this.all_pages_info()));
+			(obj.history_showed) = (next) => ((this.history_showed(next)));
 			return obj;
+		}
+		graph_pages(){
+			return [];
+		}
+		page_navigate(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		Graph(){
+			const obj = new this.$.$bog_wysiwyg_graph();
+			(obj.pages) = () => ((this.graph_pages()));
+			(obj.current_page_id) = () => ((this.page_land_link()));
+			(obj.on_navigate) = (next) => ((this.page_navigate(next)));
+			return obj;
+		}
+		Graph_panel(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Graph())]);
+			return obj;
+		}
+		Main(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Editor()), (this.Graph_panel())]);
+			return obj;
+		}
+		body_content(){
+			return [(this.Sidebar()), (this.Main())];
+		}
+		Layout(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ((this.body_content()));
+			return obj;
+		}
+		page_item_title(id){
+			return "";
+		}
+		page_item_click(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		page_item_active(id){
+			return false;
 		}
 		title(){
 			return (this.$.$mol_locale.text("$bog_wysiwyg_app_title"));
@@ -29642,12 +30207,54 @@ var $;
 		plugins(){
 			return [(this.Theme())];
 		}
+		tools(){
+			return [
+				(this.History_toggle()), 
+				(this.Graph_toggle()), 
+				(this.Lights())
+			];
+		}
 		body(){
-			return [(this.Editor())];
+			return [(this.Layout())];
+		}
+		Page_item(id){
+			const obj = new this.$.$bog_wysiwyg_app_page();
+			(obj.title) = () => ((this.page_item_title(id)));
+			(obj.click) = (next) => ((this.page_item_click(id, next)));
+			(obj.active) = () => ((this.page_item_active(id)));
+			return obj;
 		}
 	};
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Theme"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "History_icon"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "history_showed"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "History_toggle"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_icon"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "graph_showed"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_toggle"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Lights"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar_title"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "page_create"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "New_page"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar_head"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Page_list"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Editor"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "page_navigate"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_panel"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Main"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Layout"));
+	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "page_item_click"));
+	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Page_item"));
+	($.$bog_wysiwyg_app_page) = class $bog_wysiwyg_app_page extends ($.$mol_button_minor) {
+		active(){
+			return false;
+		}
+		attr(){
+			return {...(super.attr()), "bog_wysiwyg_app_page_active": (this.active())};
+		}
+	};
 
 
 ;
@@ -29807,13 +30414,250 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
+        const Registry = $giper_baza_list_link;
         class $bog_wysiwyg_app extends $.$bog_wysiwyg_app {
-            page_land_link() {
+            page_land_link(next) {
+                if (next !== undefined) {
+                    this.$.$mol_state_arg.value('page', next || null);
+                    return next;
+                }
                 return this.$.$mol_state_arg.value('page') ?? '';
             }
+            registry_land_link() {
+                return this.$.$mol_state_arg.value('registry') ?? '';
+            }
+            registry_land() {
+                const link = this.registry_land_link();
+                if (!link)
+                    return null;
+                return this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
+            }
+            registry_list() {
+                const land = this.registry_land();
+                if (!land)
+                    return null;
+                return land.Data(Registry);
+            }
+            page_links() {
+                const list = this.registry_list();
+                if (!list)
+                    return [];
+                const items = list.items_vary() ?? [];
+                return items
+                    .map(v => $giper_baza_vary_cast_link(v))
+                    .filter($mol_guard_defined)
+                    .map(link => link.str);
+            }
+            page_title_by_link(link) {
+                const land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
+                const data = land.Data($bog_wysiwyg_model_page);
+                return data.Title()?.val() ?? '';
+            }
+            page_block_ids(link) {
+                const land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
+                const data = land.Data($bog_wysiwyg_model_page);
+                const blocks = data.Blocks();
+                if (!blocks)
+                    return [];
+                return blocks.remote_list().map((b) => b.link().str);
+            }
+            page_block_html(link, block_link) {
+                const block = this.$.$giper_baza_glob.Pawn(new $giper_baza_link(block_link), $bog_wysiwyg_model_block);
+                return block.Content()?.val() ?? '';
+            }
+            all_pages_info() {
+                return this.page_links().map(link => ({
+                    id: link,
+                    title: this.page_title_by_link(link),
+                    blocks_html: this.page_block_ids(link).map(bid => this.page_block_html(link, bid)),
+                }));
+            }
+            page_rows() {
+                return this.page_links().map((link, i) => this.Page_item(i));
+            }
+            page_item_title(index) {
+                const link = this.page_links()[index];
+                if (!link)
+                    return '';
+                const title = this.page_title_by_link(link);
+                return title || `Page ${index + 1}`;
+            }
+            page_item_active(index) {
+                return this.page_links()[index] === this.page_land_link();
+            }
+            page_item_click(index, event) {
+                if (!event)
+                    return null;
+                const link = this.page_links()[index];
+                if (link)
+                    this.page_land_link(link);
+                return event;
+            }
+            page_create(event) {
+                if (!event)
+                    return null;
+                const list = this.registry_list();
+                if (!list)
+                    return null;
+                const land = this.$.$giper_baza_glob.land_grab([[null, $giper_baza_rank_post('just')]]);
+                const data = land.Data($bog_wysiwyg_model_page);
+                data.Title('auto')?.val('');
+                const current = list.items_vary() ?? [];
+                list.items_vary([...current, land.link()]);
+                this.page_land_link(land.link().str);
+                return event;
+            }
+            page_navigate(id) {
+                if (id)
+                    this.page_land_link(id);
+                return id ?? null;
+            }
+            auto() {
+                const current = this.page_land_link();
+                if (current)
+                    return;
+                const pages = this.page_links();
+                if (pages.length > 0) {
+                    this.page_land_link(pages[0]);
+                }
+            }
+            body_content() {
+                const content = [this.Sidebar()];
+                if (this.graph_showed()) {
+                    content.push(this.Graph_panel());
+                }
+                else {
+                    content.push(this.Main());
+                }
+                return content;
+            }
+            graph_pages() {
+                const self = this;
+                return this.page_links().map(link => ({
+                    id() { return link; },
+                    title() { return self.page_title_by_link(link); },
+                    block_ids() { return self.page_block_ids(link); },
+                    block_html(bid) { return self.page_block_html(link, bid); },
+                }));
+            }
         }
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "page_land_link", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "page_links", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "all_pages_info", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "page_rows", null);
+        __decorate([
+            $mol_action
+        ], $bog_wysiwyg_app.prototype, "page_create", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "auto", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "body_content", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "graph_pages", null);
         $$.$bog_wysiwyg_app = $bog_wysiwyg_app;
     })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_define($bog_wysiwyg_app, {
+        Layout: {
+            flex: {
+                direction: 'row',
+                grow: 1,
+            },
+            overflow: 'hidden',
+        },
+        Sidebar: {
+            flex: {
+                direction: 'column',
+                shrink: 0,
+            },
+            width: '14rem',
+            border: {
+                right: {
+                    width: '1px',
+                    style: 'solid',
+                    color: $mol_theme.line,
+                },
+            },
+            overflow: {
+                y: 'auto',
+                x: 'hidden',
+            },
+        },
+        Sidebar_head: {
+            flex: {
+                direction: 'row',
+            },
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: $mol_gap.block,
+        },
+        Sidebar_title: {
+            font: {
+                weight: 'bold',
+            },
+        },
+        Page_list: {
+            flex: {
+                direction: 'column',
+            },
+        },
+        Page_item: {
+            textAlign: 'left',
+            padding: {
+                top: '0.25rem',
+                bottom: '0.25rem',
+                left: $mol_gap.text,
+                right: $mol_gap.text,
+            },
+        },
+        Main: {
+            flex: {
+                direction: 'column',
+                grow: 1,
+            },
+            overflow: {
+                y: 'auto',
+            },
+            minWidth: 0,
+        },
+        Graph_panel: {
+            flex: {
+                grow: 1,
+            },
+            minWidth: 0,
+            minHeight: '400px',
+        },
+    });
+    $mol_style_define($bog_wysiwyg_app_page, {
+        '@': {
+            'bog_wysiwyg_app_page_active': {
+                'true': {
+                    background: {
+                        color: $mol_theme.hover,
+                    },
+                    font: {
+                        weight: 'bold',
+                    },
+                },
+            },
+        },
+    });
 })($ || ($ = {}));
 
 

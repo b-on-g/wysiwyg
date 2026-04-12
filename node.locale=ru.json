@@ -1,5 +1,9 @@
 {
-	"$bog_wysiwyg_app_title": "WYSIWYG Редактор",
+	"$bog_wysiwyg_app_Graph_toggle_hint": "Граф страниц",
+	"$bog_wysiwyg_app_History_toggle_hint": "История версий",
+	"$bog_wysiwyg_app_New_page_title": "+ Новая",
+	"$bog_wysiwyg_app_Sidebar_title_title": "Страницы",
+	"$bog_wysiwyg_app_title": "WikiLive",
 	"$bog_wysiwyg_block_link_url_prompt": "URL ссылки:",
 	"$bog_wysiwyg_block_placeholder": "Напишите что-нибудь или нажмите / для меню",
 	"$bog_wysiwyg_history_Save_button_title": "Сохранить версию",
@@ -15,5 +19,11 @@
 	"$bog_wysiwyg_menu_command_list": "Список",
 	"$bog_wysiwyg_menu_command_paragraph": "Текст",
 	"$bog_wysiwyg_menu_command_quote": "Цитата",
+	"$mol_lights_toggle_hint": "Переключить освещение",
+	"$mol_search_Clear_hint": "Очистить",
+	"$mol_search_hint": "Поиск..",
+	"$mol_select_filter_hint": "Фильтр..",
+	"$mol_select_hint": "Выбрать..",
+	"$mol_select_no_options_message": "Нет вариантов",
 	"$mol_text_code_Copy_hint": "Скопировать весь код"
 }

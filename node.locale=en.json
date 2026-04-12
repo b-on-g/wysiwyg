@@ -1,5 +1,9 @@
 {
-	"$bog_wysiwyg_app_title": "WYSIWYG Editor",
+	"$bog_wysiwyg_app_Graph_toggle_hint": "Page graph",
+	"$bog_wysiwyg_app_History_toggle_hint": "Version history",
+	"$bog_wysiwyg_app_New_page_title": "+ New",
+	"$bog_wysiwyg_app_Sidebar_title_title": "Pages",
+	"$bog_wysiwyg_app_title": "WikiLive",
 	"$bog_wysiwyg_block_link_url_prompt": "URL:",
 	"$bog_wysiwyg_block_placeholder": "Type / for block menu...",
 	"$bog_wysiwyg_comment_Panel_title_title": "Comments",
@@ -18,5 +22,11 @@
 	"$bog_wysiwyg_menu_command_list": "List",
 	"$bog_wysiwyg_menu_command_paragraph": "Text",
 	"$bog_wysiwyg_menu_command_quote": "Quote",
+	"$mol_lights_toggle_hint": "Toggle lights",
+	"$mol_search_Clear_hint": "Clear",
+	"$mol_search_hint": "Search...",
+	"$mol_select_filter_hint": "Filter..",
+	"$mol_select_hint": "Pick..",
+	"$mol_select_no_options_message": "No options",
 	"$mol_text_code_Copy_hint": "Copy whole code"
 }

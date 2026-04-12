@@ -6889,49 +6889,6 @@ var $;
     var $$;
     (function ($$) {
         $mol_test({
-            'sync_status returns offline when no page_land_link'() {
-                const collab = new $bog_wysiwyg_collab();
-                $mol_assert_equal(collab.sync_status(), 'offline');
-            },
-            'sync_label returns empty circle when offline'() {
-                const collab = new $bog_wysiwyg_collab();
-                $mol_assert_equal(collab.sync_label(), '\u25CB');
-            },
-            'peer_ids returns empty array when no baza'() {
-                const collab = new $bog_wysiwyg_collab();
-                $mol_assert_equal(collab.peer_ids().length, 0);
-            },
-            'peer_views returns empty array when no baza'() {
-                const collab = new $bog_wysiwyg_collab();
-                $mol_assert_equal(collab.peer_views().length, 0);
-            },
-            'peer_short returns first 4 chars of id'() {
-                const collab = new $bog_wysiwyg_collab();
-                $mol_assert_equal(collab.peer_short('abcdefgh'), 'abcd');
-            },
-            'peer_short handles short id'() {
-                const collab = new $bog_wysiwyg_collab();
-                $mol_assert_equal(collab.peer_short('ab'), 'ab');
-            },
-            'peer_title returns full id'() {
-                const collab = new $bog_wysiwyg_collab();
-                $mol_assert_equal(collab.peer_title('abcdefgh12345678'), 'abcdefgh12345678');
-            },
-            'page_land returns null when page_land_link is empty'() {
-                const collab = new $bog_wysiwyg_collab();
-                $mol_assert_equal(collab.page_land(), null);
-            },
-        });
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        $mol_test({
             'backlink_pages finds pages that reference target'() {
                 const links = new $bog_wysiwyg_links();
                 links.page_id = () => 'page_abc';
@@ -7880,6 +7837,147 @@ var $;
                 editor.block_ids(['a', 'b', 'c']);
                 const rows = editor.block_row_views();
                 $mol_assert_equal(rows.length, 3);
+            },
+        });
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            'nodes returns array with x/y from pages'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    { id: () => 'p1', title: () => 'Page One' },
+                    { id: () => 'p2', title: () => 'Page Two' },
+                ];
+                const nodes = graph.nodes();
+                $mol_assert_equal(nodes.length, 2);
+                $mol_assert_equal(nodes[0].id, 'p1');
+                $mol_assert_equal(nodes[0].title, 'Page One');
+                $mol_assert_ok(typeof nodes[0].x === 'number');
+                $mol_assert_ok(typeof nodes[0].y === 'number');
+                $mol_assert_ok(typeof nodes[1].x === 'number');
+                $mol_assert_ok(typeof nodes[1].y === 'number');
+            },
+            'nodes uses id prefix when title is empty'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    { id: () => 'abcdefghij', title: () => '' },
+                ];
+                const nodes = graph.nodes();
+                $mol_assert_equal(nodes[0].title, 'abcdefgh');
+            },
+            'edges extracts wiki links from block content'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    {
+                        id: () => 'p1',
+                        title: () => 'Page 1',
+                        block_ids: () => ['b1'],
+                        block_html: (id) => 'Link to [[p2]] here',
+                    },
+                    {
+                        id: () => 'p2',
+                        title: () => 'Page 2',
+                        block_ids: () => ['b2'],
+                        block_html: (id) => 'no links',
+                    },
+                ];
+                const edges = graph.edges();
+                $mol_assert_equal(edges.length, 1);
+                $mol_assert_equal(edges[0].source, 'p1');
+                $mol_assert_equal(edges[0].target, 'p2');
+            },
+            'edges ignores links to nonexistent pages'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    {
+                        id: () => 'p1',
+                        title: () => 'Page 1',
+                        block_ids: () => ['b1'],
+                        block_html: (id) => 'Link to [[nonexistent]]',
+                    },
+                ];
+                const edges = graph.edges();
+                $mol_assert_equal(edges.length, 0);
+            },
+            'edges deduplicates multiple links to same target'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    {
+                        id: () => 'p1',
+                        title: () => 'Page 1',
+                        block_ids: () => ['b1', 'b2'],
+                        block_html: (id) => '[[p2]] mentioned again [[p2]]',
+                    },
+                    {
+                        id: () => 'p2',
+                        title: () => 'Page 2',
+                        block_ids: () => [],
+                        block_html: (id) => '',
+                    },
+                ];
+                const edges = graph.edges();
+                $mol_assert_equal(edges.length, 1);
+            },
+            'edges ignores self-links'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    {
+                        id: () => 'p1',
+                        title: () => 'Page 1',
+                        block_ids: () => ['b1'],
+                        block_html: (id) => '[[p1]] self-ref',
+                    },
+                ];
+                const edges = graph.edges();
+                $mol_assert_equal(edges.length, 0);
+            },
+            'empty graph works without errors'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [];
+                const nodes = graph.nodes();
+                const edges = graph.edges();
+                $mol_assert_equal(nodes.length, 0);
+                $mol_assert_equal(edges.length, 0);
+            },
+            'sim_nodes creates independent copies'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    { id: () => 'p1', title: () => 'A' },
+                ];
+                const sim = graph.sim_nodes();
+                const orig = graph.nodes();
+                sim[0].x = 999;
+                $mol_assert_ok(orig[0].x !== 999);
+            },
+            'node_at finds node within radius'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    { id: () => 'p1', title: () => 'A' },
+                ];
+                const sim = graph.sim_nodes();
+                sim[0].x = 100;
+                sim[0].y = 100;
+                const found = graph.node_at(105, 105);
+                $mol_assert_ok(found !== null);
+                $mol_assert_equal(found.id, 'p1');
+            },
+            'node_at returns null when nothing nearby'() {
+                const graph = new $bog_wysiwyg_graph();
+                graph.pages = () => [
+                    { id: () => 'p1', title: () => 'A' },
+                ];
+                const sim = graph.sim_nodes();
+                sim[0].x = 100;
+                sim[0].y = 100;
+                const found = graph.node_at(500, 500);
+                $mol_assert_equal(found, null);
             },
         });
     })($$ = $.$$ || ($.$$ = {}));

@@ -12321,6 +12321,7 @@ declare namespace $ {
 	>
 	export class $bog_wysiwyg_comment extends $mol_pop {
 		panel_open( next?: boolean ): boolean
+		has_comments( ): boolean
 		Comment_icon( ): $mol_icon_comment_outline
 		comment_count_text( ): string
 		Comment_count( ): $mol_view
@@ -12336,6 +12337,9 @@ declare namespace $ {
 		Panel( ): $mol_view
 		showed( next?: ReturnType< $bog_wysiwyg_comment['panel_open'] > ): ReturnType< $bog_wysiwyg_comment['panel_open'] >
 		align( ): string
+		attr( ): ({ 
+			'bog_wysiwyg_comment_has_comments': ReturnType< $bog_wysiwyg_comment['has_comments'] >,
+		})  & ReturnType< $mol_pop['attr'] >
 		Anchor( ): ReturnType< $bog_wysiwyg_comment['Comment_button'] >
 		bubble_content( ): readonly(any)[]
 	}
@@ -12346,6 +12350,7 @@ declare namespace $ {
 declare namespace $.$$ {
     class $bog_wysiwyg_comment extends $.$bog_wysiwyg_comment {
         comment_count_text(): string;
+        has_comments(): boolean;
         toggle(event?: Event): Event | null;
         close(event?: Event): Event | null;
     }
@@ -12356,90 +12361,38 @@ declare namespace $ {
 
 declare namespace $ {
 
-	type $mol_view__attr_bog_wysiwyg_collab_1 = $mol_type_enforce<
-		({ 
-			'bog_wysiwyg_collab_status': ReturnType< $bog_wysiwyg_collab['sync_status'] >,
-		}) 
-		,
-		ReturnType< $mol_view['attr'] >
-	>
-	type $mol_view__sub_bog_wysiwyg_collab_2 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_links_1 = $mol_type_enforce<
 		readonly(any)[]
 		,
 		ReturnType< $mol_view['sub'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_collab_3 = $mol_type_enforce<
-		ReturnType< $bog_wysiwyg_collab['peer_views'] >
+	type $mol_list__rows_bog_wysiwyg_links_2 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_links['link_views'] >
 		,
-		ReturnType< $mol_view['sub'] >
+		ReturnType< $mol_list['rows'] >
 	>
-	type $mol_view__attr_bog_wysiwyg_collab_4 = $mol_type_enforce<
-		({ 
-			'title': ReturnType< $bog_wysiwyg_collab['peer_title'] >,
-		}) 
-		,
-		ReturnType< $mol_view['attr'] >
-	>
-	type $mol_view__sub_bog_wysiwyg_collab_5 = $mol_type_enforce<
-		readonly(any)[]
-		,
-		ReturnType< $mol_view['sub'] >
-	>
-	export class $bog_wysiwyg_collab extends $mol_view {
-		sync_status( ): string
-		sync_label( ): string
-		Sync_icon( ): $mol_view
-		peer_views( ): readonly(any)[]
-		Peers( ): $mol_view
-		peer_title( id: any): string
-		peer_short( id: any): string
-		page_land_link( ): string
-		sub( ): readonly(any)[]
-		Peer( id: any): $mol_view
-	}
-	
-}
-
-//# sourceMappingURL=collab.view.tree.d.ts.map
-declare namespace $.$$ {
-    class $bog_wysiwyg_collab extends $.$bog_wysiwyg_collab {
-        page_land(): $giper_baza_land | null;
-        sync_status(): "offline" | "online";
-        sync_label(): "●" | "○";
-        peer_ids(): readonly string[];
-        peer_views(): $mol_view[];
-        peer_short(id: string): string;
-        peer_title(id: string): string;
-    }
-}
-
-declare namespace $ {
-}
-
-declare namespace $ {
-}
-
-declare namespace $ {
-
-	type $mol_link__arg_bog_wysiwyg_links_1 = $mol_type_enforce<
+	type $mol_link__arg_bog_wysiwyg_links_3 = $mol_type_enforce<
 		({ 
 			'page': ReturnType< $bog_wysiwyg_links['link_page_id'] >,
 		}) 
 		,
 		ReturnType< $mol_link['arg'] >
 	>
-	type $mol_link__sub_bog_wysiwyg_links_2 = $mol_type_enforce<
+	type $mol_link__sub_bog_wysiwyg_links_4 = $mol_type_enforce<
 		readonly(any)[]
 		,
 		ReturnType< $mol_link['sub'] >
 	>
 	export class $bog_wysiwyg_links extends $mol_list {
+		header_text( ): string
+		Header( ): $mol_view
 		link_views( ): readonly(any)[]
+		Links( ): $mol_list
 		link_page_id( id: any): string
 		link_title( id: any): string
 		page_id( ): string
 		all_pages( ): readonly(any)[]
-		rows( ): ReturnType< $bog_wysiwyg_links['link_views'] >
+		rows( ): readonly(any)[]
 		Link( id: any): $mol_link
 	}
 	
@@ -12454,6 +12407,8 @@ declare namespace $.$$ {
     }
     class $bog_wysiwyg_links extends $.$bog_wysiwyg_links {
         backlink_pages(): readonly $bog_wysiwyg_links_page_info[];
+        rows(): $mol_view[];
+        header_text(): string;
         link_views(): $.$mol_link[];
         link_page_id(id: string): string;
         link_title(id: string): string;
@@ -14052,22 +14007,20 @@ declare namespace $ {
 		,
 		ReturnType< $mol_list['rows'] >
 	>
-	type $mol_button_minor__title_bog_wysiwyg_history_4 = $mol_type_enforce<
+	type $bog_wysiwyg_history_version__title_bog_wysiwyg_history_4 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_history['version_title'] >
 		,
-		ReturnType< $mol_button_minor['title'] >
+		ReturnType< $bog_wysiwyg_history_version['title'] >
 	>
-	type $mol_button_minor__click_bog_wysiwyg_history_5 = $mol_type_enforce<
+	type $bog_wysiwyg_history_version__click_bog_wysiwyg_history_5 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_history['version_click'] >
 		,
-		ReturnType< $mol_button_minor['click'] >
+		ReturnType< $bog_wysiwyg_history_version['click'] >
 	>
-	type $mol_button_minor__attr_bog_wysiwyg_history_6 = $mol_type_enforce<
-		({ 
-			'bog_wysiwyg_history_active': ReturnType< $bog_wysiwyg_history['version_active'] >,
-		})  & ReturnType< $mol_button_minor['attr'] >
+	type $bog_wysiwyg_history_version__active_bog_wysiwyg_history_6 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_history['version_active'] >
 		,
-		ReturnType< $mol_button_minor['attr'] >
+		ReturnType< $bog_wysiwyg_history_version['active'] >
 	>
 	export class $bog_wysiwyg_history extends $mol_view {
 		version_title( id: any): string
@@ -14079,11 +14032,18 @@ declare namespace $ {
 		Version_list( ): $mol_list
 		page_land_link( ): string
 		showed( next?: boolean ): boolean
-		Version( id: any): $mol_button_minor
+		Version( id: any): $bog_wysiwyg_history_version
 		sub( ): readonly(any)[]
 		attr( ): ({ 
 			'bog_wysiwyg_history_showed': ReturnType< $bog_wysiwyg_history['showed'] >,
 		})  & ReturnType< $mol_view['attr'] >
+	}
+	
+	export class $bog_wysiwyg_history_version extends $mol_button_minor {
+		active( ): boolean
+		attr( ): ({ 
+			'bog_wysiwyg_history_version_active': ReturnType< $bog_wysiwyg_history_version['active'] >,
+		})  & ReturnType< $mol_button_minor['attr'] >
 	}
 	
 }
@@ -14095,8 +14055,9 @@ declare namespace $.$$ {
         page_data(): $bog_wysiwyg_model_page | null;
         version_links(): readonly string[];
         save_version(event?: Event): Event | null;
-        version_rows(): $mol_button_minor[];
+        version_rows(): $bog_wysiwyg_history_version[];
         version_title(link: string): string;
+        current_version(next?: string | null): string | null;
         version_active(link: string): boolean;
         version_click(link: string, event?: Event): Event | null;
     }
@@ -14246,162 +14207,157 @@ declare namespace $ {
 		,
 		ReturnType< $bog_wysiwyg_comment['panel_open'] >
 	>
-	type $bog_wysiwyg_collab__page_land_link_bog_wysiwyg_6 = $mol_type_enforce<
-		ReturnType< $bog_wysiwyg['page_land_link'] >
-		,
-		ReturnType< $bog_wysiwyg_collab['page_land_link'] >
-	>
-	type $mol_list__rows_bog_wysiwyg_7 = $mol_type_enforce<
+	type $mol_list__rows_bog_wysiwyg_6 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_row_views'] >
 		,
 		ReturnType< $mol_list['rows'] >
 	>
-	type $bog_wysiwyg_links__page_id_bog_wysiwyg_8 = $mol_type_enforce<
+	type $bog_wysiwyg_links__page_id_bog_wysiwyg_7 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['page_land_link'] >
 		,
 		ReturnType< $bog_wysiwyg_links['page_id'] >
 	>
-	type $bog_wysiwyg_links__all_pages_bog_wysiwyg_9 = $mol_type_enforce<
+	type $bog_wysiwyg_links__all_pages_bog_wysiwyg_8 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['all_pages'] >
 		,
 		ReturnType< $bog_wysiwyg_links['all_pages'] >
 	>
-	type $bog_wysiwyg_menu__showed_bog_wysiwyg_10 = $mol_type_enforce<
+	type $bog_wysiwyg_menu__showed_bog_wysiwyg_9 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_showed'] >
 		,
 		ReturnType< $bog_wysiwyg_menu['showed'] >
 	>
-	type $bog_wysiwyg_menu__picked_bog_wysiwyg_11 = $mol_type_enforce<
+	type $bog_wysiwyg_menu__picked_bog_wysiwyg_10 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_picked'] >
 		,
 		ReturnType< $bog_wysiwyg_menu['picked'] >
 	>
-	type $bog_wysiwyg_menu__index_bog_wysiwyg_12 = $mol_type_enforce<
+	type $bog_wysiwyg_menu__index_bog_wysiwyg_11 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_index'] >
 		,
 		ReturnType< $bog_wysiwyg_menu['index'] >
 	>
-	type $bog_wysiwyg_menu__pos_y_bog_wysiwyg_13 = $mol_type_enforce<
+	type $bog_wysiwyg_menu__pos_y_bog_wysiwyg_12 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_pos_y'] >
 		,
 		ReturnType< $bog_wysiwyg_menu['pos_y'] >
 	>
-	type $bog_wysiwyg_menu__pos_x_bog_wysiwyg_14 = $mol_type_enforce<
+	type $bog_wysiwyg_menu__pos_x_bog_wysiwyg_13 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_pos_x'] >
 		,
 		ReturnType< $bog_wysiwyg_menu['pos_x'] >
 	>
-	type $bog_wysiwyg_ai__showed_bog_wysiwyg_15 = $mol_type_enforce<
+	type $bog_wysiwyg_ai__showed_bog_wysiwyg_14 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_showed'] >
 		,
 		ReturnType< $bog_wysiwyg_ai['showed'] >
 	>
-	type $bog_wysiwyg_ai__context_bog_wysiwyg_16 = $mol_type_enforce<
+	type $bog_wysiwyg_ai__context_bog_wysiwyg_15 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_context'] >
 		,
 		ReturnType< $bog_wysiwyg_ai['context'] >
 	>
-	type $bog_wysiwyg_ai__loading_bog_wysiwyg_17 = $mol_type_enforce<
+	type $bog_wysiwyg_ai__loading_bog_wysiwyg_16 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_loading'] >
 		,
 		ReturnType< $bog_wysiwyg_ai['loading'] >
 	>
-	type $bog_wysiwyg_ai__on_result_bog_wysiwyg_18 = $mol_type_enforce<
+	type $bog_wysiwyg_ai__on_result_bog_wysiwyg_17 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_result'] >
 		,
 		ReturnType< $bog_wysiwyg_ai['on_result'] >
 	>
-	type $bog_wysiwyg_ai__picked_bog_wysiwyg_19 = $mol_type_enforce<
+	type $bog_wysiwyg_ai__picked_bog_wysiwyg_18 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_picked'] >
 		,
 		ReturnType< $bog_wysiwyg_ai['picked'] >
 	>
-	type $bog_wysiwyg_ai__index_bog_wysiwyg_20 = $mol_type_enforce<
+	type $bog_wysiwyg_ai__index_bog_wysiwyg_19 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_index'] >
 		,
 		ReturnType< $bog_wysiwyg_ai['index'] >
 	>
-	type $bog_wysiwyg_ai__pos_y_bog_wysiwyg_21 = $mol_type_enforce<
+	type $bog_wysiwyg_ai__pos_y_bog_wysiwyg_20 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_pos_y'] >
 		,
 		ReturnType< $bog_wysiwyg_ai['pos_y'] >
 	>
-	type $bog_wysiwyg_ai__pos_x_bog_wysiwyg_22 = $mol_type_enforce<
+	type $bog_wysiwyg_ai__pos_x_bog_wysiwyg_21 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_pos_x'] >
 		,
 		ReturnType< $bog_wysiwyg_ai['pos_x'] >
 	>
-	type $bog_wysiwyg_history__page_land_link_bog_wysiwyg_23 = $mol_type_enforce<
+	type $bog_wysiwyg_history__page_land_link_bog_wysiwyg_22 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['page_land_link'] >
 		,
 		ReturnType< $bog_wysiwyg_history['page_land_link'] >
 	>
-	type $bog_wysiwyg_history__showed_bog_wysiwyg_24 = $mol_type_enforce<
+	type $bog_wysiwyg_history__showed_bog_wysiwyg_23 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['history_showed'] >
 		,
 		ReturnType< $bog_wysiwyg_history['showed'] >
 	>
-	type $bog_wysiwyg_block__html_bog_wysiwyg_25 = $mol_type_enforce<
+	type $bog_wysiwyg_block__html_bog_wysiwyg_24 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_html'] >
 		,
 		ReturnType< $bog_wysiwyg_block['html'] >
 	>
-	type $bog_wysiwyg_block__type_bog_wysiwyg_26 = $mol_type_enforce<
+	type $bog_wysiwyg_block__type_bog_wysiwyg_25 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_type'] >
 		,
 		ReturnType< $bog_wysiwyg_block['type'] >
 	>
-	type $bog_wysiwyg_block__level_bog_wysiwyg_27 = $mol_type_enforce<
+	type $bog_wysiwyg_block__level_bog_wysiwyg_26 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_level'] >
 		,
 		ReturnType< $bog_wysiwyg_block['level'] >
 	>
-	type $bog_wysiwyg_block__menu_open_bog_wysiwyg_28 = $mol_type_enforce<
+	type $bog_wysiwyg_block__menu_open_bog_wysiwyg_27 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_showed'] >
 		,
 		ReturnType< $bog_wysiwyg_block['menu_open'] >
 	>
-	type $bog_wysiwyg_block__ai_open_bog_wysiwyg_29 = $mol_type_enforce<
+	type $bog_wysiwyg_block__ai_open_bog_wysiwyg_28 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_showed'] >
 		,
 		ReturnType< $bog_wysiwyg_block['ai_open'] >
 	>
-	type $bog_wysiwyg_block__on_enter_bog_wysiwyg_30 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_enter_bog_wysiwyg_29 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_enter'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_enter'] >
 	>
-	type $bog_wysiwyg_block__on_remove_bog_wysiwyg_31 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_remove_bog_wysiwyg_30 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_remove'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_remove'] >
 	>
-	type $bog_wysiwyg_block__on_slash_bog_wysiwyg_32 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_slash_bog_wysiwyg_31 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_slash'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_slash'] >
 	>
-	type $bog_wysiwyg_block__on_menu_key_bog_wysiwyg_33 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_menu_key_bog_wysiwyg_32 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_menu_key'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_menu_key'] >
 	>
-	type $bog_wysiwyg_block__on_image_bog_wysiwyg_34 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_image_bog_wysiwyg_33 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_image'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_image'] >
 	>
-	type $bog_wysiwyg_block__on_ai_bog_wysiwyg_35 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_ai_bog_wysiwyg_34 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_ai'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_ai'] >
 	>
-	type $bog_wysiwyg_block__on_ai_key_bog_wysiwyg_36 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_ai_key_bog_wysiwyg_35 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_ai_key'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_ai_key'] >
 	>
-	type $mol_view__attr_bog_wysiwyg_37 = $mol_type_enforce<
+	type $mol_view__attr_bog_wysiwyg_36 = $mol_type_enforce<
 		({ 
 			'bog_wysiwyg_drag_over': ReturnType< $bog_wysiwyg['row_is_drag_over'] >,
 			'bog_wysiwyg_drag_pos': ReturnType< $bog_wysiwyg['row_drag_position'] >,
@@ -14410,7 +14366,7 @@ declare namespace $ {
 		,
 		ReturnType< $mol_view['attr'] >
 	>
-	type $mol_view__event_bog_wysiwyg_38 = $mol_type_enforce<
+	type $mol_view__event_bog_wysiwyg_37 = $mol_type_enforce<
 		({ 
 			dragover( next?: ReturnType< $bog_wysiwyg['row_dragover'] > ): ReturnType< $bog_wysiwyg['row_dragover'] >,
 			drop( next?: ReturnType< $bog_wysiwyg['row_drop'] > ): ReturnType< $bog_wysiwyg['row_drop'] >,
@@ -14419,7 +14375,7 @@ declare namespace $ {
 		,
 		ReturnType< $mol_view['event'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_39 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_38 = $mol_type_enforce<
 		readonly(any)[]
 		,
 		ReturnType< $mol_view['sub'] >
@@ -14448,7 +14404,7 @@ declare namespace $ {
 		block_comment_land_link( id: any): string
 		block_comment_open( id: any, next?: boolean ): boolean
 		Block_comment( id: any): $bog_wysiwyg_comment
-		Collab_bar( ): $bog_wysiwyg_collab
+		Status( ): $giper_baza_status
 		block_row_views( ): readonly(any)[]
 		Block_list( ): $mol_list
 		Backlinks( ): $bog_wysiwyg_links
@@ -14600,6 +14556,146 @@ declare namespace $.$$ {
 }
 
 declare namespace $ {
+
+	export class $mol_icon_history extends $mol_icon {
+		path( ): string
+	}
+	
+}
+
+//# sourceMappingURL=history.view.tree.d.ts.map
+declare namespace $ {
+
+	export class $mol_icon_graph extends $mol_icon {
+		path( ): string
+	}
+	
+}
+
+//# sourceMappingURL=graph.view.tree.d.ts.map
+declare namespace $ {
+
+	export class $mol_icon_graph_outline extends $mol_icon {
+		path( ): string
+	}
+	
+}
+
+//# sourceMappingURL=outline.view.tree.d.ts.map
+declare namespace $ {
+
+	export class $mol_icon_brightness_4 extends $mol_icon {
+		path( ): string
+	}
+	
+}
+
+//# sourceMappingURL=4.view.tree.d.ts.map
+declare namespace $ {
+
+	export class $mol_lights_toggle extends $mol_check_icon {
+		Lights_icon( ): $mol_icon_brightness_4
+		lights( next?: boolean ): boolean
+		Icon( ): ReturnType< $mol_lights_toggle['Lights_icon'] >
+		hint( ): string
+		checked( next?: ReturnType< $mol_lights_toggle['lights'] > ): ReturnType< $mol_lights_toggle['lights'] >
+	}
+	
+}
+
+//# sourceMappingURL=toggle.view.tree.d.ts.map
+declare namespace $.$$ {
+    class $mol_lights_toggle extends $.$mol_lights_toggle {
+        lights(next?: boolean): boolean;
+    }
+}
+
+declare namespace $ {
+
+	type $mol_view__dom_name_bog_wysiwyg_graph_1 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_view['dom_name'] >
+	>
+	type $mol_view__attr_bog_wysiwyg_graph_2 = $mol_type_enforce<
+		({ 
+			'width': ReturnType< $bog_wysiwyg_graph['canvas_width'] >,
+			'height': ReturnType< $bog_wysiwyg_graph['canvas_height'] >,
+		}) 
+		,
+		ReturnType< $mol_view['attr'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_graph_3 = $mol_type_enforce<
+		readonly(any)[]
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	export class $bog_wysiwyg_graph extends $mol_view {
+		content( ): readonly(any)[]
+		canvas_width( ): number
+		canvas_height( ): number
+		empty_message( ): string
+		pages( ): readonly(any)[]
+		current_page_id( ): string
+		on_navigate( next?: any ): any
+		sub( ): ReturnType< $bog_wysiwyg_graph['content'] >
+		Canvas( ): $mol_view
+		Empty( ): $mol_view
+	}
+	
+}
+
+//# sourceMappingURL=graph.view.tree.d.ts.map
+declare namespace $.$$ {
+    interface Graph_node {
+        id: string;
+        title: string;
+        x: number;
+        y: number;
+        vx: number;
+        vy: number;
+    }
+    interface Graph_edge {
+        source: string;
+        target: string;
+    }
+    export class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
+        content(): $mol_view[];
+        canvas_width(): number;
+        canvas_height(): number;
+        logical_width(): number;
+        logical_height(): number;
+        nodes(): Graph_node[];
+        edges(): Graph_edge[];
+        sim_nodes(): Graph_node[];
+        sim_tick(): void;
+        drag_id(next?: string | null): string | null;
+        _events_bound: boolean;
+        bind_events(): void;
+        node_at(x: number, y: number): Graph_node | null;
+        read_theme_colors(): {
+            focus: string;
+            card: string;
+            line: string;
+            text: string;
+            shade: string;
+        };
+        _anim_id: number;
+        _running: boolean;
+        start_sim(): void;
+        tick_loop(): void;
+        stop_sim(): void;
+        auto(): void;
+        render_canvas(): void;
+        destructor(): void;
+    }
+    export {};
+}
+
+declare namespace $ {
+}
+
+declare namespace $ {
     function $mol_offline(): void;
 }
 
@@ -14631,18 +14727,167 @@ declare namespace $ {
 
 declare namespace $ {
 
-	type $bog_wysiwyg__page_land_link_bog_wysiwyg_app_1 = $mol_type_enforce<
+	type $mol_check_icon__Icon_bog_wysiwyg_app_1 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['History_icon'] >
+		,
+		ReturnType< $mol_check_icon['Icon'] >
+	>
+	type $mol_check_icon__hint_bog_wysiwyg_app_2 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_check_icon['hint'] >
+	>
+	type $mol_check_icon__checked_bog_wysiwyg_app_3 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['history_showed'] >
+		,
+		ReturnType< $mol_check_icon['checked'] >
+	>
+	type $mol_check_icon__Icon_bog_wysiwyg_app_4 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['Graph_icon'] >
+		,
+		ReturnType< $mol_check_icon['Icon'] >
+	>
+	type $mol_check_icon__hint_bog_wysiwyg_app_5 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_check_icon['hint'] >
+	>
+	type $mol_check_icon__checked_bog_wysiwyg_app_6 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['graph_showed'] >
+		,
+		ReturnType< $mol_check_icon['checked'] >
+	>
+	type $mol_paragraph__title_bog_wysiwyg_app_7 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_paragraph['title'] >
+	>
+	type $mol_button_minor__title_bog_wysiwyg_app_8 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_button_minor['title'] >
+	>
+	type $mol_button_minor__click_bog_wysiwyg_app_9 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['page_create'] >
+		,
+		ReturnType< $mol_button_minor['click'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_10 = $mol_type_enforce<
+		readonly(any)[]
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $mol_list__rows_bog_wysiwyg_app_11 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['page_rows'] >
+		,
+		ReturnType< $mol_list['rows'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_12 = $mol_type_enforce<
+		readonly(any)[]
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $bog_wysiwyg__page_land_link_bog_wysiwyg_app_13 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_land_link'] >
 		,
 		ReturnType< $bog_wysiwyg['page_land_link'] >
 	>
+	type $bog_wysiwyg__all_pages_bog_wysiwyg_app_14 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['all_pages_info'] >
+		,
+		ReturnType< $bog_wysiwyg['all_pages'] >
+	>
+	type $bog_wysiwyg__history_showed_bog_wysiwyg_app_15 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['history_showed'] >
+		,
+		ReturnType< $bog_wysiwyg['history_showed'] >
+	>
+	type $bog_wysiwyg_graph__pages_bog_wysiwyg_app_16 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['graph_pages'] >
+		,
+		ReturnType< $bog_wysiwyg_graph['pages'] >
+	>
+	type $bog_wysiwyg_graph__current_page_id_bog_wysiwyg_app_17 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['page_land_link'] >
+		,
+		ReturnType< $bog_wysiwyg_graph['current_page_id'] >
+	>
+	type $bog_wysiwyg_graph__on_navigate_bog_wysiwyg_app_18 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['page_navigate'] >
+		,
+		ReturnType< $bog_wysiwyg_graph['on_navigate'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_19 = $mol_type_enforce<
+		readonly(any)[]
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_20 = $mol_type_enforce<
+		readonly(any)[]
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_21 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['body_content'] >
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $bog_wysiwyg_app_page__title_bog_wysiwyg_app_22 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['page_item_title'] >
+		,
+		ReturnType< $bog_wysiwyg_app_page['title'] >
+	>
+	type $bog_wysiwyg_app_page__click_bog_wysiwyg_app_23 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['page_item_click'] >
+		,
+		ReturnType< $bog_wysiwyg_app_page['click'] >
+	>
+	type $bog_wysiwyg_app_page__active_bog_wysiwyg_app_24 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['page_item_active'] >
+		,
+		ReturnType< $bog_wysiwyg_app_page['active'] >
+	>
 	export class $bog_wysiwyg_app extends $mol_page {
 		Theme( ): $mol_theme_auto
+		History_icon( ): $mol_icon_history
+		history_showed( next?: boolean ): boolean
+		History_toggle( ): $mol_check_icon
+		Graph_icon( ): $mol_icon_graph_outline
+		graph_showed( next?: boolean ): boolean
+		Graph_toggle( ): $mol_check_icon
+		Lights( ): $mol_lights_toggle
+		Sidebar_title( ): $mol_paragraph
+		page_create( next?: any ): any
+		New_page( ): $mol_button_minor
+		Sidebar_head( ): $mol_view
+		page_rows( ): readonly(any)[]
+		Page_list( ): $mol_list
+		Sidebar( ): $mol_view
 		page_land_link( ): string
+		all_pages_info( ): readonly(any)[]
 		Editor( ): $bog_wysiwyg
+		graph_pages( ): readonly(any)[]
+		page_navigate( next?: any ): any
+		Graph( ): $bog_wysiwyg_graph
+		Graph_panel( ): $mol_view
+		Main( ): $mol_view
+		body_content( ): readonly(any)[]
+		Layout( ): $mol_view
+		page_item_title( id: any): string
+		page_item_click( id: any, next?: any ): any
+		page_item_active( id: any): boolean
 		title( ): string
 		plugins( ): readonly(any)[]
+		tools( ): readonly(any)[]
 		body( ): readonly(any)[]
+		Page_item( id: any): $bog_wysiwyg_app_page
+	}
+	
+	export class $bog_wysiwyg_app_page extends $mol_button_minor {
+		active( ): boolean
+		attr( ): ({ 
+			'bog_wysiwyg_app_page_active': ReturnType< $bog_wysiwyg_app_page['active'] >,
+		})  & ReturnType< $mol_button_minor['attr'] >
 	}
 	
 }
@@ -14650,8 +14895,37 @@ declare namespace $ {
 //# sourceMappingURL=app.view.tree.d.ts.map
 declare namespace $.$$ {
     class $bog_wysiwyg_app extends $.$bog_wysiwyg_app {
-        page_land_link(): string;
+        page_land_link(next?: string): string;
+        registry_land_link(): string;
+        registry_land(): $giper_baza_land | null;
+        registry_list(): $giper_baza_list_link | null;
+        page_links(): readonly string[];
+        page_title_by_link(link: string): string;
+        page_block_ids(link: string): readonly string[];
+        page_block_html(link: string, block_link: string): string;
+        all_pages_info(): {
+            id: string;
+            title: string;
+            blocks_html: string[];
+        }[];
+        page_rows(): $bog_wysiwyg_app_page[];
+        page_item_title(index: number): string;
+        page_item_active(index: number): boolean;
+        page_item_click(index: number, event?: Event): Event | null;
+        page_create(event?: Event): Event | null;
+        page_navigate(id?: string): string | null;
+        auto(): void;
+        body_content(): any[];
+        graph_pages(): {
+            id(): string;
+            title(): string;
+            block_ids(): readonly string[];
+            block_html(bid: string): string;
+        }[];
     }
+}
+
+declare namespace $ {
 }
 
 export = $;
