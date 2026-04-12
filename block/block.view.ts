@@ -118,6 +118,7 @@ namespace $.$$ {
 		is_empty() {
 			const html = this.html()
 			if( this.type() === 'image' && html?.includes( '<img' ) ) return false
+			if( this.type() === 'embed' && html?.includes( '<a' ) ) return false
 			return !html?.replace( /<[^>]*>/g, '' ).trim()
 		}
 
@@ -129,11 +130,15 @@ namespace $.$$ {
 			return this.type() === 'image'
 		}
 
+		is_static() {
+			return this.type() === 'image' || this.type() === 'embed'
+		}
+
 		override auto() {
 			const node = this.dom_node() as HTMLElement
 			const doc = this.$.$mol_dom_context.document
 
-			if( this.is_image() ) {
+			if( this.is_static() ) {
 				node.contentEditable = 'false'
 				const html = this.html()
 				if( node.innerHTML !== html ) {

@@ -185,6 +185,9 @@ namespace $.$$ {
 		@ $mol_mem
 		override layout_content() {
 			if( this.graph_showed() ) {
+				if( this.page_links().length === 0 ) {
+					this.page_create( new Event( 'auto' ) )
+				}
 				return [ this.Sidebar(), this.Graph_panel() ]
 			} else {
 				return [ this.Sidebar(), this.Main() ]

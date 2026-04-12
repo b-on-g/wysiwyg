@@ -1,1 +1,3 @@
 include \/mol/offline/install
+include \/bog/wysiwyg/plugin/callout
+include \/bog/wysiwyg/plugin/embed
