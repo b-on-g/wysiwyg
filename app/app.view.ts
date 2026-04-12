@@ -127,6 +127,17 @@ namespace $.$$ {
 			return event
 		}
 
+		/** Rename page title in Baza */
+		page_item_rename( index: number, val?: string ) {
+			if( val === undefined ) return null
+			const link = this.page_links()[ index ]
+			if( !link ) return val
+			const land = this.$.$giper_baza_glob.Land( new $giper_baza_link( link ) )
+			const data = land.Data( $bog_wysiwyg_model_page )
+			data.Title( 'auto' )?.val( val )
+			return val
+		}
+
 		/** Create new page land and add to registry */
 		@ $mol_action
 		page_create( event?: Event ) {
@@ -190,6 +201,34 @@ namespace $.$$ {
 				block_ids() { return self.page_block_ids( link ) },
 				block_html( bid: string ) { return self.page_block_html( link, bid ) },
 			}) )
+		}
+
+	}
+
+	export class $bog_wysiwyg_app_page extends $.$bog_wysiwyg_app_page {
+
+		@ $mol_mem
+		override page_content() {
+			if( this.editing() ) {
+				return [ this.Title_input(), this.Rename_confirm() ]
+			}
+			return [ this.Title_nav(), this.Rename_trigger() ]
+		}
+
+		@ $mol_action
+		override start_rename( event?: Event ) {
+			if( !event ) return null
+			this.edit_title( this.title() )
+			this.editing( true )
+			return event
+		}
+
+		@ $mol_action
+		override confirm_rename( event?: Event ) {
+			if( !event ) return null
+			this.on_rename( this.edit_title() )
+			this.editing( false )
+			return event
 		}
 
 	}

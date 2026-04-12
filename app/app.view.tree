@@ -42,9 +42,31 @@ $bog_wysiwyg_app $mol_page
 		title <= page_item_title* \
 		click?event <=> page_item_click*?event null
 		active <= page_item_active* false
+		on_rename?val <=> page_item_rename*?val null
 
-$bog_wysiwyg_app_page $mol_button_minor
+$bog_wysiwyg_app_page $mol_view
 	active false
+	editing? false
+	title \
+	click?event null
+	on_rename?val null
+	edit_title? \
+	start_rename?event null
+	confirm_rename?event null
 	attr *
-		^
 		bog_wysiwyg_app_page_active <= active
+		bog_wysiwyg_app_page_editing <= editing?
+	sub <= page_content /
+		<= Title_nav $mol_button_minor
+			title <= title
+			click?event <=> click?event null
+		<= Rename_trigger $mol_button_minor
+			sub /
+				<= Rename_icon $mol_icon_pencil
+			click?event <=> start_rename?event null
+	Title_input $mol_string
+		value? <=> edit_title?
+	Rename_confirm $mol_button_minor
+		sub /
+			<= Confirm_icon $mol_icon_check
+		click?event <=> confirm_rename?event null
