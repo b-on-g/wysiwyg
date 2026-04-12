@@ -1,6 +1,7 @@
 $bog_wysiwyg_app $mol_page
-	title \WYSIWYG Редактор
+	title @ \WYSIWYG Editor
 	plugins /
 		<= Theme $mol_theme_auto
 	body /
 		<= Editor $bog_wysiwyg
+			page_land_link <= page_land_link \

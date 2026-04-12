@@ -1,0 +1,19 @@
+.bog_wysiwyg_block_row:hover > .bog_wysiwyg_drag_handle {
+	opacity: 1;
+}
+
+.bog_wysiwyg_drag_handle:active {
+	cursor: grabbing;
+}
+
+.bog_wysiwyg_block_row[bog_wysiwyg_dragging="true"] {
+	opacity: 0.5;
+}
+
+.bog_wysiwyg_block_row[bog_wysiwyg_drag_over="true"][bog_wysiwyg_drag_pos="before"] {
+	border-top: 2px solid var(--mol_theme_focus);
+}
+
+.bog_wysiwyg_block_row[bog_wysiwyg_drag_over="true"][bog_wysiwyg_drag_pos="after"] {
+	border-bottom: 2px solid var(--mol_theme_focus);
+}

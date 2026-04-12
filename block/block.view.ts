@@ -33,16 +33,33 @@ namespace $.$$ {
 
 		@ $mol_mem
 		is_empty() {
-			return !this.html()?.replace( /<[^>]*>/g, '' ).trim()
+			const html = this.html()
+			if( this.type() === 'image' && html?.includes( '<img' ) ) return false
+			return !html?.replace( /<[^>]*>/g, '' ).trim()
 		}
 
 		override sub() {
 			return null as any
 		}
 
+		is_image() {
+			return this.type() === 'image'
+		}
+
 		override auto() {
 			const node = this.dom_node() as HTMLElement
 			const doc = this.$.$mol_dom_context.document
+
+			if( this.is_image() ) {
+				node.contentEditable = 'false'
+				const html = this.html()
+				if( node.innerHTML !== html ) {
+					node.innerHTML = html
+				}
+				return
+			}
+
+			node.contentEditable = 'true'
 
 			if( node !== doc.activeElement ) {
 				const html = this.html()
@@ -154,7 +171,7 @@ namespace $.$$ {
 			if( !event ) return null
 			event.preventDefault()
 
-			const url = prompt( 'URL:' )
+			const url = prompt( this.$.$mol_locale.text( '$bog_wysiwyg_block_link_url_prompt' ) )
 			if( !url ) return event
 
 			const sel = this.$.$mol_dom_context.document.defaultView?.getSelection()
@@ -171,10 +188,88 @@ namespace $.$$ {
 			return event
 		}
 
+		paste_event( event?: ClipboardEvent ) {
+			if( !event ) return null
+
+			const items = event.clipboardData?.items
+			if( !items ) return event
+
+			for( const item of items ) {
+				if( item.type.startsWith( 'image/' ) ) {
+					event.preventDefault()
+					const file = item.getAsFile()
+					if( file ) this.insert_image_file( file )
+					return event
+				}
+			}
+
+			return event
+		}
+
+		drop_event( event?: DragEvent ) {
+			if( !event ) return null
+
+			const files = event.dataTransfer?.files
+			if( !files ) return event
+
+			for( const file of files ) {
+				if( file.type.startsWith( 'image/' ) ) {
+					event.preventDefault()
+					this.insert_image_file( file )
+					return event
+				}
+			}
+
+			return event
+		}
+
+		dragover_event( event?: DragEvent ) {
+			if( !event ) return null
+			event.preventDefault()
+			return event
+		}
+
+		insert_image_file( file: File ) {
+			const reader = new FileReader()
+			reader.onload = () => {
+				const src = reader.result as string
+				this.on_image( src )
+			}
+			reader.readAsDataURL( file )
+		}
+
 		keydown_event( event?: KeyboardEvent ) {
 			if( !event ) return null
 
 			const node = event.target as HTMLElement
+
+			// Image blocks: only allow Backspace to remove
+			if( this.is_image() ) {
+				if( event.key === 'Backspace' || event.key === 'Delete' ) {
+					event.preventDefault()
+					this.on_remove( event )
+					return event
+				}
+				if( event.key === 'Enter' && !event.shiftKey ) {
+					event.preventDefault()
+					this.on_enter( event )
+					return event
+				}
+				return event
+			}
+
+			// When AI menu is open, delegate navigation keys
+			if( this.ai_open() ) {
+				if( [ 'ArrowDown', 'ArrowUp', 'Enter', 'Escape' ].includes( event.key ) ) {
+					event.preventDefault()
+					this.on_ai_key( event )
+					return event
+				}
+				if( event.key.length === 1 && !event.ctrlKey && !event.metaKey ) {
+					this.on_ai_key( event )
+					return event
+				}
+			}
 
 			// When menu is open, delegate navigation keys
 			if( this.menu_open() ) {
@@ -208,6 +303,13 @@ namespace $.$$ {
 			if( event.key === '/' && !node.textContent?.trim() ) {
 				event.preventDefault()
 				this.on_slash( event )
+				return event
+			}
+
+			// Ctrl/Cmd+J: open AI menu
+			if( event.key === 'j' && ( event.ctrlKey || event.metaKey ) && !event.shiftKey ) {
+				event.preventDefault()
+				this.on_ai( event )
 				return event
 			}
 

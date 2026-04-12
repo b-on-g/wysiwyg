@@ -1,0 +1,11 @@
+{
+	"$bog_wysiwyg_menu_command_paragraph": "Text",
+	"$bog_wysiwyg_menu_command_heading1": "Heading 1",
+	"$bog_wysiwyg_menu_command_heading2": "Heading 2",
+	"$bog_wysiwyg_menu_command_heading3": "Heading 3",
+	"$bog_wysiwyg_menu_command_code": "Code",
+	"$bog_wysiwyg_menu_command_quote": "Quote",
+	"$bog_wysiwyg_menu_command_list": "List",
+	"$bog_wysiwyg_menu_command_divider": "Divider",
+	"$bog_wysiwyg_menu_command_image": "Image"
+}

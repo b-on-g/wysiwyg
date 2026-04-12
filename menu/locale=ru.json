@@ -1,0 +1,11 @@
+{
+	"$bog_wysiwyg_menu_command_paragraph": "Текст",
+	"$bog_wysiwyg_menu_command_heading1": "Заголовок 1",
+	"$bog_wysiwyg_menu_command_heading2": "Заголовок 2",
+	"$bog_wysiwyg_menu_command_heading3": "Заголовок 3",
+	"$bog_wysiwyg_menu_command_code": "Код",
+	"$bog_wysiwyg_menu_command_quote": "Цитата",
+	"$bog_wysiwyg_menu_command_list": "Список",
+	"$bog_wysiwyg_menu_command_divider": "Разделитель",
+	"$bog_wysiwyg_menu_command_image": "Картинка"
+}

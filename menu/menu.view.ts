@@ -3,16 +3,25 @@ namespace $.$$ {
 	export class $bog_wysiwyg_menu extends $.$bog_wysiwyg_menu {
 
 		commands() {
-			return [
-				{ id: 'paragraph', title: '\u00B6 \u0422\u0435\u043A\u0441\u0442' },
-				{ id: 'heading1', title: 'H1 \u0417\u0430\u0433\u043E\u043B\u043E\u0432\u043E\u043A 1' },
-				{ id: 'heading2', title: 'H2 \u0417\u0430\u0433\u043E\u043B\u043E\u0432\u043E\u043A 2' },
-				{ id: 'heading3', title: 'H3 \u0417\u0430\u0433\u043E\u043B\u043E\u0432\u043E\u043A 3' },
-				{ id: 'code', title: '</> \u041A\u043E\u0434' },
-				{ id: 'quote', title: '\u275D \u0426\u0438\u0442\u0430\u0442\u0430' },
-				{ id: 'list', title: '\u2022 \u0421\u043F\u0438\u0441\u043E\u043A' },
-				{ id: 'divider', title: '\u2014 \u0420\u0430\u0437\u0434\u0435\u043B\u0438\u0442\u0435\u043B\u044C' },
+			const t = ( key: string ) => this.$.$mol_locale.text( key )
+			const builtin = [
+				{ id: 'paragraph', title: '\u00B6 ' + t( '$bog_wysiwyg_menu_command_paragraph' ) },
+				{ id: 'heading1', title: 'H1 ' + t( '$bog_wysiwyg_menu_command_heading1' ) },
+				{ id: 'heading2', title: 'H2 ' + t( '$bog_wysiwyg_menu_command_heading2' ) },
+				{ id: 'heading3', title: 'H3 ' + t( '$bog_wysiwyg_menu_command_heading3' ) },
+				{ id: 'code', title: '</> ' + t( '$bog_wysiwyg_menu_command_code' ) },
+				{ id: 'quote', title: '\u275D ' + t( '$bog_wysiwyg_menu_command_quote' ) },
+				{ id: 'list', title: '\u2022 ' + t( '$bog_wysiwyg_menu_command_list' ) },
+				{ id: 'divider', title: '\u2014 ' + t( '$bog_wysiwyg_menu_command_divider' ) },
+				{ id: 'image', title: '\uD83D\uDDBC ' + t( '$bog_wysiwyg_menu_command_image' ) },
 			]
+
+			const plugins = $bog_wysiwyg_plugin_registry.all().map( p => ({
+				id: p.id,
+				title: p.title,
+			}) )
+
+			return [ ...builtin, ...plugins ]
 		}
 
 		option_rows() {

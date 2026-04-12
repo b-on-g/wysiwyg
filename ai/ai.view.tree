@@ -1,0 +1,24 @@
+$bog_wysiwyg_ai $mol_view
+	showed? false
+	context \
+	loading? false
+	on_result?text null
+	picked?val \
+	index? 0
+	pos_y? 0
+	pos_x? 0
+	Option* $mol_button_minor
+		title <= option_title* \
+		click?event <=> option_click*?event null
+		attr *
+			^
+			bog_wysiwyg_ai_option_active <= option_active* false
+	sub <= option_rows /
+	attr *
+		^
+		bog_wysiwyg_ai_showed <= showed?
+		bog_wysiwyg_ai_loading <= loading?
+	style *
+		^
+		top <= pos_y_str \0px
+		left <= pos_x_str \0px

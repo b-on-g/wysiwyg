@@ -278,6 +278,71 @@ namespace $.$$ {
 			}
 		},
 
+		// === Image block ===
+
+		'paste_event without event returns null'() {
+			const block = new $bog_wysiwyg_block()
+			$mol_assert_equal( block.paste_event(), null )
+		},
+
+		'paste_event with image prevents default'() {
+			let prevented = false
+			const block = new $bog_wysiwyg_block()
+
+			let image_src = ''
+			block.on_image = ( src?: string ) => {
+				if( src ) image_src = src
+				return image_src || null
+			}
+
+			const blob = new Blob( [ '' ], { type: 'image/png' } )
+			const file = new File( [ blob ], 'test.png', { type: 'image/png' } )
+
+			const dt = new DataTransfer()
+			dt.items.add( file )
+
+			const event = new ClipboardEvent( 'paste', { clipboardData: dt } )
+			Object.defineProperty( event, 'preventDefault', { value: () => { prevented = true } } )
+
+			const result = block.paste_event( event )
+
+			$mol_assert_ok( result )
+			$mol_assert_ok( prevented )
+		},
+
+		'paste_event without image does not prevent default'() {
+			const block = new $bog_wysiwyg_block()
+
+			const dt = new DataTransfer()
+			dt.items.add( 'hello', 'text/plain' )
+
+			const event = new ClipboardEvent( 'paste', { clipboardData: dt } )
+			let prevented = false
+			Object.defineProperty( event, 'preventDefault', { value: () => { prevented = true } } )
+
+			const result = block.paste_event( event )
+
+			$mol_assert_ok( result )
+			$mol_assert_equal( prevented, false )
+		},
+
+		'drop_event without event returns null'() {
+			const block = new $bog_wysiwyg_block()
+			$mol_assert_equal( block.drop_event(), null )
+		},
+
+		'is_image returns true for image type'() {
+			const block = new $bog_wysiwyg_block()
+			block.type = () => 'image'
+			$mol_assert_equal( block.is_image(), true )
+		},
+
+		'is_image returns false for paragraph type'() {
+			const block = new $bog_wysiwyg_block()
+			block.type = () => 'paragraph'
+			$mol_assert_equal( block.is_image(), false )
+		},
+
 	})
 
 }

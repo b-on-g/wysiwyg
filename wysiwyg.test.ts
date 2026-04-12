@@ -595,6 +595,193 @@ namespace $.$$ {
 			$mol_assert_equal( editor.block_type( 'b1' ), 'code' )
 		},
 
+		// === Image block ===
+
+		'image command exists in slash menu'() {
+
+			const menu = new $bog_wysiwyg_menu()
+			const cmds = menu.commands()
+			const image_cmd = cmds.find( c => c.id === 'image' )
+			$mol_assert_ok( image_cmd )
+		},
+
+		'block_image sets type to image and stores img html'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'b1' ] )
+
+			editor.block_image( 'b1', 'https://example.com/photo.jpg' )
+
+			$mol_assert_equal( editor.block_type( 'b1' ), 'image' )
+			$mol_assert_ok( editor.block_html( 'b1' ).includes( '<img' ) )
+			$mol_assert_ok( editor.block_html( 'b1' ).includes( 'https://example.com/photo.jpg' ) )
+		},
+
+		'block_image without src returns null'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'b1' ] )
+
+			$mol_assert_equal( editor.block_image( 'b1' ), null )
+			$mol_assert_equal( editor.block_type( 'b1' ), 'paragraph' )
+		},
+
+		'menu_picked with image prompts for URL'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.active_block_id( 'b1' )
+			editor.block_ids( [ 'b1' ] )
+			editor.menu_showed( true )
+			editor.focus_block = () => {}
+
+			const original_prompt = globalThis.prompt
+			globalThis.prompt = () => 'https://example.com/img.png'
+
+			editor.menu_picked( 'image' )
+
+			$mol_assert_equal( editor.block_type( 'b1' ), 'image' )
+			$mol_assert_ok( editor.block_html( 'b1' ).includes( 'https://example.com/img.png' ) )
+			$mol_assert_equal( editor.menu_showed(), false )
+
+			globalThis.prompt = original_prompt
+		},
+
+		'menu_picked with image cancelled prompt keeps paragraph'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.active_block_id( 'b1' )
+			editor.block_ids( [ 'b1' ] )
+			editor.menu_showed( true )
+			editor.focus_block = () => {}
+
+			const original_prompt = globalThis.prompt
+			globalThis.prompt = () => null
+
+			editor.menu_picked( 'image' )
+
+			$mol_assert_equal( editor.block_type( 'b1' ), 'paragraph' )
+			$mol_assert_equal( editor.menu_showed(), false )
+
+			globalThis.prompt = original_prompt
+		},
+
+		// === Drag & Drop ===
+
+		'move_block moves block down (after)'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a', 'b', 'c' ] )
+
+			editor.move_block( 'a', 'c', 'after' )
+
+			const ids = editor.block_ids()
+			$mol_assert_equal( ids[ 0 ], 'b' )
+			$mol_assert_equal( ids[ 1 ], 'c' )
+			$mol_assert_equal( ids[ 2 ], 'a' )
+		},
+
+		'move_block moves block up (before)'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a', 'b', 'c' ] )
+
+			editor.move_block( 'c', 'a', 'before' )
+
+			const ids = editor.block_ids()
+			$mol_assert_equal( ids[ 0 ], 'c' )
+			$mol_assert_equal( ids[ 1 ], 'a' )
+			$mol_assert_equal( ids[ 2 ], 'b' )
+		},
+
+		'move_block to same position does not change order'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a', 'b', 'c' ] )
+
+			editor.move_block( 'b', 'a', 'after' )
+
+			const ids = editor.block_ids()
+			$mol_assert_equal( ids[ 0 ], 'a' )
+			$mol_assert_equal( ids[ 1 ], 'b' )
+			$mol_assert_equal( ids[ 2 ], 'c' )
+		},
+
+		'move_block with invalid from_id does nothing'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a', 'b', 'c' ] )
+
+			editor.move_block( 'nonexistent', 'b', 'after' )
+
+			const ids = editor.block_ids()
+			$mol_assert_equal( ids.length, 3 )
+			$mol_assert_equal( ids[ 0 ], 'a' )
+		},
+
+		'drag_source_id stores and clears'() {
+
+			const editor = new $bog_wysiwyg()
+			$mol_assert_equal( editor.drag_source_id(), '' )
+
+			editor.drag_source_id( 'block1' )
+			$mol_assert_equal( editor.drag_source_id(), 'block1' )
+
+			editor.drag_source_id( '' )
+			$mol_assert_equal( editor.drag_source_id(), '' )
+		},
+
+		'drag_over_id stores and clears'() {
+
+			const editor = new $bog_wysiwyg()
+			$mol_assert_equal( editor.drag_over_id(), '' )
+
+			editor.drag_over_id( 'block2' )
+			$mol_assert_equal( editor.drag_over_id(), 'block2' )
+		},
+
+		'clear_drag_state resets all drag state'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.drag_source_id( 'src' )
+			editor.drag_over_id( 'over' )
+			editor.drag_over_position( 'before' )
+
+			editor.clear_drag_state()
+
+			$mol_assert_equal( editor.drag_source_id(), '' )
+			$mol_assert_equal( editor.drag_over_id(), '' )
+			$mol_assert_equal( editor.drag_over_position(), 'after' )
+		},
+
+		'row_is_drag_over returns true for target, false for source'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.drag_source_id( 'a' )
+			editor.drag_over_id( 'b' )
+
+			$mol_assert_equal( editor.row_is_drag_over( 'b' ), true )
+			$mol_assert_equal( editor.row_is_drag_over( 'a' ), false )
+			$mol_assert_equal( editor.row_is_drag_over( 'c' ), false )
+		},
+
+		'row_is_dragging returns true for source block'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.drag_source_id( 'a' )
+
+			$mol_assert_equal( editor.row_is_dragging( 'a' ), true )
+			$mol_assert_equal( editor.row_is_dragging( 'b' ), false )
+		},
+
+		'block_row_views returns rows matching block_ids'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a', 'b', 'c' ] )
+
+			const rows = editor.block_row_views()
+			$mol_assert_equal( rows.length, 3 )
+		},
+
 	})
 
 }

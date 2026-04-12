@@ -1,0 +1,21 @@
+[bog_wysiwyg_block_type="image"] img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 0.5rem;
+	display: block;
+	margin: 0 auto;
+}
+
+[bog_wysiwyg_block_type="image"][bog_wysiwyg_block_empty="true"] {
+	border: 2px dashed var(--mol_theme_line);
+	border-radius: 0.5rem;
+	min-height: 6rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+[bog_wysiwyg_block_type="image"][bog_wysiwyg_block_empty="true"]::before {
+	content: "\1F5BC  \0414\043E\0431\0430\0432\044C\0442\0435 \043A\0430\0440\0442\0438\043D\043A\0443";
+}

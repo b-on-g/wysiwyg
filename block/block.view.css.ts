@@ -33,7 +33,7 @@ namespace $ {
 		'[bog_wysiwyg_block_empty]': {
 			'true': {
 				'::before': {
-					content: '"Нажми / для выбора блока..."',
+					content: 'attr(bog_wysiwyg_block_placeholder)',
 					color: $mol_theme.shade,
 					pointerEvents: 'none',
 					position: 'absolute',
@@ -102,6 +102,16 @@ namespace $ {
 				},
 				margin: { top: '0.5rem', bottom: '0.5rem' },
 				pointerEvents: 'none',
+			},
+			image: {
+				cursor: 'default',
+				padding: {
+					top: '0.5rem',
+					bottom: '0.5rem',
+					left: 0,
+					right: 0,
+				},
+				textAlign: 'center',
 			},
 		},
 

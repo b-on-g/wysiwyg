@@ -1,20 +1,55 @@
 $bog_wysiwyg $mol_view
+	page_land_link \
 	block_ids? /
 	Block* $bog_wysiwyg_block
 		html? <=> block_html*? \
 		type? <=> block_type*? \paragraph
 		level? <=> block_level*? 1
 		menu_open <= menu_showed? false
+		ai_open <= ai_showed? false
 		on_enter?event <=> block_enter*?event null
 		on_remove?event <=> block_remove*?event null
 		on_slash?event <=> block_slash*?event null
 		on_menu_key?event <=> block_menu_key*?event null
+		on_image?src <=> block_image*?src null
+		on_ai?event <=> block_ai*?event null
+		on_ai_key?event <=> block_ai_key*?event null
+	Block_row* $mol_view
+		attr *
+			bog_wysiwyg_drag_over <= row_is_drag_over* false
+			bog_wysiwyg_drag_pos <= row_drag_position* \
+			bog_wysiwyg_dragging <= row_is_dragging* false
+		event *
+			dragover?event <=> row_dragover*?event null
+			drop?event <=> row_drop*?event null
+			dragend?event <=> row_dragend*?event null
+		sub /
+			<= Drag_handle* $mol_view
+				attr *
+					draggable \true
+				event *
+					dragstart?event <=> handle_dragstart*?event null
+				sub /
+					\⠿
+			<= Block*
+	drag_source_id? \
+	drag_over_id? \
+	drag_over_position? \after
 	sub /
 		<= Block_list $mol_list
-			rows <= block_views /
+			rows <= block_row_views /
 		<= Menu $bog_wysiwyg_menu
 			showed? <=> menu_showed? false
 			picked?val <=> menu_picked?val \
 			index? <=> menu_index? 0
 			pos_y <= menu_pos_y? 0
 			pos_x <= menu_pos_x? 0
+		<= Ai $bog_wysiwyg_ai
+			showed? <=> ai_showed? false
+			context <= ai_context? \
+			loading? <=> ai_loading? false
+			on_result?text <=> ai_result?text null
+			picked?val <=> ai_picked?val \
+			index? <=> ai_index? 0
+			pos_y <= ai_pos_y? 0
+			pos_x <= ai_pos_x? 0
