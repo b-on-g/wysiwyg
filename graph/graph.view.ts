@@ -17,6 +17,9 @@ namespace $.$$ {
 	/** Wiki link pattern: [[page_id]] or [[page_id|display text]] */
 	const wiki_link_re = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g
 
+	/** Wiki link already converted to HTML: data-wiki-link="page_id" */
+	const wiki_attr_re = /data-wiki-link="([^"]+)"/g
+
 	export class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
 
 		override sub() {
@@ -116,9 +119,22 @@ namespace $.$$ {
 				const seen = new Set<string>()
 				for( const bid of page.block_ids() ) {
 					const html = page.block_html( bid ) ?? ''
+
+					// Extract from data-wiki-link attributes (already converted links)
 					let match: RegExpExecArray | null
+					wiki_attr_re.lastIndex = 0
+					while( ( match = wiki_attr_re.exec( html ) ) !== null ) {
+						const target = match[ 1 ].trim()
+						if( page_ids.has( target ) && target !== page.id() && !seen.has( target ) ) {
+							seen.add( target )
+							result.push({ source: page.id(), target })
+						}
+					}
+
+					// Extract from raw [[wiki_link]] text (not yet converted)
+					const text = html.replace( /<[^>]*>/g, '' )
 					wiki_link_re.lastIndex = 0
-					while( ( match = wiki_link_re.exec( html ) ) !== null ) {
+					while( ( match = wiki_link_re.exec( text ) ) !== null ) {
 						const target = match[ 1 ].trim()
 						if( page_ids.has( target ) && target !== page.id() && !seen.has( target ) ) {
 							seen.add( target )
