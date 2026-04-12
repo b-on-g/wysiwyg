@@ -9,10 +9,10 @@ namespace $ {
 		alignItems: 'center',
 		gap: '0.5rem',
 		padding: {
-			top: '0',
+			top: 0,
 			bottom: '0.75rem',
-			left: '0',
-			right: '0',
+			left: 0,
+			right: 0,
 		},
 
 		Sync_icon: {
