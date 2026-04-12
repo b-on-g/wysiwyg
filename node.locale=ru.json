@@ -1,0 +1,19 @@
+{
+	"$bog_wysiwyg_app_title": "WYSIWYG Редактор",
+	"$bog_wysiwyg_block_link_url_prompt": "URL ссылки:",
+	"$bog_wysiwyg_block_placeholder": "Напишите что-нибудь или нажмите / для меню",
+	"$bog_wysiwyg_history_Save_button_title": "Сохранить версию",
+	"$bog_wysiwyg_history_version_label": "Версия",
+	"$bog_wysiwyg_image_url_prompt": "URL картинки:",
+	"$bog_wysiwyg_links_title": "Обратные ссылки",
+	"$bog_wysiwyg_menu_command_code": "Код",
+	"$bog_wysiwyg_menu_command_divider": "Разделитель",
+	"$bog_wysiwyg_menu_command_heading1": "Заголовок 1",
+	"$bog_wysiwyg_menu_command_heading2": "Заголовок 2",
+	"$bog_wysiwyg_menu_command_heading3": "Заголовок 3",
+	"$bog_wysiwyg_menu_command_image": "Картинка",
+	"$bog_wysiwyg_menu_command_list": "Список",
+	"$bog_wysiwyg_menu_command_paragraph": "Текст",
+	"$bog_wysiwyg_menu_command_quote": "Цитата",
+	"$mol_text_code_Copy_hint": "Скопировать весь код"
+}

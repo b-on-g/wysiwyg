@@ -1,1 +1,22 @@
-{}
+{
+	"$bog_wysiwyg_app_title": "WYSIWYG Editor",
+	"$bog_wysiwyg_block_link_url_prompt": "URL:",
+	"$bog_wysiwyg_block_placeholder": "Type / for block menu...",
+	"$bog_wysiwyg_comment_Panel_title_title": "Comments",
+	"$bog_wysiwyg_comment_thread_Input_hint": "Write a comment...",
+	"$bog_wysiwyg_comment_thread_Send_title": "Send",
+	"$bog_wysiwyg_history_Save_button_title": "Save version",
+	"$bog_wysiwyg_history_version_label": "Version",
+	"$bog_wysiwyg_image_url_prompt": "Image URL:",
+	"$bog_wysiwyg_links_title": "Backlinks",
+	"$bog_wysiwyg_menu_command_code": "Code",
+	"$bog_wysiwyg_menu_command_divider": "Divider",
+	"$bog_wysiwyg_menu_command_heading1": "Heading 1",
+	"$bog_wysiwyg_menu_command_heading2": "Heading 2",
+	"$bog_wysiwyg_menu_command_heading3": "Heading 3",
+	"$bog_wysiwyg_menu_command_image": "Image",
+	"$bog_wysiwyg_menu_command_list": "List",
+	"$bog_wysiwyg_menu_command_paragraph": "Text",
+	"$bog_wysiwyg_menu_command_quote": "Quote",
+	"$mol_text_code_Copy_hint": "Copy whole code"
+}

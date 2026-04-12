@@ -1,16 +1,94 @@
-$mol_list $mol_view
-	render_visible_only true
-	render_over 0.1
-	sub <= rows /$mol_view
-		<= Gap_before $mol_view style * paddingTop <= gap_before 0
-		<= Empty $mol_view
-		<= Gap_after $mol_view style * paddingTop <= gap_after 0
-	item_height_min* 1
-	item_width_min* 1
-	view_window_shift? 0
-	view_window /
+$mol_ghost $mol_view
+	Sub $mol_view
+
+$mol_follower $mol_ghost
+	Anchor $mol_view
+	align /number
+		-.5
+		-.5
+	offset /number
 		0
 		0
+	style *
+		^
+		transform <= transform \
+
+$mol_pop $mol_view
+	showed? false
+	align_vert \
+	align_hor \
+	align \bottom_center
+	prefer \vert
+	auto /
+		<= bubble null
+	sub /
+		<= Anchor null
+	sub_visible /
+		<= Anchor
+		<= Follower $mol_follower
+			offset <= bubble_offset /number
+				0
+				1
+			align <= bubble_align /number
+				0
+				0
+			Anchor <= Anchor
+			Sub <= Bubble $mol_pop_bubble
+				content <= bubble_content /$mol_view_content
+				height_max <= height_max 9999
+
+$mol_pop_bubble $mol_view
+	sub <= content /$mol_view_content
+	style *
+		^
+		maxHeight <= height_max 9999
+	attr *
+		^
+		tabindex 0
+		popover \manual
+
+$mol_scroll $mol_view
+	scroll_top? 0
+	scroll_left? 0
+	attr *
+		^
+		tabindex <= tabindex -1
+	event *
+		^
+		scroll?event <=> event_scroll?event null
+
+$mol_svg $mol_view
+	dom_name \svg
+	dom_name_space \http://www.w3.org/2000/svg
+	font_size 16
+	font_family \
+	style_size *
+
+$mol_svg_root $mol_svg
+	dom_name \svg
+	attr *
+		^
+		viewBox <= view_box \0 0 100 100
+		preserveAspectRatio <= aspect \xMidYMid
+
+$mol_svg_path $mol_svg
+	dom_name \path
+	attr *
+		^
+		d <= geometry \
+
+
+$mol_icon $mol_svg_root
+	view_box \0 0 24 24
+	minimal_width 16
+	minimal_height 16
+	sub /
+		<= Path $mol_svg_path
+			geometry <= path \
+
+$mol_icon_comment $mol_icon path \M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22V22H9Z
+
+$mol_icon_comment_outline $mol_icon path \M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22V22H9M10,16V19.08L13.08,16H20V4H4V16H10Z
 
 $mol_speck $mol_view
 	theme \$mol_theme_accent
@@ -44,13 +122,333 @@ $mol_button_typed $mol_button
 
 $mol_button_minor $mol_button_typed
 
+$mol_paragraph $mol_view
+	line_height 24
+	letter_width 7
+	width_limit +Infinity
+	row_width 0
+	sub / <= title
+
+$mol_icon_close $mol_icon path \M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z
+
+$mol_list $mol_view
+	render_visible_only true
+	render_over 0.1
+	sub <= rows /$mol_view
+		<= Gap_before $mol_view style * paddingTop <= gap_before 0
+		<= Empty $mol_view
+		<= Gap_after $mol_view style * paddingTop <= gap_after 0
+	item_height_min* 1
+	item_width_min* 1
+	view_window_shift? 0
+	view_window /
+		0
+		0
+
+$mol_stack $mol_view
+
+$mol_dimmer $mol_paragraph
+	haystack \
+	needle \
+	sub <= parts /$mol_view_content
+	Low* $mol_paragraph
+		sub /
+			<= string* \
+	High* $mol_paragraph
+		sub /
+			<= string* \
+
+$mol_text_code_token $mol_dimmer
+	attr *
+		^
+		mol_text_code_token_type <= type \
+
+$mol_text_code_token_link $mol_text_code_token
+	dom_name \a
+	type \code-link
+	attr *
+		^
+		href <= uri \
+		target \_blank
+
+$mol_text_code_line $mol_paragraph
+	text \
+	minimal_height 24
+	numb_showed true
+	syntax null
+	uri_resolve* \
+	Numb $mol_view
+		sub /
+			<= numb 0
+	Token* $mol_text_code_token
+		type <= token_type* \
+		haystack <= token_text* \
+		needle <= highlight \
+	Token_link* $mol_text_code_token_link
+		haystack <= token_text* \
+		needle <= highlight \
+		uri <= token_uri* \
+	find_pos* null
+
+$mol_icon_clipboard $mol_icon path \M19,3H14.82C14.4,1.84 13.3,1 12,1C10.7,1 9.6,1.84 9.18,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M12,3A1,1 0 0,1 13,4A1,1 0 0,1 12,5A1,1 0 0,1 11,4A1,1 0 0,1 12,3
+
+$mol_icon_clipboard_outline $mol_icon path \M19,3H14.82C14.4,1.84 13.3,1 12,1C10.7,1 9.6,1.84 9.18,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M12,3A1,1 0 0,1 13,4A1,1 0 0,1 12,5A1,1 0 0,1 11,4A1,1 0 0,1 12,3M7,7H17V5H19V19H5V5H7V7Z
+
+$mol_button_copy $mol_button_minor
+	blobs /$mol_blob
+		<= text_blob? $mol_blob /
+			/BlobPart <= text <= title
+			* type \text/plain
+		<= html_blob? $mol_blob /
+			/BlobPart <= html \
+			* type \text/html
+	data *
+	sub /
+		<= Icon $mol_icon_clipboard_outline
+		<= title \
+
+$mol_text_code $mol_stack
+	attr *
+		^
+		mol_text_code_sidebar_showed <= sidebar_showed false
+	text \
+	text_lines /string
+	find_pos* null
+	uri_base \
+	row_themes /string
+	sub /
+		<= Rows $mol_list
+			render_visible_only <= render_visible_only false
+			rows <= rows /
+				<= Row*0 $mol_text_code_line
+					numb_showed <= sidebar_showed
+					numb <= row_numb* 0
+					theme <= row_theme* \
+					text <= row_text* \
+					syntax <= syntax null
+					uri_resolve* <= uri_resolve* \
+					highlight <= highlight \
+		<= Copy $mol_button_copy
+			hint @ \Copy whole code
+			text <= text_export \
+
+$mol_hotkey $mol_plugin
+	event *
+		^
+		keydown?event <=> keydown?event null
+	key *
+	mod_ctrl false
+	mod_alt false
+	mod_shift false
+
+$mol_string $mol_view
+	dom_name \input
+	enabled true
+	minimal_height 40
+	autocomplete false
+	selection? /number
+		0
+		0
+	auto /
+		<= selection_watcher null
+		<= error_report null
+	field *
+		^
+		disabled <= disabled false
+		value <= value_changed? <=> value? \
+		placeholder <= hint_visible <= hint \
+		spellcheck <= spellcheck true
+		autocomplete <= autocomplete_native \
+		selectionEnd <= selection_end 0
+		selectionStart <= selection_start 0
+		inputMode <= keyboard \text
+		enterkeyhint <= enter \go
+	attr *
+		^
+		maxlength <= length_max +Infinity
+		type <= type? \text
+	event *
+		^
+		input?event <=> event_change?event null
+	plugins /
+		<= Submit $mol_hotkey
+			mod_ctrl <= submit_with_ctrl false
+			key * enter?event <=> submit?event null
+
+$mol_textarea $mol_stack
+	attr *
+		^
+		mol_textarea_clickable <= clickable? false
+		mol_textarea_sidebar_showed <= sidebar_showed false
+	event *
+		keydown?event <=> press?event null
+		pointermove?event <=> hover?event null
+	sub /
+		<= Edit $mol_textarea_edit
+			value? <=> value? \
+			hint <= hint \ 
+			enabled <= enabled true
+			spellcheck <= spellcheck true
+			length_max <= length_max +Infinity
+			selection? <=> selection? /number
+			bring => bring
+			submit? <=> submit? null
+			submit_with_ctrl <= submit_with_ctrl true
+		<= View $mol_text_code
+			text <= value
+			render_visible_only false
+			row_numb* <= row_numb* 0
+			sidebar_showed <= sidebar_showed
+			highlight <= highlight \
+			syntax <= syntax $mol_syntax2
+	symbols_alt *string
+		comma \<
+		period \>
+		dash \−
+		equals \≈
+		graveAccent \́
+		forwardSlash \÷
+		E \€
+		V \✔
+		X \×
+		C \©
+		P \§
+		H \₽
+		key0 \°
+		key8 \•
+		key2 \@
+		key3 \#
+		key4 \$
+		key6 \^
+		key7 \&
+		bracketOpen \[
+		bracketClose \]
+		slashBack \|
+	symbols_alt_ctrl *string
+		space \ 
+	symbols_alt_shift *string
+		V \✅
+		X \❌
+		O \⭕
+		key1 \❗
+		key4 \💲
+		key7 \❓
+		comma \«
+		period \»
+		semicolon \“
+		quoteSingle \”
+		dash \—
+		equals \≠
+		graveAccent \̱
+		bracketOpen \{
+		bracketClose \}
+
+$mol_textarea_edit $mol_string
+	dom_name \textarea
+	enter \enter
+	field *
+		^
+		scrollTop 0
+
+$bog_wysiwyg_comment_thread $mol_view
+	comment_land_link \
+	comment_count 0
+	sub /
+		<= Comments $mol_list
+			rows <= comment_views /
+		<= Input_row $mol_view
+			sub /
+				<= Input $mol_textarea
+					hint @ \Write a comment...
+					value? <=> draft? \
+				<= Send $mol_button_minor
+					title @ \Send
+					click?event <=> send?event null
+	Comment_row*0 $mol_view
+		sub /
+			<= Comment_author*0 $mol_paragraph
+				title <= comment_author* \
+			<= Comment_text*0 $mol_paragraph
+				title <= comment_text* \
+
+$bog_wysiwyg_comment $mol_pop
+	showed? <=> panel_open? false
+	align \right_center
+	Anchor <= Comment_button $mol_button_minor
+		sub /
+			<= Comment_icon $mol_icon_comment_outline
+			<= Comment_count $mol_view
+				sub /
+					<= comment_count_text \
+		click?event <=> toggle?event null
+	bubble_content /
+		<= Panel $mol_view
+			sub /
+				<= Panel_head $mol_view
+					sub /
+						<= Panel_title $mol_paragraph
+							title @ \Comments
+						<= Close $mol_button_minor
+							sub /
+								<= Close_icon $mol_icon_close
+							click?event <=> close?event null
+				<= Thread $bog_wysiwyg_comment_thread
+					comment_land_link <= comment_land_link \
+
+$bog_wysiwyg_collab $mol_view
+	page_land_link \
+	sub /
+		<= Sync_icon $mol_view
+			attr *
+				bog_wysiwyg_collab_status <= sync_status \offline
+			sub /
+				<= sync_label \
+		<= Peers $mol_view
+			sub <= peer_views /
+	Peer* $mol_view
+		attr *
+			title <= peer_title* \
+		sub /
+			<= peer_short* \
+
+$mol_link $mol_view
+	uri \
+	dom_name \a
+	uri_off \
+	uri_native null
+	external false
+	attr *
+		^
+		href <= uri_toggle \
+		title <= hint_safe <= hint \
+		target <= target \_self
+		download <= file_name \
+		mol_link_current <= current false
+		rel <= relation \
+	sub /$mol_view_content
+		<= title
+	arg *
+	event *
+		^
+		click?event <=> click?event <=> event_click?event null
+
+$bog_wysiwyg_links $mol_list
+	page_id \
+	all_pages /
+	rows <= link_views /
+	Link*id $mol_link
+		arg *
+			page <= link_page_id* \
+		sub /
+			<= link_title* \
+
 $bog_wysiwyg_menu $mol_view
 	showed? false
 	picked?val \
 	index? 0
-	handle_key?event null
 	pos_y? 0
 	pos_x? 0
+	commands /
 	Option* $mol_button_minor
 		title <= option_title* \
 		click?event <=> option_click*?event null
@@ -66,33 +464,77 @@ $bog_wysiwyg_menu $mol_view
 		top <= pos_y_str \0px
 		left <= pos_x_str \0px
 
-$mol_hotkey $mol_plugin
-	event *
+$bog_wysiwyg_ai $mol_view
+	showed? false
+	context \
+	loading? false
+	on_result?text null
+	picked?val \
+	index? 0
+	pos_y? 0
+	pos_x? 0
+	commands /
+	Option* $mol_button_minor
+		title <= option_title* \
+		click?event <=> option_click*?event null
+		attr *
+			^
+			bog_wysiwyg_ai_option_active <= option_active* false
+	sub <= option_rows /
+	attr *
 		^
-		keydown?event <=> keydown?event null
-	key *
-	mod_ctrl false
-	mod_alt false
-	mod_shift false
+		bog_wysiwyg_ai_showed <= showed?
+		bog_wysiwyg_ai_loading <= loading?
+	style *
+		^
+		top <= pos_y_str \0px
+		left <= pos_x_str \0px
+
+$bog_wysiwyg_history $mol_view
+	page_land_link \
+	showed? false
+	Version* $mol_button_minor
+		title <= version_title* \
+		click?event <=> version_click*?event null
+		attr *
+			^
+			bog_wysiwyg_history_active <= version_active* false
+	sub /
+		<= Save_button $mol_button_minor
+			title @ \Save version
+			click?event <=> save_version?event null
+		<= Version_list $mol_list
+			rows <= version_rows /
+	attr *
+		^
+		bog_wysiwyg_history_showed <= showed?
 
 $bog_wysiwyg_block $mol_view
 	html? \
 	type? \paragraph
 	level? 1
 	menu_open false
+	placeholder @ \Type / for block menu...
 	on_enter?event null
 	on_remove?event null
 	on_slash?event null
 	on_menu_key?event null
+	on_image?src null
+	ai_open false
+	on_ai?event null
+	on_ai_key?event null
 	bold_exec?event null
 	italic_exec?event null
 	underline_exec?event null
+	strike_exec?event null
+	link_exec?event null
 	attr *
 		^
 		contenteditable \true
 		bog_wysiwyg_block_type <= type?
 		bog_wysiwyg_block_level <= level?
 		bog_wysiwyg_block_empty <= is_empty false
+		bog_wysiwyg_block_placeholder <= placeholder
 	plugins /
 		<= Hotkey_format $mol_hotkey
 			mod_ctrl true
@@ -100,43 +542,87 @@ $bog_wysiwyg_block $mol_view
 				B?event <=> bold_exec?event
 				I?event <=> italic_exec?event
 				U?event <=> underline_exec?event
+		<= Hotkey_strike $mol_hotkey
+			mod_ctrl true
+			mod_shift true
+			key *
+				S?event <=> strike_exec?event
 	event *
 		^
 		input?event <=> input_event?event null
 		keydown?event <=> keydown_event?event null
+		paste?event <=> paste_event?event null
+		drop?event <=> drop_event?event null
+		dragover?event <=> dragover_event?event null
 	sub /
 
 $bog_wysiwyg $mol_view
+	page_land_link \
 	block_ids? /
 	Block* $bog_wysiwyg_block
 		html? <=> block_html*? \
 		type? <=> block_type*? \paragraph
 		level? <=> block_level*? 1
 		menu_open <= menu_showed? false
+		ai_open <= ai_showed? false
 		on_enter?event <=> block_enter*?event null
 		on_remove?event <=> block_remove*?event null
 		on_slash?event <=> block_slash*?event null
 		on_menu_key?event <=> block_menu_key*?event null
+		on_image?src <=> block_image*?src null
+		on_ai?event <=> block_ai*?event null
+		on_ai_key?event <=> block_ai_key*?event null
+	Block_row* $mol_view
+		attr *
+			bog_wysiwyg_drag_over <= row_is_drag_over* false
+			bog_wysiwyg_drag_pos <= row_drag_position* \
+			bog_wysiwyg_dragging <= row_is_dragging* false
+		event *
+			dragover?event <=> row_dragover*?event null
+			drop?event <=> row_drop*?event null
+			dragend?event <=> row_dragend*?event null
+		sub /
+			<= Drag_handle* $mol_view
+				attr *
+					draggable \true
+				event *
+					dragstart?event <=> handle_dragstart*?event null
+				sub /
+					\⠿
+			<= Block*
+			<= Block_comment* $bog_wysiwyg_comment
+				comment_land_link <= block_comment_land_link* \
+				panel_open? <=> block_comment_open*? false
+	drag_source_id? \
+	drag_over_id? \
+	drag_over_position? \after
+	all_pages /
 	sub /
+		<= Collab_bar $bog_wysiwyg_collab
+			page_land_link <= page_land_link
 		<= Block_list $mol_list
-			rows <= block_views /
+			rows <= block_row_views /
+		<= Backlinks $bog_wysiwyg_links
+			page_id <= page_land_link
+			all_pages <= all_pages
 		<= Menu $bog_wysiwyg_menu
 			showed? <=> menu_showed? false
 			picked?val <=> menu_picked?val \
 			index? <=> menu_index? 0
-			handle_key?event <=> menu_handle_key?event null
 			pos_y <= menu_pos_y? 0
 			pos_x <= menu_pos_x? 0
-
-$mol_scroll $mol_view
-	scroll_top? 0
-	scroll_left? 0
-	attr *
-		^
-		tabindex <= tabindex -1
-	event *
-		^
-		scroll?event <=> event_scroll?event null
+		<= Ai $bog_wysiwyg_ai
+			showed? <=> ai_showed? false
+			context <= ai_context? \
+			loading? <=> ai_loading? false
+			on_result?text <=> ai_result?text null
+			picked?val <=> ai_picked?val \
+			index? <=> ai_index? 0
+			pos_y <= ai_pos_y? 0
+			pos_x <= ai_pos_x? 0
+		<= History $bog_wysiwyg_history
+			page_land_link <= page_land_link
+			showed? <=> history_showed? false
 
 $mol_page $mol_view
 	dom_name \article
@@ -169,8 +655,9 @@ $mol_theme_auto $mol_plugin
 	attr * mol_theme <= theme <= dark \$mol_theme_dark
 
 $bog_wysiwyg_app $mol_page
-	title \WYSIWYG Редактор
+	title @ \WYSIWYG Editor
 	plugins /
 		<= Theme $mol_theme_auto
 	body /
 		<= Editor $bog_wysiwyg
+			page_land_link <= page_land_link \
