@@ -1,0 +1,18 @@
+$bog_wysiwyg_history $mol_view
+	page_land_link \
+	showed? false
+	Version* $mol_button_minor
+		title <= version_title* \
+		click?event <=> version_click*?event null
+		attr *
+			^
+			bog_wysiwyg_history_active <= version_active* false
+	sub /
+		<= Save_button $mol_button_minor
+			title @ \Save version
+			click?event <=> save_version?event null
+		<= Version_list $mol_list
+			rows <= version_rows /
+	attr *
+		^
+		bog_wysiwyg_history_showed <= showed?

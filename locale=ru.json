@@ -1,3 +1,5 @@
 {
-	"$bog_wysiwyg_image_url_prompt": "URL картинки:"
+	"$bog_wysiwyg_image_url_prompt": "URL картинки:",
+	"$bog_wysiwyg_history_Save_button_title": "Сохранить версию",
+	"$bog_wysiwyg_history_version_label": "Версия"
 }

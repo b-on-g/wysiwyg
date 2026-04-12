@@ -46,6 +46,13 @@ namespace $ {
 			},
 			minWidth: 0,
 		},
+
+		Block_comment: {
+			flex: {
+				shrink: 0,
+			},
+			alignSelf: 'center',
+		},
 	} )
 
 }

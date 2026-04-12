@@ -1,0 +1,23 @@
+$bog_wysiwyg_comment $mol_pop
+	showed? <=> panel_open? false
+	align \right_center
+	Anchor <= Comment_button $mol_button_minor
+		sub /
+			<= Comment_icon $mol_icon_comment_outline
+			<= Comment_count $mol_view
+				sub /
+					<= comment_count_text \
+		click?event <=> toggle?event null
+	bubble_content /
+		<= Panel $mol_view
+			sub /
+				<= Panel_head $mol_view
+					sub /
+						<= Panel_title $mol_paragraph
+							title @ \Comments
+						<= Close $mol_button_minor
+							sub /
+								<= Close_icon $mol_icon_close
+							click?event <=> close?event null
+				<= Thread $bog_wysiwyg_comment_thread
+					comment_land_link <= comment_land_link \

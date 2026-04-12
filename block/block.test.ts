@@ -93,6 +93,28 @@ namespace $.$$ {
 			)
 		},
 
+		'wiki link [[page_id]] converts to anchor'() {
+			const result = apply_markdown( 'see [[my_page]] for info' )
+			$mol_assert_ok( result.includes( '<a ' ) )
+			$mol_assert_ok( result.includes( 'data-wiki-link="my_page"' ) )
+			$mol_assert_ok( result.includes( 'href="#my_page"' ) )
+			$mol_assert_ok( result.includes( '>my_page</a>' ) )
+		},
+
+		'wiki link with empty content does not convert'() {
+			$mol_assert_equal(
+				apply_markdown( 'hello [[]] end' ),
+				'hello [[]] end',
+			)
+		},
+
+		'partially typed wiki link does not convert'() {
+			$mol_assert_equal(
+				apply_markdown( '[[not closed' ),
+				'[[not closed',
+			)
+		},
+
 		'empty bold content does not convert'() {
 			$mol_assert_equal(
 				apply_markdown( 'hello **** end' ),

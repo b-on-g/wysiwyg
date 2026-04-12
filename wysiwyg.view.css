@@ -1,4 +1,5 @@
-.bog_wysiwyg_block_row:hover > .bog_wysiwyg_drag_handle {
+.bog_wysiwyg_block_row:hover > .bog_wysiwyg_drag_handle,
+.bog_wysiwyg_block_row:hover > .bog_wysiwyg_comment .bog_wysiwyg_comment_comment_button {
 	opacity: 1;
 }
 

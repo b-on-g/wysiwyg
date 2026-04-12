@@ -1,0 +1,19 @@
+$bog_wysiwyg_comment_thread $mol_view
+	comment_land_link \
+	sub /
+		<= Comments $mol_list
+			rows <= comment_views /
+		<= Input_row $mol_view
+			sub /
+				<= Input $mol_textarea
+					hint @ \Write a comment...
+					value? <=> draft? \
+				<= Send $mol_button_minor
+					title @ \Send
+					click?event <=> send?event null
+	Comment_row*0 $mol_view
+		sub /
+			<= Comment_author*0 $mol_paragraph
+				title <= comment_author* \
+			<= Comment_text*0 $mol_paragraph
+				title <= comment_text* \

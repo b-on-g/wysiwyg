@@ -25,6 +25,8 @@ namespace $.$$ {
 
 	const link_pattern = /\[(.+?)\]\((\S+?)\)/
 
+	const wiki_link_pattern = /\[\[([^\]]+)\]\]/
+
 	export class $bog_wysiwyg_block extends $.$bog_wysiwyg_block {
 
 		override minimal_height() {
@@ -98,6 +100,21 @@ namespace $.$$ {
 					el.href = url
 					el.textContent = link_text
 					this.replace_match_in_text( text_node as Text, link_match, el, sel )
+					return
+				}
+			}
+
+			// Try wiki link pattern: [[page_id]]
+			const wiki_match = wiki_link_pattern.exec( text )
+			if( wiki_match ) {
+				const page_id = wiki_match[ 1 ]
+				if( page_id ) {
+					const el = doc.createElement( 'a' )
+					el.href = '#' + page_id
+					el.setAttribute( 'data-wiki-link', page_id )
+					el.className = 'bog_wysiwyg_wiki_link'
+					el.textContent = page_id
+					this.replace_match_in_text( text_node as Text, wiki_match, el, sel )
 					return
 				}
 			}

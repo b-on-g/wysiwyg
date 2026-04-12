@@ -32,12 +32,21 @@ $bog_wysiwyg $mol_view
 				sub /
 					\⠿
 			<= Block*
+			<= Block_comment* $bog_wysiwyg_comment
+				comment_land_link <= block_comment_land_link* \
+				panel_open? <=> block_comment_open*? false
 	drag_source_id? \
 	drag_over_id? \
 	drag_over_position? \after
+	all_pages /
 	sub /
+		<= Collab_bar $bog_wysiwyg_collab
+			page_land_link <= page_land_link
 		<= Block_list $mol_list
 			rows <= block_row_views /
+		<= Backlinks $bog_wysiwyg_links
+			page_id <= page_land_link
+			all_pages <= all_pages
 		<= Menu $bog_wysiwyg_menu
 			showed? <=> menu_showed? false
 			picked?val <=> menu_picked?val \
@@ -53,3 +62,6 @@ $bog_wysiwyg $mol_view
 			index? <=> ai_index? 0
 			pos_y <= ai_pos_y? 0
 			pos_x <= ai_pos_x? 0
+		<= History $bog_wysiwyg_history
+			page_land_link <= page_land_link
+			showed? <=> history_showed? false

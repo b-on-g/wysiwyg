@@ -362,7 +362,10 @@ namespace $.$$ {
 
 			if( event.key === 'Enter' ) {
 				const cmd = cmds[ this.ai_index() ]
-				if( cmd ) this.ai_picked( cmd.id )
+				if( cmd ) {
+					this.ai_picked( cmd.id )
+					;( this.Ai() as $bog_wysiwyg_ai ).run_command( cmd.id )
+				}
 				return event
 			}
 
@@ -390,6 +393,43 @@ namespace $.$$ {
 			this.focus_block( id )
 
 			return text
+		}
+
+		// === Comments ===
+
+		/** Dict mapping block_id -> comment land link string. Do NOT put @$mol_mem here. */
+		comments_dict() {
+			const data = this.page_data()
+			if( !data ) return null
+			return data.Comments( 'auto' )
+		}
+
+		/** Get existing comment land link for a block, or empty string */
+		block_comment_land_link( id: string ): string {
+			if( !this.has_baza() ) return ''
+			const dict = this.comments_dict()
+			if( !dict ) return ''
+			return dict.key( id )?.val() ?? ''
+		}
+
+		/** When comment panel opens, ensure a comment land exists for this block */
+		@ $mol_mem_key
+		block_comment_open( id: string, next?: boolean ): boolean {
+			if( next === undefined ) return false
+			if( next && this.has_baza() && !this.block_comment_land_link( id ) ) {
+				this.comment_land_ensure( id )
+			}
+			return next
+		}
+
+		/** Create a comment land for a block and store its link in the registry */
+		@ $mol_action
+		comment_land_ensure( block_id: string ) {
+			const dict = this.comments_dict()
+			if( !dict ) return
+			const land = this.$.$giper_baza_glob.land_grab( [[ null, $giper_baza_rank_post( 'just' ) ]] )
+			const atom = dict.key( block_id, 'auto' )
+			if( atom ) atom.val( land.link().str )
 		}
 
 		// === Drag & Drop ===

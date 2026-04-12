@@ -1,0 +1,15 @@
+$bog_wysiwyg_collab $mol_view
+	page_land_link \
+	sub /
+		<= Sync_icon $mol_view
+			attr *
+				bog_wysiwyg_collab_status <= sync_status \offline
+			sub /
+				<= sync_label \
+		<= Peers $mol_view
+			sub <= peer_views /
+	Peer* $mol_view
+		attr *
+			title <= peer_title* \
+		sub /
+			<= peer_short* \
