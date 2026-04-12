@@ -15,22 +15,39 @@ namespace $.$$ {
 			return this.$.$mol_state_arg.value( 'page' ) ?? ''
 		}
 
-		/** Registry land link from URL or seed */
-		registry_land_link() {
+		/** Registry land link from URL or auto-created */
+		@ $mol_mem
+		registry_land_link( next?: string ) {
+			if( next !== undefined ) {
+				this.$.$mol_state_arg.value( 'registry', next || null )
+				return next
+			}
 			return this.$.$mol_state_arg.value( 'registry' ) ?? ''
 		}
 
-		/** Registry land (stores list of page links). Do NOT put @$mol_mem. */
+		/** Registry land (stores list of page links). Do NOT put @$mol_mem on land access. */
 		registry_land() {
 			const link = this.registry_land_link()
 			if( !link ) return null
 			return this.$.$giper_baza_glob.Land( new $giper_baza_link( link ) )
 		}
 
-		/** Page list from registry. Do NOT put @$mol_mem. */
+		/** Page list from registry. Do NOT put @$mol_mem on pawn access. */
 		registry_list() {
 			const land = this.registry_land()
 			if( !land ) return null
+			return land.Data( Registry )
+		}
+
+		/** Create registry land if none exists, return registry list */
+		@ $mol_action
+		registry_ensure() {
+			let list = this.registry_list()
+			if( list ) return list
+			const land = this.$.$giper_baza_glob.land_grab(
+				[[ null, $giper_baza_rank_post( 'just' ) ]]
+			)
+			this.registry_land_link( land.link().str )
 			return land.Data( Registry )
 		}
 
@@ -115,8 +132,7 @@ namespace $.$$ {
 		page_create( event?: Event ) {
 			if( !event ) return null
 
-			const list = this.registry_list()
-			if( !list ) return null
+			const list = this.registry_ensure()
 
 			const land = this.$.$giper_baza_glob.land_grab(
 				[[ null, $giper_baza_rank_post( 'just' ) ]]

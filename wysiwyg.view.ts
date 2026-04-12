@@ -208,12 +208,10 @@ namespace $.$$ {
 			this.active_block_id( id )
 
 			const block_node = this.Block( id ).dom_node() as HTMLElement
-			const editor_node = this.dom_node() as HTMLElement
 			const block_rect = block_node.getBoundingClientRect()
-			const editor_rect = editor_node.getBoundingClientRect()
 
-			this.menu_pos_y( block_rect.bottom - editor_rect.top )
-			this.menu_pos_x( block_rect.left - editor_rect.left )
+			this.menu_pos_y( block_rect.bottom )
+			this.menu_pos_x( block_rect.left )
 			this.menu_index( 0 )
 			this.menu_showed( true )
 
@@ -320,15 +318,13 @@ namespace $.$$ {
 			this.active_block_id( id )
 
 			const block_node = this.Block( id ).dom_node() as HTMLElement
-			const editor_node = this.dom_node() as HTMLElement
 			const block_rect = block_node.getBoundingClientRect()
-			const editor_rect = editor_node.getBoundingClientRect()
 
 			const text = block_node.textContent ?? ''
 			this.ai_context( text )
 
-			this.ai_pos_y( block_rect.bottom - editor_rect.top )
-			this.ai_pos_x( block_rect.left - editor_rect.left )
+			this.ai_pos_y( block_rect.bottom )
+			this.ai_pos_x( block_rect.left )
 			this.ai_index( 0 )
 			this.ai_showed( true )
 

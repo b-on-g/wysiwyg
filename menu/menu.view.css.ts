@@ -2,7 +2,7 @@ namespace $ {
 
 	$mol_style_define( $bog_wysiwyg_menu, {
 
-		position: 'absolute',
+		position: 'fixed',
 		zIndex: 100,
 		background: {
 			color: $mol_theme.back,

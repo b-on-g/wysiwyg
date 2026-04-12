@@ -28,8 +28,8 @@ namespace $ {
 			flex: {
 				direction: 'column',
 			},
-			width: '20rem',
-			maxWidth: '20rem',
+			width: '18rem',
+			maxWidth: '90vw',
 			maxHeight: '24rem',
 			background: {
 				color: $mol_theme.card,

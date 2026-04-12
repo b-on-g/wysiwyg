@@ -7,7 +7,6 @@ namespace $ {
 				direction: 'row',
 				grow: 1,
 			},
-			overflow: 'hidden',
 		},
 
 		Sidebar: {
