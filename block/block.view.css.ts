@@ -117,7 +117,6 @@ namespace $ {
 
 	} )
 
-	// Styles for dynamic innerHTML content — not expressible in $mol_style_define
 	$mol_style_attach( 'bog_wysiwyg_block_inner', `
 		[bog_wysiwyg_block_type="image"] img {
 			max-width: 100%;
