@@ -86,7 +86,7 @@ namespace $.$$ {
 
 			const cursor = sel.getRangeAt( 0 )
 			const text_node = cursor.startContainer
-			if( text_node.nodeType !== Node.TEXT_NODE ) return
+			if( text_node.nodeType !== 3 /* Node.TEXT_NODE */ ) return
 
 			const text = text_node.textContent ?? ''
 

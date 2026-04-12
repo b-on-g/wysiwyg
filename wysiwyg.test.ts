@@ -118,7 +118,7 @@ namespace $.$$ {
 				return picked_val
 			}
 
-			const event = new MouseEvent( 'click' )
+			const event = new Event( 'click' )
 			menu.option_click( 'heading1', event )
 
 			$mol_assert_equal( picked_val, 'heading1' )

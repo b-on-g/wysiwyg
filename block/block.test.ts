@@ -36,7 +36,7 @@ namespace $.$$ {
 		div.focus()
 
 		if( select_text ) {
-			const walker = doc.createTreeWalker( div, NodeFilter.SHOW_TEXT )
+			const walker = doc.createTreeWalker( div, 4 /* NodeFilter.SHOW_TEXT */ )
 			let node: Text | null
 			while( node = walker.nextNode() as Text | null ) {
 				const idx = ( node.textContent ?? '' ).indexOf( select_text )
@@ -202,6 +202,7 @@ namespace $.$$ {
 		},
 
 		'strike_exec wraps selection in strikethrough'() {
+			if( typeof document === 'undefined' ) return
 			const div = make_block_with_selection( 'hello world end', 'world' )
 			try {
 				const block = new $bog_wysiwyg_block()
@@ -225,6 +226,7 @@ namespace $.$$ {
 		},
 
 		'link_exec with cancelled prompt does nothing'() {
+			if( typeof document === 'undefined' ) return
 			const div = make_block_with_selection( 'hello world end', 'world' )
 			try {
 				const original_prompt = globalThis.prompt
@@ -247,6 +249,7 @@ namespace $.$$ {
 		},
 
 		'link_exec creates link from selected text'() {
+			if( typeof document === 'undefined' ) return
 			const div = make_block_with_selection( 'click here now', 'here' )
 			try {
 				const original_prompt = globalThis.prompt
@@ -270,6 +273,7 @@ namespace $.$$ {
 		},
 
 		'link_exec inserts url as text when no selection'() {
+			if( typeof document === 'undefined' ) return
 			const div = make_block_with_selection( 'hello world' )
 			try {
 				div.focus()
@@ -308,6 +312,7 @@ namespace $.$$ {
 		},
 
 		'paste_event with image prevents default'() {
+			if( typeof document === 'undefined' ) return
 			let prevented = false
 			const block = new $bog_wysiwyg_block()
 
@@ -333,6 +338,7 @@ namespace $.$$ {
 		},
 
 		'paste_event without image does not prevent default'() {
+			if( typeof document === 'undefined' ) return
 			const block = new $bog_wysiwyg_block()
 
 			const dt = new DataTransfer()

@@ -7,7 +7,7 @@ namespace $.$$ {
 			const comment = new $bog_wysiwyg_comment()
 			$mol_assert_equal( comment.panel_open(), false )
 
-			const event = new MouseEvent( 'click' )
+			const event = new Event( 'click' )
 			comment.toggle( event )
 			$mol_assert_equal( comment.panel_open(), true )
 
@@ -21,7 +21,7 @@ namespace $.$$ {
 			comment.panel_open( true )
 			$mol_assert_equal( comment.panel_open(), true )
 
-			const event = new MouseEvent( 'click' )
+			const event = new Event( 'click' )
 			comment.close( event )
 			$mol_assert_equal( comment.panel_open(), false )
 		},
