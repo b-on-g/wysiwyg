@@ -83,6 +83,9 @@ namespace $ {
 				grow: 1,
 			},
 			minWidth: 0,
+			overflow: {
+				x: 'hidden',
+			},
 		},
 
 		Block_comment: {
