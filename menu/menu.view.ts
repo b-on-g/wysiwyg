@@ -36,33 +36,6 @@ namespace $.$$ {
 			return event
 		}
 
-		handle_key( event?: KeyboardEvent ) {
-			if( !event ) return null
-
-			const cmds = this.commands()
-
-			if( event.key === 'ArrowDown' ) {
-				this.index( Math.min( this.index() + 1, cmds.length - 1 ) )
-				return event
-			}
-
-			if( event.key === 'ArrowUp' ) {
-				this.index( Math.max( this.index() - 1, 0 ) )
-				return event
-			}
-
-			if( event.key === 'Enter' ) {
-				const cmd = cmds[ this.index() ]
-				if( cmd ) {
-					this.picked( cmd.id )
-					this.showed( false )
-				}
-				return event
-			}
-
-			return event
-		}
-
 		pos_y_str() {
 			return this.pos_y() + 'px'
 		}

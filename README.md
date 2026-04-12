@@ -19,9 +19,19 @@ Open-source блочный WYSIWYG-редактор на **$mol/MAM**. MIT Licen
 | `Enter` | Новый блок |
 | `Backspace` (пустой) | Удалить блок |
 | `/` (пустой блок) | Slash-меню |
-| `Ctrl/Cmd + B` | **Жирный** |
-| `Ctrl/Cmd + I` | *Курсив* |
-| `Ctrl/Cmd + U` | Подчёркнутый |
+| `↑` / `↓` (в меню) | Навигац��я по пунктам |
+| `Enter` (в меню) | Выбрать пункт |
+| `Escape` (в меню) | Закрыть меню |
+| `Ctrl/Cmd + B` | **Жирный** (`$mol_hotkey`) |
+| `Ctrl/Cmd + I` | *Курсив* (`$mol_hotkey`) |
+| `Ctrl/Cmd + U` | Подчёркнутый (`$mol_hotkey`) |
+| `Ctrl/Cmd + Shift + S` | ~~Зачёркнутый~~ (`$mol_hotkey`) |
+| `Ctrl/Cmd + K` | Вставить ссылку |
+| `**text**` | **Жирный** (markdown) |
+| `*text*` | *Курсив* (markdown) |
+| `` `text` `` | `Код` (markdown) |
+| `~~text~~` | ~~Зачёркнутый~~ (markdown) |
+| `[text](url)` | Ссылка (markdown) |
 
 ## Типы блоков
 
@@ -36,17 +46,18 @@ Open-source блочный WYSIWYG-редактор на **$mol/MAM**. MIT Licen
 ### Готово
 - [x] Блочный редактор с contenteditable
 - [x] Типы блоков: параграф, H1-H3, код, цитата, список, разделитель
-- [x] Slash-меню (/)
-- [x] Горячие клавиши: Bold, Italic, Underline
+- [x] Slash-меню (/) с навигацией стрелками и Enter
+- [x] Горячие клавиши через `$mol_hotkey`: Bold, Italic, Underline, Strikethrough
+- [x] Ctrl+K — вставка ссылок
+- [x] Markdown-форматирование при наборе: `**bold**`, `*italic*`, `` `code` ``, `~~strike~~`, `[text](url)`
 - [x] Enter/Backspace — управление блоками
-- [x] CSS стили для всех типов
+- [x] Все стили в `.view.css.ts` (`$mol_style_define`), без `.view.css`
+- [x] Перенос текста на следующую строку (`display: block`, `overflow-wrap`)
 - [x] Плейсхолдер
 - [x] GitHub Pages CI
+- [x] Тесты: меню, markdown, hotkeys, интеграционные
 
 ### Бэклог
-- [ ] Markdown-форматирование (`**bold**`, `*italic*`, `` `code` ``, `[link](url)`)
-- [ ] Вставка ссылок (Ctrl+K)
-- [ ] Strikethrough (Ctrl+Shift+S)
 - [ ] Локализация (locale=ru.json)
 - [ ] Giper Baza интеграция (коллаб, persistence, автосохранение)
 - [ ] Ссылки между страницами + обратные ссылки (backlinks)
@@ -57,9 +68,7 @@ Open-source блочный WYSIWYG-редактор на **$mol/MAM**. MIT Licen
 - [ ] Граф связей между страницами
 - [ ] Картинки
 - [ ] Drag & drop блоков
-- [ ] MWS Tables интеграция (Fusion API)
 - [ ] Плагины / расширяемость
-- [ ] Соответствие Design Kit
 
 ## Лицензия
 

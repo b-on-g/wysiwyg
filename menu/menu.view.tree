@@ -2,7 +2,6 @@ $bog_wysiwyg_menu $mol_view
 	showed? false
 	picked?val \
 	index? 0
-	handle_key?event null
 	pos_y? 0
 	pos_x? 0
 	Option* $mol_button_minor

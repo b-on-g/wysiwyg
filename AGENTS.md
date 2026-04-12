@@ -64,20 +64,20 @@ render() {
 - **Блочный редактор**: `block_ids` → `$mol_list` с `Block*` (keyed factory)
 - **Типы блоков**: paragraph, heading (1-3), code, quote, list, divider — через CSS атрибут `bog_wysiwyg_block_type`
 - **Slash-меню**: `/` на пустом блоке → абс.-позиционированный `$bog_wysiwyg_menu` → выбор типа
-- **Хоткеи**: Ctrl+B (bold), Ctrl+I (italic), Ctrl+U (underline) через `document.execCommand()`
+- **Хоткеи**: Ctrl+B (bold), Ctrl+I (italic), Ctrl+U (underline), Ctrl+Shift+S (strikethrough), Ctrl+K (ссылка)
+- **Markdown inline**: `**bold**`, `*italic*`, `` `code` ``, `~~strike~~`, `[text](url)` — конвертация при наборе через regex + Range API
 - **Блок-менеджмент**: Enter → новый блок после текущего, Backspace на пустом → удаление, фокус перемещается
 - **Плейсхолдер**: CSS `::before` с `content:` на пустых блоках
 - **Русский UI**: меню и плейсхолдер на русском, заголовок страницы
+- **Тесты**: `wysiwyg.test.ts` (меню, интеграция), `block/block.test.ts` (markdown, hotkeys)
 
 ## Что НЕ реализовано — бэклог (в порядке приоритета)
 
 ### P0 — Критично для хакатона
 
-1. **Markdown-форматирование при наборе** — `**bold**`→**bold**, `*italic*`→*italic*, `` `code` ``→`code`, `[text](url)`→ссылка. Подход: в `input_event` после каждого ввода искать паттерны regex в textContent, заменять на HTML (execCommand или Range API). Референс: `$mol_syntax2_md_line` в `mol/syntax2/` — регулярки для inline markdown.
-
-2. **Вставка ссылок** — Ctrl+K → промпт URL → `document.execCommand('createLink', false, url)`. Или markdown `[text](url)`.
-
-3. **Strikethrough** — Ctrl+Shift+S → `document.execCommand('strikeThrough')`.
+1. ~~**Markdown-форматирование при наборе**~~ — DONE. `block/block.view.ts:try_markdown()` + regex + Range API
+2. ~~**Вставка ссылок**~~ — DONE. Ctrl+K → prompt → `createLink`. `block/block.view.ts:link_exec()`
+3. ~~**Strikethrough**~~ — DONE. Ctrl+Shift+S → `strikeThrough`. `block/block.view.ts:strike_exec()`
 
 4. **Giper Baza интеграция** — Страница = 1 Land. Блоки хранятся как `$giper_baza_list` ссылок на `$giper_baza_dict` (type, text). Коллаб из коробки через CRDT. Автосохранение = запись в atom. Референс: `bog/feedback2/form/form.view.ts` — двухуровневая модель (registry land + data land). ВАЖНО: `@$mol_mem` НЕЛЬЗЯ на методы возвращающие land/pawn/player.
 
@@ -123,18 +123,10 @@ render() {
 3. Обработку в `wysiwyg.view.ts` → `menu_picked()` если нужна спец-логика
 
 ### Добавить хоткей
-В `block/block.view.ts` → `keydown_event()` — новый `if` блок с `event.key` / модификаторами.
+В `block/block.view.tree` добавь `$mol_hotkey` плагин или в `block/block.view.ts` → `keydown_event()`. Паттерн: `bold_exec`, `italic_exec`, `strike_exec`, `link_exec`.
 
-### Markdown-форматирование (приоритет P0)
-Подход: в `input_event()` или отдельном `auto()` шаге, после каждого ввода:
-1. Получить textContent текущего блока
-2. Найти markdown-паттерны: `**bold**`, `*italic*`, `` `code` ``, `~~strike~~`, `[text](url)`
-3. Заменить на HTML: `<b>bold</b>`, `<i>italic</i>`, `<code>code</code>`, `<s>strike</s>`, `<a href="url">text</a>`
-4. Обновить innerHTML и восстановить позицию курсора
-
-Сложность: сохранение позиции курсора после замены innerHTML. Использовать `window.getSelection()` + `Range` для запоминания offset до и восстановления после.
-
-Регулярки для inline markdown есть в `mol/syntax2/syntax2.ts` — `$mol_syntax2_md_line`.
+### Markdown inline (реализовано)
+В `block/block.view.ts:try_markdown()` — regex-паттерны + Range API. Вызывается из `input_event`. Один паттерн за проход, курсор ставится после нового элемента.
 
 ### Giper Baza интеграция (приоритет P0)
 Модель данных:

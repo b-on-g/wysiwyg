@@ -16,6 +16,5 @@ $bog_wysiwyg $mol_view
 			showed? <=> menu_showed? false
 			picked?val <=> menu_picked?val \
 			index? <=> menu_index? 0
-			handle_key?event <=> menu_handle_key?event null
 			pos_y <= menu_pos_y? 0
 			pos_x <= menu_pos_x? 0

@@ -10,6 +10,8 @@ $bog_wysiwyg_block $mol_view
 	bold_exec?event null
 	italic_exec?event null
 	underline_exec?event null
+	strike_exec?event null
+	link_exec?event null
 	attr *
 		^
 		contenteditable \true
@@ -23,6 +25,11 @@ $bog_wysiwyg_block $mol_view
 				B?event <=> bold_exec?event
 				I?event <=> italic_exec?event
 				U?event <=> underline_exec?event
+		<= Hotkey_strike $mol_hotkey
+			mod_ctrl true
+			mod_shift true
+			key *
+				S?event <=> strike_exec?event
 	event *
 		^
 		input?event <=> input_event?event null

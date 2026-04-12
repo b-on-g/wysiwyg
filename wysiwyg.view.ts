@@ -105,8 +105,24 @@ namespace $.$$ {
 				return event
 			}
 
-			// Delegate arrow/enter to menu
-			this.menu_handle_key( event )
+			const cmds = this.Menu().commands()
+
+			if( event.key === 'ArrowDown' ) {
+				this.menu_index( Math.min( this.menu_index() + 1, cmds.length - 1 ) )
+				return event
+			}
+
+			if( event.key === 'ArrowUp' ) {
+				this.menu_index( Math.max( this.menu_index() - 1, 0 ) )
+				return event
+			}
+
+			if( event.key === 'Enter' ) {
+				const cmd = cmds[ this.menu_index() ]
+				if( cmd ) this.menu_picked( cmd.id )
+				return event
+			}
+
 			return event
 		}
 
