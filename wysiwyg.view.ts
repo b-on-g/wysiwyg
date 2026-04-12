@@ -294,6 +294,62 @@ namespace $.$$ {
 			this.focus_block( id )
 		}
 
+		block_paste_blocks( id: string, val?: { type: string, content: string, level?: number }[] ) {
+			if( !val || !val.length ) return null
+
+			// First block replaces the current one
+			this.block_type( id, val[ 0 ].type )
+			this.block_html( id, val[ 0 ].content )
+			if( val[ 0 ].level ) this.block_level( id, val[ 0 ].level )
+
+			// Remaining blocks are inserted after
+			const ids = [ ...this.block_ids() ]
+			const index = ids.indexOf( id )
+			let last_id = id
+
+			for( let i = 1; i < val.length; i++ ) {
+				const block = val[ i ]
+
+				let new_id: string
+				if( this.has_baza() ) {
+					const data = this.page_data()
+					const blocks_list = data?.Blocks( 'auto' )
+					if( blocks_list ) {
+						const pawn = blocks_list.make( null )
+						pawn.Type( 'auto' )?.val( block.type )
+						pawn.Content( 'auto' )?.val( block.content )
+						if( block.level ) pawn.Level( 'auto' )?.val( block.level )
+						new_id = pawn.link().str
+					} else {
+						new_id = this.generate_id()
+					}
+				} else {
+					new_id = this.generate_id()
+				}
+
+				const insert_at = ids.indexOf( last_id ) + 1
+				ids.splice( insert_at, 0, new_id )
+				last_id = new_id
+			}
+
+			this.block_ids( ids )
+
+			// Set data for non-baza blocks
+			if( !this.has_baza() ) {
+				let pos = index + 1
+				for( let i = 1; i < val.length; i++ ) {
+					const new_id = ids[ pos ]
+					this.block_type( new_id, val[ i ].type )
+					this.block_html( new_id, val[ i ].content )
+					if( val[ i ].level ) this.block_level( new_id, val[ i ].level )
+					pos++
+				}
+			}
+
+			this.focus_block( last_id )
+			return val
+		}
+
 		block_image( id: string, src?: string ) {
 			if( !src ) return null
 			this.block_type( id, 'image' )

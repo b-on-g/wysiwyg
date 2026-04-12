@@ -12,6 +12,7 @@ $bog_wysiwyg_block $mol_view
 	ai_open false
 	on_ai?event null
 	on_ai_key?event null
+	on_paste_blocks?val null
 	bold_exec?event null
 	italic_exec?event null
 	underline_exec?event null

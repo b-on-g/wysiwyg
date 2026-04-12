@@ -220,6 +220,16 @@ namespace $.$$ {
 				}
 			}
 
+			const text = event.clipboardData?.getData( 'text/plain' ) ?? ''
+			if( text.includes( '\n' ) ) {
+				event.preventDefault()
+				const blocks = $bog_wysiwyg_parse_markdown( text )
+				if( blocks.length > 0 ) {
+					this.on_paste_blocks( blocks )
+				}
+				return event
+			}
+
 			return event
 		}
 

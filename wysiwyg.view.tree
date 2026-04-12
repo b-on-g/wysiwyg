@@ -14,6 +14,7 @@ $bog_wysiwyg $mol_view
 		on_image?src <=> block_image*?src null
 		on_ai?event <=> block_ai*?event null
 		on_ai_key?event <=> block_ai_key*?event null
+		on_paste_blocks?val <=> block_paste_blocks*?val null
 	Block_row* $mol_view
 		attr *
 			bog_wysiwyg_drag_over <= row_is_drag_over* false
