@@ -4,7 +4,7 @@ namespace $ {
 
 		'[bog_wysiwyg_block_type]': {
 			callout: {
-				background: { color: '#fff3cd' },
+				background: { color: $mol_theme.card },
 				padding: {
 					top: '0.75rem',
 					bottom: '0.75rem',
@@ -16,7 +16,7 @@ namespace $ {
 					left: {
 						width: '4px',
 						style: 'solid',
-						color: '#ffc107',
+						color: $mol_theme.focus,
 					},
 				},
 			},

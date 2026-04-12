@@ -35,6 +35,7 @@ namespace $.$$ {
 			return event
 		}
 
+		@ $mol_action
 		run_command( id: string ) {
 			const cmd = this.commands().find( c => c.id === id )
 			if( !cmd ) return
@@ -44,34 +45,29 @@ namespace $.$$ {
 
 			this.loading( true )
 
-			const keys = this.$.$mol_github_model_keys
-			const key = keys[ Math.floor( Math.random() * keys.length ) ]
-			const models = this.$.$mol_github_model_polyglots
-			const model_name = models[ Math.floor( Math.random() * models.length ) ]
+			try {
+				const keys = this.$.$mol_github_model_keys
+				const key = keys[ Math.floor( Math.random() * keys.length ) ]
+				const models = this.$.$mol_github_model_polyglots
+				const model_name = models[ Math.floor( Math.random() * models.length ) ]
 
-			const body = JSON.stringify( {
-				model: model_name,
-				stream: false,
-				response_format: { type: 'json_object' },
-				messages: [
-					{ role: 'system', content: 'You are a writing assistant. Respond in JSON: {"text": "your result"}. Return only the result text, no explanations.' },
-					{ role: 'user', content: `${ cmd.prompt }\n\n\u0422\u0435\u043A\u0441\u0442:\n${ context }` },
-				],
-			} )
+				const data = this.$.$mol_fetch.json( 'https://models.github.ai/inference/chat/completions', {
+					method: 'POST',
+					headers: {
+						'Authorization': 'Bearer ' + key,
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify( {
+						model: model_name,
+						stream: false,
+						response_format: { type: 'json_object' },
+						messages: [
+							{ role: 'system', content: 'You are a writing assistant. Respond in JSON: {"text": "your result"}. Return only the result text, no explanations.' },
+							{ role: 'user', content: `${ cmd.prompt }\n\n\u0422\u0435\u043A\u0441\u0442:\n${ context }` },
+						],
+					} ),
+				} )
 
-			fetch( 'https://models.github.ai/inference/chat/completions', {
-				method: 'POST',
-				headers: {
-					'Authorization': 'Bearer ' + key,
-					'Content-Type': 'application/json',
-				},
-				body,
-			} )
-			.then( resp => {
-				if( !resp.ok ) throw new Error( `AI request failed: ${ resp.status }` )
-				return resp.json()
-			} )
-			.then( data => {
 				const content = data?.choices?.[ 0 ]?.message?.content ?? ''
 				let text: string
 				try {
@@ -80,15 +76,15 @@ namespace $.$$ {
 				} catch {
 					text = content
 				}
+
 				this.loading( false )
 				this.showed( false )
 				this.on_result( text )
-			} )
-			.catch( error => {
+			} catch( error: unknown ) {
 				this.loading( false )
 				this.showed( false )
-				console.error( 'AI error:', error )
-			} )
+				$mol_fail_log( error )
+			}
 		}
 
 		pos_y_str() {

@@ -21,6 +21,17 @@ namespace $ {
 			},
 			fontSize: '0.75rem',
 			cursor: 'default',
+
+			'@': {
+				'bog_wysiwyg_collab_status': {
+					'online': {
+						color: $mol_theme.focus,
+					},
+					'offline': {
+						color: $mol_theme.shade,
+					},
+				},
+			},
 		},
 
 		Peers: {

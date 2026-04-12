@@ -170,9 +170,9 @@ namespace $.$$ {
 			}
 		}
 
-		/** Body content depends on graph toggle */
+		/** Layout content depends on graph toggle */
 		@ $mol_mem
-		override body_content() {
+		override layout_content() {
 			if( this.graph_showed() ) {
 				return [ this.Sidebar(), this.Graph_panel() ]
 			} else {

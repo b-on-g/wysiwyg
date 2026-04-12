@@ -236,7 +236,7 @@ namespace $.$$ {
 		bold_exec( event?: KeyboardEvent ) {
 			if( !event ) return null
 			event.preventDefault()
-			document.execCommand( 'bold' )
+			this.$.$mol_dom_context.document.execCommand( 'bold' )
 			this.html( ( this.dom_node() as HTMLElement ).innerHTML )
 			return event
 		}
@@ -244,7 +244,7 @@ namespace $.$$ {
 		italic_exec( event?: KeyboardEvent ) {
 			if( !event ) return null
 			event.preventDefault()
-			document.execCommand( 'italic' )
+			this.$.$mol_dom_context.document.execCommand( 'italic' )
 			this.html( ( this.dom_node() as HTMLElement ).innerHTML )
 			return event
 		}
@@ -252,7 +252,7 @@ namespace $.$$ {
 		underline_exec( event?: KeyboardEvent ) {
 			if( !event ) return null
 			event.preventDefault()
-			document.execCommand( 'underline' )
+			this.$.$mol_dom_context.document.execCommand( 'underline' )
 			this.html( ( this.dom_node() as HTMLElement ).innerHTML )
 			return event
 		}
@@ -260,7 +260,7 @@ namespace $.$$ {
 		strike_exec( event?: KeyboardEvent ) {
 			if( !event ) return null
 			event.preventDefault()
-			document.execCommand( 'strikeThrough' )
+			this.$.$mol_dom_context.document.execCommand( 'strikeThrough' )
 			this.html( ( this.dom_node() as HTMLElement ).innerHTML )
 			return event
 		}
@@ -269,17 +269,18 @@ namespace $.$$ {
 			if( !event ) return null
 			event.preventDefault()
 
-			const url = prompt( this.$.$mol_locale.text( '$bog_wysiwyg_block_link_url_prompt' ) )
+			const url = this.$.$mol_dom_context.prompt( this.$.$mol_locale.text( '$bog_wysiwyg_block_link_url_prompt' ) )
 			if( !url ) return event
 
-			const sel = this.$.$mol_dom_context.document.defaultView?.getSelection()
+			const doc = this.$.$mol_dom_context.document
+			const sel = doc.defaultView?.getSelection()
 			if( sel && sel.toString().length > 0 ) {
-				document.execCommand( 'createLink', false, url )
+				doc.execCommand( 'createLink', false, url )
 			} else {
-				const a = this.$.$mol_dom_context.document.createElement( 'a' )
+				const a = doc.createElement( 'a' )
 				a.href = url
 				a.textContent = url
-				document.execCommand( 'insertHTML', false, a.outerHTML )
+				doc.execCommand( 'insertHTML', false, a.outerHTML )
 			}
 
 			this.html( ( this.dom_node() as HTMLElement ).innerHTML )

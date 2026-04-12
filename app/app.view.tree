@@ -13,20 +13,19 @@ $bog_wysiwyg_app $mol_page
 			hint @ \Page graph
 			checked? <=> graph_showed? false
 		<= Lights $mol_lights_toggle
-	body /
+	sub /
+		<= Head
 		<= Layout $mol_view
-			sub <= body_content /
-				<= Sidebar $mol_view
-					sub /
-						<= Sidebar_head $mol_view
-							sub /
-								<= Sidebar_title $mol_paragraph
-									title @ \Pages
-								<= New_page $mol_button_minor
-									title @ \+ New
-									click?event <=> page_create?event null
-						<= Page_list $mol_list
-							rows <= page_rows /
+			sub <= layout_content /
+				<= Sidebar $bog_ui_sidebar
+					items <= page_rows /
+					Header <= Sidebar_head $mol_view
+						sub /
+							<= Sidebar_title $mol_paragraph
+								title @ \Pages
+							<= New_page $mol_button_minor
+								title @ \+ New
+								click?event <=> page_create?event null
 				<= Main $mol_view
 					sub <= main_content /
 						<= Editor $bog_wysiwyg
@@ -39,7 +38,7 @@ $bog_wysiwyg_app $mol_page
 							pages <= graph_pages /
 							current_page_id <= page_land_link
 							on_navigate?id <=> page_navigate?id null
-	Page_item*0 $bog_wysiwyg_app_page
+	Page_item* $bog_wysiwyg_app_page
 		title <= page_item_title* \
 		click?event <=> page_item_click*?event null
 		active <= page_item_active* false

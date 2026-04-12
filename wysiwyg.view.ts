@@ -292,7 +292,7 @@ namespace $.$$ {
 
 			if( cmd === 'image' ) {
 				this.menu_showed( false )
-				const url = prompt( this.$.$mol_locale.text( '$bog_wysiwyg_image_url_prompt' ) )
+				const url = this.$.$mol_dom_context.prompt( this.$.$mol_locale.text( '$bog_wysiwyg_image_url_prompt' ) )
 				if( !url ) {
 					this.focus_block( id )
 					return
@@ -514,7 +514,61 @@ namespace $.$$ {
 				this.select_all_blocks()
 				return event
 			}
+			if( event.key === 'Backspace' || event.key === 'Delete' ) {
+				const selected = this.selected_block_ids()
+				if( selected.length > 1 ) {
+					event.preventDefault()
+					this.delete_blocks( selected )
+					return event
+				}
+			}
 			return event
+		}
+
+		selected_block_ids() {
+			const sel = this.$.$mol_dom_context.document.defaultView?.getSelection()
+			if( !sel || sel.isCollapsed ) return []
+
+			const ids = this.block_ids()
+			return ids.filter( id => {
+				const node = this.Block( id ).dom_node() as HTMLElement
+				return sel.containsNode( node, true )
+			})
+		}
+
+		delete_blocks( selected: string[] ) {
+			const ids = [ ...this.block_ids() ]
+
+			for( const id of selected ) {
+				const index = ids.indexOf( id )
+				if( index >= 0 ) {
+					ids.splice( index, 1 )
+					if( this.has_baza() ) {
+						const data = this.page_data()
+						const blocks_list = data?.Blocks( 'auto' )
+						if( blocks_list ) {
+							blocks_list.cut( new $giper_baza_link( id ) )
+						}
+					}
+				}
+			}
+
+			if( ids.length === 0 ) {
+				if( this.has_baza() ) {
+					const data = this.page_data()
+					const blocks_list = data?.Blocks( 'auto' )
+					if( blocks_list ) {
+						const block = blocks_list.make( null )
+						block.Type( 'auto' )?.val( 'paragraph' )
+						ids.push( block.link().str )
+					}
+				} else {
+					ids.push( this.generate_id() )
+				}
+			}
+
+			this.block_ids( ids )
+			this.focus_block( ids[ 0 ] )
 		}
 
 		select_all_blocks() {

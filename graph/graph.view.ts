@@ -74,7 +74,17 @@ namespace $.$$ {
 			const ctx = canvas.getContext( '2d' )
 			if( !ctx ) return
 
-			this.paint( ctx, dpr, w, h, nodes, edges, current )
+			// Read theme colors from CSS variables
+			const style = this.$.$mol_dom_context.getComputedStyle( node )
+			const colors = {
+				edge: style.getPropertyValue( '--mol_theme_line' ).trim() || '#88888866',
+				focus: style.getPropertyValue( '--mol_theme_focus' ).trim() || '#3b82f6',
+				back: style.getPropertyValue( '--mol_theme_back' ).trim() || '#ffffff',
+				line: style.getPropertyValue( '--mol_theme_line' ).trim() || '#cccccc',
+				text: style.getPropertyValue( '--mol_theme_text' ).trim() || '#333333',
+			}
+
+			this.paint( ctx, dpr, w, h, nodes, edges, current, colors )
 		}
 
 		_logical_width = 600
@@ -228,6 +238,7 @@ namespace $.$$ {
 			nodes: readonly Graph_node[],
 			edges: readonly Graph_edge[],
 			current: string,
+			colors: { edge: string, focus: string, back: string, line: string, text: string },
 		) {
 			ctx.save()
 			ctx.setTransform( dpr, 0, 0, dpr, 0, 0 )
@@ -236,7 +247,7 @@ namespace $.$$ {
 			const node_map = new Map( nodes.map( n => [ n.id, n ] ) )
 
 			// Edges
-			ctx.strokeStyle = '#88888866'
+			ctx.strokeStyle = colors.edge
 			ctx.lineWidth = 1.5
 			for( const edge of edges ) {
 				const a = node_map.get( edge.source )
@@ -255,7 +266,7 @@ namespace $.$$ {
 				ctx.lineTo( ax - 8 * Math.cos( angle - 0.4 ), ay - 8 * Math.sin( angle - 0.4 ) )
 				ctx.lineTo( ax - 8 * Math.cos( angle + 0.4 ), ay - 8 * Math.sin( angle + 0.4 ) )
 				ctx.closePath()
-				ctx.fillStyle = '#88888866'
+				ctx.fillStyle = colors.edge
 				ctx.fill()
 			}
 
@@ -266,13 +277,13 @@ namespace $.$$ {
 
 				ctx.beginPath()
 				ctx.arc( n.x, n.y, radius, 0, Math.PI * 2 )
-				ctx.fillStyle = is_current ? '#3b82f6' : '#ffffff'
+				ctx.fillStyle = is_current ? colors.focus : colors.back
 				ctx.fill()
-				ctx.strokeStyle = is_current ? '#3b82f6' : '#cccccc'
+				ctx.strokeStyle = is_current ? colors.focus : colors.line
 				ctx.lineWidth = is_current ? 2.5 : 1.5
 				ctx.stroke()
 
-				ctx.fillStyle = '#333333'
+				ctx.fillStyle = colors.text
 				ctx.font = is_current ? 'bold 12px system-ui' : '11px system-ui'
 				ctx.textAlign = 'center'
 				ctx.textBaseline = 'top'
