@@ -1,3 +1,24 @@
+namespace $ {
+
+	export function $bog_wysiwyg_html_to_md( html: string ): string {
+		let text = html
+		text = text.replace( /<br\s*\/?>/gi, '\n' )
+		text = text.replace( /<(?:b|strong)>(.+?)<\/(?:b|strong)>/gi, '**$1**' )
+		text = text.replace( /<(?:i|em)>(.+?)<\/(?:i|em)>/gi, '*$1*' )
+		text = text.replace( /<code>(.+?)<\/code>/gi, '`$1`' )
+		text = text.replace( /<(?:s|del)>(.+?)<\/(?:s|del)>/gi, '~~$1~~' )
+		text = text.replace( /<a[^>]*href="([^"]*)"[^>]*>(.+?)<\/a>/gi, '[$2]($1)' )
+		text = text.replace( /<[^>]*>/g, '' )
+		text = text.replace( /&amp;/g, '&' )
+		text = text.replace( /&lt;/g, '<' )
+		text = text.replace( /&gt;/g, '>' )
+		text = text.replace( /&quot;/g, '"' )
+		text = text.replace( /&nbsp;/g, ' ' )
+		return text
+	}
+
+}
+
 namespace $.$$ {
 
 	export class $bog_wysiwyg extends $.$bog_wysiwyg {
