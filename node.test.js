@@ -26071,6 +26071,101 @@ var $;
                 block.type = () => 'paragraph';
                 $mol_assert_equal(block.is_image(), false);
             },
+            'parse_markdown: single paragraph'() {
+                const blocks = $bog_wysiwyg_parse_markdown('hello world');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].type, 'paragraph');
+                $mol_assert_equal(blocks[0].content, 'hello world');
+            },
+            'parse_markdown: two paragraphs separated by empty line'() {
+                const blocks = $bog_wysiwyg_parse_markdown('first\n\nsecond');
+                $mol_assert_equal(blocks.length, 2);
+                $mol_assert_equal(blocks[0].content, 'first');
+                $mol_assert_equal(blocks[1].content, 'second');
+            },
+            'parse_markdown: heading levels 1-3'() {
+                const blocks = $bog_wysiwyg_parse_markdown('# H1\n\n## H2\n\n### H3');
+                $mol_assert_equal(blocks.length, 3);
+                $mol_assert_equal(blocks[0].type, 'heading');
+                $mol_assert_equal(blocks[0].level, 1);
+                $mol_assert_equal(blocks[0].content, 'H1');
+                $mol_assert_equal(blocks[1].level, 2);
+                $mol_assert_equal(blocks[2].level, 3);
+            },
+            'parse_markdown: code block'() {
+                const blocks = $bog_wysiwyg_parse_markdown('```\nconst x = 1\nconst y = 2\n```');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].type, 'code');
+                $mol_assert_equal(blocks[0].content, 'const x = 1\nconst y = 2');
+            },
+            'parse_markdown: code block escapes HTML'() {
+                const blocks = $bog_wysiwyg_parse_markdown('```\n<div>&</div>\n```');
+                $mol_assert_equal(blocks[0].content, '&lt;div&gt;&amp;&lt;/div&gt;');
+            },
+            'parse_markdown: blockquote'() {
+                const blocks = $bog_wysiwyg_parse_markdown('> line one\n> line two');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].type, 'quote');
+                $mol_assert_equal(blocks[0].content, 'line one<br>line two');
+            },
+            'parse_markdown: divider ---'() {
+                const blocks = $bog_wysiwyg_parse_markdown('above\n\n---\n\nbelow');
+                $mol_assert_equal(blocks.length, 3);
+                $mol_assert_equal(blocks[1].type, 'divider');
+                $mol_assert_equal(blocks[1].content, '');
+            },
+            'parse_markdown: divider ***'() {
+                const blocks = $bog_wysiwyg_parse_markdown('***');
+                $mol_assert_equal(blocks[0].type, 'divider');
+            },
+            'parse_markdown: inline bold'() {
+                const blocks = $bog_wysiwyg_parse_markdown('hello **world**');
+                $mol_assert_equal(blocks[0].content, 'hello <b>world</b>');
+            },
+            'parse_markdown: inline italic'() {
+                const blocks = $bog_wysiwyg_parse_markdown('hello *world*');
+                $mol_assert_equal(blocks[0].content, 'hello <i>world</i>');
+            },
+            'parse_markdown: inline code'() {
+                const blocks = $bog_wysiwyg_parse_markdown('run `npm install`');
+                $mol_assert_equal(blocks[0].content, 'run <code>npm install</code>');
+            },
+            'parse_markdown: inline strike'() {
+                const blocks = $bog_wysiwyg_parse_markdown('hello ~~world~~');
+                $mol_assert_equal(blocks[0].content, 'hello <s>world</s>');
+            },
+            'parse_markdown: inline link'() {
+                const blocks = $bog_wysiwyg_parse_markdown('click [here](https://example.com)');
+                $mol_assert_equal(blocks[0].content, 'click <a href="https://example.com">here</a>');
+            },
+            'parse_markdown: multi-line paragraph joins with br'() {
+                const blocks = $bog_wysiwyg_parse_markdown('line one\nline two\nline three');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].content, 'line one<br>line two<br>line three');
+            },
+            'parse_markdown: mixed content article'() {
+                const md = '# Title\n\nSome text **bold**.\n\n```\ncode here\n```\n\n> quote\n\n---\n\nEnd.';
+                const blocks = $bog_wysiwyg_parse_markdown(md);
+                $mol_assert_equal(blocks.length, 6);
+                $mol_assert_equal(blocks[0].type, 'heading');
+                $mol_assert_equal(blocks[1].type, 'paragraph');
+                $mol_assert_equal(blocks[2].type, 'code');
+                $mol_assert_equal(blocks[3].type, 'quote');
+                $mol_assert_equal(blocks[4].type, 'divider');
+                $mol_assert_equal(blocks[5].type, 'paragraph');
+            },
+            'parse_markdown: empty input returns empty array'() {
+                $mol_assert_equal($bog_wysiwyg_parse_markdown('').length, 0);
+            },
+            'parse_markdown: only empty lines returns empty array'() {
+                $mol_assert_equal($bog_wysiwyg_parse_markdown('\n\n\n').length, 0);
+            },
+            'parse_markdown: unclosed code block collects to end'() {
+                const blocks = $bog_wysiwyg_parse_markdown('```\ncode without closing');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].type, 'code');
+                $mol_assert_equal(blocks[0].content, 'code without closing');
+            },
         });
     })($$ = $.$$ || ($.$$ = {}));
 })($ || ($ = {}));
@@ -30383,6 +30478,88 @@ var $;
                 editor.block_ids(['a', 'b', 'c']);
                 const rows = editor.block_row_views();
                 $mol_assert_equal(rows.length, 3);
+            },
+            'html_to_md: bold to markdown'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<b>hello</b>'), '**hello**');
+            },
+            'html_to_md: strong to markdown'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<strong>hello</strong>'), '**hello**');
+            },
+            'html_to_md: italic to markdown'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<i>hello</i>'), '*hello*');
+            },
+            'html_to_md: em to markdown'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<em>hello</em>'), '*hello*');
+            },
+            'html_to_md: code to markdown'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<code>x</code>'), '`x`');
+            },
+            'html_to_md: strike to markdown'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<s>old</s>'), '~~old~~');
+            },
+            'html_to_md: del to markdown'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<del>old</del>'), '~~old~~');
+            },
+            'html_to_md: link to markdown'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<a href="https://example.com">click</a>'), '[click](https://example.com)');
+            },
+            'html_to_md: br to newline'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('line1<br>line2'), 'line1\nline2');
+            },
+            'html_to_md: strips unknown tags'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('<div>hello</div>'), 'hello');
+            },
+            'html_to_md: decodes HTML entities'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('&amp; &lt; &gt; &quot;'), '& < > "');
+            },
+            'html_to_md: mixed inline formatting'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('hello <b>bold</b> and <i>italic</i>'), 'hello **bold** and *italic*');
+            },
+            'html_to_md: plain text unchanged'() {
+                $mol_assert_equal($bog_wysiwyg_html_to_md('just text'), 'just text');
+            },
+            'block_paste_blocks replaces current and inserts new blocks'() {
+                const editor = new $bog_wysiwyg();
+                editor.block_ids(['a', 'b']);
+                editor.focus_block = () => { };
+                editor.block_paste_blocks('a', [
+                    { type: 'heading', content: 'Title', level: 1 },
+                    { type: 'paragraph', content: 'text' },
+                    { type: 'code', content: 'x = 1' },
+                ]);
+                const ids = editor.block_ids();
+                $mol_assert_equal(ids.length, 4);
+                $mol_assert_equal(ids[0], 'a');
+                $mol_assert_equal(ids[3], 'b');
+                $mol_assert_equal(editor.block_type('a'), 'heading');
+                $mol_assert_equal(editor.block_html('a'), 'Title');
+                $mol_assert_equal(editor.block_level('a'), 1);
+                $mol_assert_equal(editor.block_type(ids[1]), 'paragraph');
+                $mol_assert_equal(editor.block_html(ids[1]), 'text');
+                $mol_assert_equal(editor.block_type(ids[2]), 'code');
+                $mol_assert_equal(editor.block_html(ids[2]), 'x = 1');
+            },
+            'block_paste_blocks with single block replaces current only'() {
+                const editor = new $bog_wysiwyg();
+                editor.block_ids(['a', 'b']);
+                editor.focus_block = () => { };
+                editor.block_paste_blocks('a', [
+                    { type: 'quote', content: 'quoted' },
+                ]);
+                $mol_assert_equal(editor.block_ids().length, 2);
+                $mol_assert_equal(editor.block_type('a'), 'quote');
+                $mol_assert_equal(editor.block_html('a'), 'quoted');
+            },
+            'block_paste_blocks with empty array returns null'() {
+                const editor = new $bog_wysiwyg();
+                editor.block_ids(['a']);
+                $mol_assert_equal(editor.block_paste_blocks('a', []), null);
+                $mol_assert_equal(editor.block_ids().length, 1);
+            },
+            'block_paste_blocks without val returns null'() {
+                const editor = new $bog_wysiwyg();
+                editor.block_ids(['a']);
+                $mol_assert_equal(editor.block_paste_blocks('a'), null);
             },
         });
     })($$ = $.$$ || ($.$$ = {}));
