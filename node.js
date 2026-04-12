@@ -19888,596 +19888,6 @@ var $;
 })($ || ($ = {}));
 
 ;
-	($.$bog_wysiwyg_block) = class $bog_wysiwyg_block extends ($.$mol_view) {
-		is_empty(){
-			return false;
-		}
-		Hotkey_format(){
-			const obj = new this.$.$mol_hotkey();
-			(obj.mod_ctrl) = () => (true);
-			(obj.key) = () => ({
-				"B": (next) => (this.bold_exec(next)), 
-				"I": (next) => (this.italic_exec(next)), 
-				"U": (next) => (this.underline_exec(next))
-			});
-			return obj;
-		}
-		Hotkey_strike(){
-			const obj = new this.$.$mol_hotkey();
-			(obj.mod_ctrl) = () => (true);
-			(obj.mod_shift) = () => (true);
-			(obj.key) = () => ({"S": (next) => (this.strike_exec(next))});
-			return obj;
-		}
-		input_event(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		keydown_event(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		paste_event(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		drop_event(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		dragover_event(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		html(next){
-			if(next !== undefined) return next;
-			return "";
-		}
-		type(next){
-			if(next !== undefined) return next;
-			return "paragraph";
-		}
-		level(next){
-			if(next !== undefined) return next;
-			return 1;
-		}
-		menu_open(){
-			return false;
-		}
-		placeholder(){
-			return (this.$.$mol_locale.text("$bog_wysiwyg_block_placeholder"));
-		}
-		on_enter(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		on_remove(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		on_slash(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		on_menu_key(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		on_image(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		ai_open(){
-			return false;
-		}
-		on_ai(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		on_ai_key(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		bold_exec(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		italic_exec(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		underline_exec(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		strike_exec(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		link_exec(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		attr(){
-			return {
-				...(super.attr()), 
-				"contenteditable": "true", 
-				"bog_wysiwyg_block_type": (this.type()), 
-				"bog_wysiwyg_block_level": (this.level()), 
-				"bog_wysiwyg_block_empty": (this.is_empty()), 
-				"bog_wysiwyg_block_placeholder": (this.placeholder())
-			};
-		}
-		plugins(){
-			return [(this.Hotkey_format()), (this.Hotkey_strike())];
-		}
-		event(){
-			return {
-				...(super.event()), 
-				"input": (next) => (this.input_event(next)), 
-				"keydown": (next) => (this.keydown_event(next)), 
-				"paste": (next) => (this.paste_event(next)), 
-				"drop": (next) => (this.drop_event(next)), 
-				"dragover": (next) => (this.dragover_event(next))
-			};
-		}
-		sub(){
-			return [];
-		}
-	};
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "Hotkey_format"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "Hotkey_strike"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "input_event"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "keydown_event"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "paste_event"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "drop_event"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "dragover_event"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "html"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "type"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "level"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_enter"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_remove"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_slash"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_menu_key"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_image"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_ai"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_ai_key"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "bold_exec"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "italic_exec"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "underline_exec"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "strike_exec"));
-	($mol_mem(($.$bog_wysiwyg_block.prototype), "link_exec"));
-
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        const markdown_patterns = [
-            {
-                regex: /\*\*(.+?)\*\*/,
-                tag: 'b',
-            },
-            {
-                regex: /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/,
-                tag: 'i',
-            },
-            {
-                regex: /`(.+?)`/,
-                tag: 'code',
-            },
-            {
-                regex: /~~(.+?)~~/,
-                tag: 's',
-            },
-        ];
-        const link_pattern = /\[(.+?)\]\((\S+?)\)/;
-        const wiki_link_pattern = /\[\[([^\]]+)\]\]/;
-        class $bog_wysiwyg_block extends $.$bog_wysiwyg_block {
-            minimal_height() {
-                return 40;
-            }
-            is_empty() {
-                const html = this.html();
-                if (this.type() === 'image' && html?.includes('<img'))
-                    return false;
-                return !html?.replace(/<[^>]*>/g, '').trim();
-            }
-            sub() {
-                return null;
-            }
-            is_image() {
-                return this.type() === 'image';
-            }
-            auto() {
-                const node = this.dom_node();
-                const doc = this.$.$mol_dom_context.document;
-                if (this.is_image()) {
-                    node.contentEditable = 'false';
-                    const html = this.html();
-                    if (node.innerHTML !== html) {
-                        node.innerHTML = html;
-                    }
-                    return;
-                }
-                node.contentEditable = 'true';
-                if (node !== doc.activeElement) {
-                    const html = this.html();
-                    if (node.innerHTML !== html) {
-                        node.innerHTML = html;
-                    }
-                }
-            }
-            input_event(event) {
-                if (!event)
-                    return null;
-                const node = event.target;
-                this.try_markdown(node);
-                this.html(node.innerHTML);
-                return event;
-            }
-            try_markdown(container) {
-                const doc = container.ownerDocument;
-                const sel = doc.defaultView?.getSelection();
-                if (!sel || sel.rangeCount === 0)
-                    return;
-                const cursor = sel.getRangeAt(0);
-                const text_node = cursor.startContainer;
-                if (text_node.nodeType !== 3)
-                    return;
-                const text = text_node.textContent ?? '';
-                const link_match = link_pattern.exec(text);
-                if (link_match) {
-                    const link_text = link_match[1];
-                    const url = link_match[2];
-                    if (link_text && url) {
-                        const el = doc.createElement('a');
-                        el.href = url;
-                        el.textContent = link_text;
-                        this.replace_match_in_text(text_node, link_match, el, sel);
-                        return;
-                    }
-                }
-                const wiki_match = wiki_link_pattern.exec(text);
-                if (wiki_match) {
-                    const page_id = wiki_match[1];
-                    if (page_id) {
-                        const el = doc.createElement('a');
-                        el.href = '#' + page_id;
-                        el.setAttribute('data-wiki-link', page_id);
-                        el.className = 'bog_wysiwyg_wiki_link';
-                        el.textContent = page_id;
-                        this.replace_match_in_text(text_node, wiki_match, el, sel);
-                        return;
-                    }
-                }
-                for (const pattern of markdown_patterns) {
-                    const match = pattern.regex.exec(text);
-                    if (!match)
-                        continue;
-                    const content = match[1];
-                    if (!content)
-                        continue;
-                    const el = doc.createElement(pattern.tag);
-                    el.textContent = content;
-                    this.replace_match_in_text(text_node, match, el, sel);
-                    return;
-                }
-            }
-            replace_match_in_text(text_node, match, el, sel) {
-                const start = match.index;
-                const end = start + match[0].length;
-                const range = text_node.ownerDocument.createRange();
-                range.setStart(text_node, start);
-                range.setEnd(text_node, end);
-                range.deleteContents();
-                range.insertNode(el);
-                const after = text_node.ownerDocument.createRange();
-                after.setStartAfter(el);
-                after.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(after);
-            }
-            bold_exec(event) {
-                if (!event)
-                    return null;
-                event.preventDefault();
-                document.execCommand('bold');
-                this.html(this.dom_node().innerHTML);
-                return event;
-            }
-            italic_exec(event) {
-                if (!event)
-                    return null;
-                event.preventDefault();
-                document.execCommand('italic');
-                this.html(this.dom_node().innerHTML);
-                return event;
-            }
-            underline_exec(event) {
-                if (!event)
-                    return null;
-                event.preventDefault();
-                document.execCommand('underline');
-                this.html(this.dom_node().innerHTML);
-                return event;
-            }
-            strike_exec(event) {
-                if (!event)
-                    return null;
-                event.preventDefault();
-                document.execCommand('strikeThrough');
-                this.html(this.dom_node().innerHTML);
-                return event;
-            }
-            link_exec(event) {
-                if (!event)
-                    return null;
-                event.preventDefault();
-                const url = prompt(this.$.$mol_locale.text('$bog_wysiwyg_block_link_url_prompt'));
-                if (!url)
-                    return event;
-                const sel = this.$.$mol_dom_context.document.defaultView?.getSelection();
-                if (sel && sel.toString().length > 0) {
-                    document.execCommand('createLink', false, url);
-                }
-                else {
-                    const a = this.$.$mol_dom_context.document.createElement('a');
-                    a.href = url;
-                    a.textContent = url;
-                    document.execCommand('insertHTML', false, a.outerHTML);
-                }
-                this.html(this.dom_node().innerHTML);
-                return event;
-            }
-            paste_event(event) {
-                if (!event)
-                    return null;
-                const items = event.clipboardData?.items;
-                if (!items)
-                    return event;
-                for (const item of items) {
-                    if (item.type.startsWith('image/')) {
-                        event.preventDefault();
-                        const file = item.getAsFile();
-                        if (file)
-                            this.insert_image_file(file);
-                        return event;
-                    }
-                }
-                return event;
-            }
-            drop_event(event) {
-                if (!event)
-                    return null;
-                const files = event.dataTransfer?.files;
-                if (!files)
-                    return event;
-                for (const file of files) {
-                    if (file.type.startsWith('image/')) {
-                        event.preventDefault();
-                        this.insert_image_file(file);
-                        return event;
-                    }
-                }
-                return event;
-            }
-            dragover_event(event) {
-                if (!event)
-                    return null;
-                event.preventDefault();
-                return event;
-            }
-            insert_image_file(file) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const src = reader.result;
-                    this.on_image(src);
-                };
-                reader.readAsDataURL(file);
-            }
-            keydown_event(event) {
-                if (!event)
-                    return null;
-                const node = event.target;
-                if (this.is_image()) {
-                    if (event.key === 'Backspace' || event.key === 'Delete') {
-                        event.preventDefault();
-                        this.on_remove(event);
-                        return event;
-                    }
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        this.on_enter(event);
-                        return event;
-                    }
-                    return event;
-                }
-                if (this.ai_open()) {
-                    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
-                        event.preventDefault();
-                        this.on_ai_key(event);
-                        return event;
-                    }
-                    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
-                        this.on_ai_key(event);
-                        return event;
-                    }
-                }
-                if (this.menu_open()) {
-                    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
-                        event.preventDefault();
-                        this.on_menu_key(event);
-                        return event;
-                    }
-                    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
-                        this.on_menu_key(event);
-                        return event;
-                    }
-                }
-                if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    this.on_enter(event);
-                    return event;
-                }
-                if (event.key === 'Backspace' && !node.textContent?.trim()) {
-                    event.preventDefault();
-                    this.on_remove(event);
-                    return event;
-                }
-                if (event.key === '/' && !node.textContent?.trim()) {
-                    event.preventDefault();
-                    this.on_slash(event);
-                    return event;
-                }
-                if (event.key === 'j' && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
-                    event.preventDefault();
-                    this.on_ai(event);
-                    return event;
-                }
-                if (event.key === 'k' && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
-                    this.link_exec(event);
-                    return event;
-                }
-                return event;
-            }
-        }
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_block.prototype, "is_empty", null);
-        $$.$bog_wysiwyg_block = $bog_wysiwyg_block;
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_attach("bog/wysiwyg/block/block.view.css", "[bog_wysiwyg_block_type=\"image\"] img {\n\tmax-width: 100%;\n\theight: auto;\n\tborder-radius: 0.5rem;\n\tdisplay: block;\n\tmargin: 0 auto;\n}\n\n[bog_wysiwyg_block_type=\"image\"][bog_wysiwyg_block_empty=\"true\"] {\n\tborder: 2px dashed var(--mol_theme_line);\n\tborder-radius: 0.5rem;\n\tmin-height: 6rem;\n\tdisplay: flex;\n\talign-items: center;\n\tjustify-content: center;\n\tcursor: pointer;\n}\n\n[bog_wysiwyg_block_type=\"image\"][bog_wysiwyg_block_empty=\"true\"]::before {\n\tcontent: \"\\1F5BC  \\0414\\043E\\0431\\0430\\0432\\044C\\0442\\0435 \\043A\\0430\\0440\\0442\\0438\\043D\\043A\\0443\";\n}\n\n.bog_wysiwyg_wiki_link {\n\tcolor: var(--mol_theme_focus);\n\ttext-decoration: none;\n\tborder-bottom: 1px dashed var(--mol_theme_focus);\n\tcursor: pointer;\n}\n\n.bog_wysiwyg_wiki_link:hover {\n\tborder-bottom-style: solid;\n}\n");
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_define($bog_wysiwyg_block, {
-        display: 'block',
-        outline: 'none',
-        padding: {
-            top: '0.25rem',
-            bottom: '0.25rem',
-            left: '0.5rem',
-            right: '0.5rem',
-        },
-        minHeight: '1.5em',
-        lineHeight: '1.6',
-        borderRadius: '0.25rem',
-        cursor: 'text',
-        position: 'relative',
-        overflowWrap: 'break-word',
-        ':hover': {
-            background: {
-                color: $mol_theme.hover,
-            },
-        },
-        ':focus': {
-            outline: 'none',
-            background: {
-                color: $mol_theme.hover,
-            },
-        },
-        '[bog_wysiwyg_block_empty]': {
-            'true': {
-                '::before': {
-                    content: 'attr(bog_wysiwyg_block_placeholder)',
-                    color: $mol_theme.shade,
-                    pointerEvents: 'none',
-                    position: 'absolute',
-                },
-            },
-        },
-        '[bog_wysiwyg_block_type]': {
-            heading: {
-                '[bog_wysiwyg_block_level]': {
-                    '1': {
-                        font: { size: '2rem', weight: 700 },
-                        lineHeight: '1.2',
-                        margin: { top: '1rem' },
-                    },
-                    '2': {
-                        font: { size: '1.5rem', weight: 700 },
-                        lineHeight: '1.3',
-                        margin: { top: '0.75rem' },
-                    },
-                    '3': {
-                        font: { size: '1.25rem', weight: 600 },
-                        lineHeight: '1.4',
-                        margin: { top: '0.5rem' },
-                    },
-                },
-            },
-            code: {
-                font: { family: 'monospace' },
-                background: { color: $mol_theme.card },
-                padding: {
-                    top: '1rem',
-                    bottom: '1rem',
-                    left: '1rem',
-                    right: '1rem',
-                },
-                borderRadius: '0.5rem',
-                whiteSpace: 'pre-wrap',
-            },
-            quote: {
-                border: {
-                    left: {
-                        width: '3px',
-                        style: 'solid',
-                        color: $mol_theme.focus,
-                    },
-                },
-                padding: { left: '1rem' },
-                color: $mol_theme.shade,
-                font: { style: 'italic' },
-            },
-            divider: {
-                border: {
-                    top: {
-                        width: '1px',
-                        style: 'solid',
-                        color: $mol_theme.line,
-                    },
-                },
-                minHeight: 0,
-                padding: {
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                },
-                margin: { top: '0.5rem', bottom: '0.5rem' },
-                pointerEvents: 'none',
-            },
-            image: {
-                cursor: 'default',
-                padding: {
-                    top: '0.5rem',
-                    bottom: '0.5rem',
-                    left: 0,
-                    right: 0,
-                },
-                textAlign: 'center',
-            },
-        },
-    });
-})($ || ($ = {}));
-
-;
 	($.$bog_wysiwyg) = class $bog_wysiwyg extends ($.$mol_view) {
 		block_html(id, next){
 			if(next !== undefined) return next;
@@ -20527,6 +19937,10 @@ var $;
 			if(next !== undefined) return next;
 			return null;
 		}
+		block_paste_blocks(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
 		row_is_drag_over(id){
 			return false;
 		}
@@ -20571,6 +19985,14 @@ var $;
 			(obj.comment_land_link) = () => ((this.block_comment_land_link(id)));
 			(obj.panel_open) = (next) => ((this.block_comment_open(id, next)));
 			return obj;
+		}
+		editor_keydown(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		editor_copy(next){
+			if(next !== undefined) return next;
+			return null;
 		}
 		Status(){
 			const obj = new this.$.$giper_baza_status();
@@ -20686,6 +20108,7 @@ var $;
 			(obj.on_image) = (next) => ((this.block_image(id, next)));
 			(obj.on_ai) = (next) => ((this.block_ai(id, next)));
 			(obj.on_ai_key) = (next) => ((this.block_ai_key(id, next)));
+			(obj.on_paste_blocks) = (next) => ((this.block_paste_blocks(id, next)));
 			return obj;
 		}
 		Block_row(id){
@@ -20722,6 +20145,13 @@ var $;
 		all_pages(){
 			return [];
 		}
+		event(){
+			return {
+				...(super.event()), 
+				"keydown": (next) => (this.editor_keydown(next)), 
+				"copy": (next) => (this.editor_copy(next))
+			};
+		}
 		sub(){
 			return [
 				(this.Status()), 
@@ -20745,6 +20175,7 @@ var $;
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_image"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_ai"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_ai_key"));
+	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_paste_blocks"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "row_dragover"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "row_drop"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "row_dragend"));
@@ -20752,6 +20183,8 @@ var $;
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "Drag_handle"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_comment_open"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "Block_comment"));
+	($mol_mem(($.$bog_wysiwyg.prototype), "editor_keydown"));
+	($mol_mem(($.$bog_wysiwyg.prototype), "editor_copy"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "Status"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "Block_list"));
 	($mol_mem(($.$bog_wysiwyg.prototype), "Backlinks"));
@@ -20784,6 +20217,25 @@ var $;
 ;
 "use strict";
 var $;
+(function ($) {
+    function $bog_wysiwyg_html_to_md(html) {
+        let text = html;
+        text = text.replace(/<br\s*\/?>/gi, '\n');
+        text = text.replace(/<(?:b|strong)>(.+?)<\/(?:b|strong)>/gi, '**$1**');
+        text = text.replace(/<(?:i|em)>(.+?)<\/(?:i|em)>/gi, '*$1*');
+        text = text.replace(/<code>(.+?)<\/code>/gi, '`$1`');
+        text = text.replace(/<(?:s|del)>(.+?)<\/(?:s|del)>/gi, '~~$1~~');
+        text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>(.+?)<\/a>/gi, '[$2]($1)');
+        text = text.replace(/<[^>]*>/g, '');
+        text = text.replace(/&amp;/g, '&');
+        text = text.replace(/&lt;/g, '<');
+        text = text.replace(/&gt;/g, '>');
+        text = text.replace(/&quot;/g, '"');
+        text = text.replace(/&nbsp;/g, ' ');
+        return text;
+    }
+    $.$bog_wysiwyg_html_to_md = $bog_wysiwyg_html_to_md;
+})($ || ($ = {}));
 (function ($) {
     var $$;
     (function ($$) {
@@ -21031,6 +20483,56 @@ var $;
                 this.block_html(id, '');
                 this.focus_block(id);
             }
+            block_paste_blocks(id, val) {
+                if (!val || !val.length)
+                    return null;
+                this.block_type(id, val[0].type);
+                this.block_html(id, val[0].content);
+                if (val[0].level)
+                    this.block_level(id, val[0].level);
+                const ids = [...this.block_ids()];
+                const index = ids.indexOf(id);
+                let last_id = id;
+                for (let i = 1; i < val.length; i++) {
+                    const block = val[i];
+                    let new_id;
+                    if (this.has_baza()) {
+                        const data = this.page_data();
+                        const blocks_list = data?.Blocks('auto');
+                        if (blocks_list) {
+                            const pawn = blocks_list.make(null);
+                            pawn.Type('auto')?.val(block.type);
+                            pawn.Content('auto')?.val(block.content);
+                            if (block.level)
+                                pawn.Level('auto')?.val(block.level);
+                            new_id = pawn.link().str;
+                        }
+                        else {
+                            new_id = this.generate_id();
+                        }
+                    }
+                    else {
+                        new_id = this.generate_id();
+                    }
+                    const insert_at = ids.indexOf(last_id) + 1;
+                    ids.splice(insert_at, 0, new_id);
+                    last_id = new_id;
+                }
+                this.block_ids(ids);
+                if (!this.has_baza()) {
+                    let pos = index + 1;
+                    for (let i = 1; i < val.length; i++) {
+                        const new_id = ids[pos];
+                        this.block_type(new_id, val[i].type);
+                        this.block_html(new_id, val[i].content);
+                        if (val[i].level)
+                            this.block_level(new_id, val[i].level);
+                        pos++;
+                    }
+                }
+                this.focus_block(last_id);
+                return val;
+            }
             block_image(id, src) {
                 if (!src)
                     return null;
@@ -21138,6 +20640,85 @@ var $;
                 const atom = dict.key(block_id, 'auto');
                 if (atom)
                     atom.val(land.link().str);
+            }
+            editor_keydown(event) {
+                if (!event)
+                    return null;
+                if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
+                    event.preventDefault();
+                    this.select_all_blocks();
+                    return event;
+                }
+                return event;
+            }
+            select_all_blocks() {
+                const ids = this.block_ids();
+                if (!ids.length)
+                    return;
+                const first = this.Block(ids[0]).dom_node();
+                const last = this.Block(ids[ids.length - 1]).dom_node();
+                const sel = this.$.$mol_dom_context.document.defaultView?.getSelection();
+                if (!sel)
+                    return;
+                sel.removeAllRanges();
+                const range = this.$.$mol_dom_context.document.createRange();
+                range.setStart(first, 0);
+                range.setEnd(last, last.childNodes.length);
+                sel.addRange(range);
+            }
+            editor_copy(event) {
+                if (!event)
+                    return null;
+                const sel = this.$.$mol_dom_context.document.defaultView?.getSelection();
+                if (!sel || sel.isCollapsed)
+                    return event;
+                const ids = this.block_ids();
+                const md_parts = [];
+                for (const id of ids) {
+                    const node = this.Block(id).dom_node();
+                    if (!sel.containsNode(node, true))
+                        continue;
+                    const type = this.block_type(id);
+                    const html = node.innerHTML;
+                    switch (type) {
+                        case 'heading': {
+                            const level = this.block_level(id);
+                            md_parts.push('#'.repeat(level) + ' ' + $.$bog_wysiwyg_html_to_md(html));
+                            break;
+                        }
+                        case 'code':
+                            md_parts.push('```\n' + (node.textContent ?? '') + '\n```');
+                            break;
+                        case 'quote':
+                            md_parts.push($.$bog_wysiwyg_html_to_md(html)
+                                .split('\n')
+                                .map(l => '> ' + l)
+                                .join('\n'));
+                            break;
+                        case 'divider':
+                            md_parts.push('---');
+                            break;
+                        case 'image': {
+                            const img = node.querySelector('img');
+                            if (img)
+                                md_parts.push(`![](${img.src})`);
+                            break;
+                        }
+                        default:
+                            md_parts.push($.$bog_wysiwyg_html_to_md(html));
+                    }
+                }
+                if (md_parts.length > 1) {
+                    event.preventDefault();
+                    const md = md_parts.join('\n\n');
+                    event.clipboardData?.setData('text/plain', md);
+                    const html = ids
+                        .filter(id => sel.containsNode(this.Block(id).dom_node(), true))
+                        .map(id => this.Block(id).dom_node().outerHTML)
+                        .join('');
+                    event.clipboardData?.setData('text/html', html);
+                }
+                return event;
             }
             row_is_drag_over(id) {
                 return this.drag_over_id() === id && this.drag_source_id() !== id;
@@ -21313,13 +20894,6 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    $mol_style_attach("bog/wysiwyg/wysiwyg.view.css", ".bog_wysiwyg_block_row:hover > .bog_wysiwyg_drag_handle,\n.bog_wysiwyg_block_row:hover > .bog_wysiwyg_comment .bog_wysiwyg_comment_comment_button {\n\topacity: 1;\n}\n\n.bog_wysiwyg_drag_handle:active {\n\tcursor: grabbing;\n}\n\n.bog_wysiwyg_block_row[bog_wysiwyg_dragging=\"true\"] {\n\topacity: 0.5;\n}\n\n.bog_wysiwyg_block_row[bog_wysiwyg_drag_over=\"true\"][bog_wysiwyg_drag_pos=\"before\"] {\n\tborder-top: 2px solid var(--mol_theme_focus);\n}\n\n.bog_wysiwyg_block_row[bog_wysiwyg_drag_over=\"true\"][bog_wysiwyg_drag_pos=\"after\"] {\n\tborder-bottom: 2px solid var(--mol_theme_focus);\n}\n");
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
     $mol_style_define($bog_wysiwyg, {
         position: 'relative',
         flex: {
@@ -21341,6 +20915,39 @@ var $;
                 direction: 'row',
             },
             alignItems: 'flex-start',
+            '@': {
+                'bog_wysiwyg_dragging': {
+                    'true': {
+                        opacity: 0.5,
+                    },
+                },
+                'bog_wysiwyg_drag_over': {
+                    'true': {
+                        '@': {
+                            'bog_wysiwyg_drag_pos': {
+                                'before': {
+                                    border: {
+                                        top: {
+                                            width: '2px',
+                                            style: 'solid',
+                                            color: $mol_theme.focus,
+                                        },
+                                    },
+                                },
+                                'after': {
+                                    border: {
+                                        bottom: {
+                                            width: '2px',
+                                            style: 'solid',
+                                            color: $mol_theme.focus,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         },
         Drag_handle: {
             flex: {
@@ -21356,6 +20963,9 @@ var $;
             userSelect: 'none',
             fontSize: '1rem',
             lineHeight: '1.6',
+            ':active': {
+                cursor: 'grabbing',
+            },
         },
         Block: {
             flex: {
@@ -21370,6 +20980,12 @@ var $;
             alignSelf: 'center',
         },
     });
+    $mol_style_attach('bog_wysiwyg_hover', `
+		.bog_wysiwyg_block_row:hover > .bog_wysiwyg_drag_handle,
+		.bog_wysiwyg_block_row:hover > .bog_wysiwyg_comment .bog_wysiwyg_comment_comment_button {
+			opacity: 1;
+		}
+	`);
 })($ || ($ = {}));
 
 ;
@@ -21970,22 +21586,42 @@ var $;
                     return { focus: '#3b82f6', card: '#ffffff', line: '#cccccc', text: '#333333', shade: '#888888' };
                 }
             }
-            render_canvas() {
-                const canvas = this.Canvas().dom_node();
-                const ctx = canvas.getContext('2d');
-                if (!ctx)
-                    return;
+            node_at(x, y) {
+                const nodes = this.sim_nodes();
+                for (let i = nodes.length - 1; i >= 0; i--) {
+                    const n = nodes[i];
+                    const dx = n.x - x;
+                    const dy = n.y - y;
+                    if (dx * dx + dy * dy < 24 * 24)
+                        return n;
+                }
+                return null;
+            }
+            auto() {
+                const nodes = this.sim_nodes();
+                const edges = this.edges();
+                const current = this.current_page_id();
                 const dpr = this.$.$mol_dom_context.devicePixelRatio || 1;
                 const w = this.logical_width();
                 const h = this.logical_height();
+                const colors = this.read_theme_colors();
+                requestAnimationFrame(() => {
+                    try {
+                        const canvas = this.Canvas().dom_node();
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx)
+                            return;
+                        this.paint(ctx, dpr, w, h, nodes, edges, current, colors);
+                        this.bind_events(canvas);
+                    }
+                    catch { }
+                });
+            }
+            paint(ctx, dpr, w, h, nodes, edges, current, colors) {
                 ctx.save();
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                 ctx.clearRect(0, 0, w, h);
-                const nodes = this.sim_nodes();
-                const edges = this.edges();
                 const node_map = new Map(nodes.map(n => [n.id, n]));
-                const current = this.current_page_id();
-                const colors = this.read_theme_colors();
                 ctx.strokeStyle = colors.shade + '66';
                 ctx.lineWidth = 1.5;
                 for (const edge of edges) {
@@ -22027,23 +21663,11 @@ var $;
                 }
                 ctx.restore();
             }
-            node_at(x, y) {
-                const nodes = this.sim_nodes();
-                for (let i = nodes.length - 1; i >= 0; i--) {
-                    const n = nodes[i];
-                    const dx = n.x - x;
-                    const dy = n.y - y;
-                    if (dx * dx + dy * dy < 24 * 24)
-                        return n;
-                }
-                return null;
-            }
             _events_bound = false;
-            bind_events() {
+            bind_events(canvas) {
                 if (this._events_bound)
                     return;
                 this._events_bound = true;
-                const canvas = this.Canvas().dom_node();
                 canvas.addEventListener('click', (e) => {
                     const rect = canvas.getBoundingClientRect();
                     const node = this.node_at(e.clientX - rect.left, e.clientY - rect.top);
@@ -22056,10 +21680,6 @@ var $;
                     const y = e.clientY - rect.top;
                     canvas.style.cursor = this.node_at(x, y) ? 'pointer' : 'default';
                 });
-            }
-            auto() {
-                this.render_canvas();
-                this.bind_events();
             }
         }
         __decorate([
@@ -22341,6 +21961,708 @@ var $;
 })($ || ($ = {}));
 
 ;
+	($.$bog_wysiwyg_block) = class $bog_wysiwyg_block extends ($.$mol_view) {
+		is_empty(){
+			return false;
+		}
+		Hotkey_format(){
+			const obj = new this.$.$mol_hotkey();
+			(obj.mod_ctrl) = () => (true);
+			(obj.key) = () => ({
+				"B": (next) => (this.bold_exec(next)), 
+				"I": (next) => (this.italic_exec(next)), 
+				"U": (next) => (this.underline_exec(next))
+			});
+			return obj;
+		}
+		Hotkey_strike(){
+			const obj = new this.$.$mol_hotkey();
+			(obj.mod_ctrl) = () => (true);
+			(obj.mod_shift) = () => (true);
+			(obj.key) = () => ({"S": (next) => (this.strike_exec(next))});
+			return obj;
+		}
+		input_event(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		keydown_event(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		paste_event(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		drop_event(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		dragover_event(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		html(next){
+			if(next !== undefined) return next;
+			return "";
+		}
+		type(next){
+			if(next !== undefined) return next;
+			return "paragraph";
+		}
+		level(next){
+			if(next !== undefined) return next;
+			return 1;
+		}
+		menu_open(){
+			return false;
+		}
+		placeholder(){
+			return (this.$.$mol_locale.text("$bog_wysiwyg_block_placeholder"));
+		}
+		on_enter(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_remove(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_slash(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_menu_key(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_image(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		ai_open(){
+			return false;
+		}
+		on_ai(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_ai_key(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_paste_blocks(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		bold_exec(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		italic_exec(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		underline_exec(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		strike_exec(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		link_exec(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		attr(){
+			return {
+				...(super.attr()), 
+				"contenteditable": "true", 
+				"bog_wysiwyg_block_type": (this.type()), 
+				"bog_wysiwyg_block_level": (this.level()), 
+				"bog_wysiwyg_block_empty": (this.is_empty()), 
+				"bog_wysiwyg_block_placeholder": (this.placeholder())
+			};
+		}
+		plugins(){
+			return [(this.Hotkey_format()), (this.Hotkey_strike())];
+		}
+		event(){
+			return {
+				...(super.event()), 
+				"input": (next) => (this.input_event(next)), 
+				"keydown": (next) => (this.keydown_event(next)), 
+				"paste": (next) => (this.paste_event(next)), 
+				"drop": (next) => (this.drop_event(next)), 
+				"dragover": (next) => (this.dragover_event(next))
+			};
+		}
+		sub(){
+			return [];
+		}
+	};
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "Hotkey_format"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "Hotkey_strike"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "input_event"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "keydown_event"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "paste_event"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "drop_event"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "dragover_event"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "html"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "type"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "level"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_enter"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_remove"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_slash"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_menu_key"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_image"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_ai"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_ai_key"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_paste_blocks"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "bold_exec"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "italic_exec"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "underline_exec"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "strike_exec"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "link_exec"));
+
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    function $bog_wysiwyg_parse_markdown(text) {
+        const blocks = [];
+        const lines = text.split('\n');
+        let i = 0;
+        while (i < lines.length) {
+            const line = lines[i];
+            if (!line.trim()) {
+                i++;
+                continue;
+            }
+            if (line.trimStart().startsWith('```')) {
+                const code_lines = [];
+                i++;
+                while (i < lines.length && !lines[i].trimStart().startsWith('```')) {
+                    code_lines.push(lines[i]);
+                    i++;
+                }
+                if (i < lines.length)
+                    i++;
+                blocks.push({ type: 'code', content: md_escape_html(code_lines.join('\n')) });
+                continue;
+            }
+            const heading_match = line.match(/^(#{1,3})\s+(.+)/);
+            if (heading_match) {
+                blocks.push({ type: 'heading', content: md_inline(heading_match[2]), level: heading_match[1].length });
+                i++;
+                continue;
+            }
+            if (/^[-*_]{3,}\s*$/.test(line.trim())) {
+                blocks.push({ type: 'divider', content: '' });
+                i++;
+                continue;
+            }
+            if (line.trimStart().startsWith('> ') || line.trimStart() === '>') {
+                const quote_lines = [];
+                while (i < lines.length && (lines[i].trimStart().startsWith('> ') || lines[i].trimStart() === '>')) {
+                    quote_lines.push(lines[i].replace(/^>\s?/, ''));
+                    i++;
+                }
+                blocks.push({ type: 'quote', content: md_inline(quote_lines.join('<br>')) });
+                continue;
+            }
+            const para_lines = [];
+            while (i < lines.length && lines[i].trim()
+                && !lines[i].trimStart().startsWith('```')
+                && !lines[i].match(/^#{1,3}\s/)
+                && !(/^[-*_]{3,}\s*$/.test(lines[i].trim()))
+                && !lines[i].trimStart().startsWith('> ')) {
+                para_lines.push(lines[i]);
+                i++;
+            }
+            if (para_lines.length) {
+                blocks.push({ type: 'paragraph', content: md_inline(para_lines.join('<br>')) });
+            }
+        }
+        return blocks;
+    }
+    $.$bog_wysiwyg_parse_markdown = $bog_wysiwyg_parse_markdown;
+    function md_inline(text) {
+        text = text.replace(/\[(.+?)\]\((\S+?)\)/g, '<a href="$2">$1</a>');
+        text = text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+        text = text.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<i>$1</i>');
+        text = text.replace(/`(.+?)`/g, '<code>$1</code>');
+        text = text.replace(/~~(.+?)~~/g, '<s>$1</s>');
+        return text;
+    }
+    function md_escape_html(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+})($ || ($ = {}));
+(function ($) {
+    var $$;
+    (function ($$) {
+        const markdown_patterns = [
+            {
+                regex: /\*\*(.+?)\*\*/,
+                tag: 'b',
+            },
+            {
+                regex: /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/,
+                tag: 'i',
+            },
+            {
+                regex: /`(.+?)`/,
+                tag: 'code',
+            },
+            {
+                regex: /~~(.+?)~~/,
+                tag: 's',
+            },
+        ];
+        const link_pattern = /\[(.+?)\]\((\S+?)\)/;
+        const wiki_link_pattern = /\[\[([^\]]+)\]\]/;
+        class $bog_wysiwyg_block extends $.$bog_wysiwyg_block {
+            minimal_height() {
+                return 40;
+            }
+            is_empty() {
+                const html = this.html();
+                if (this.type() === 'image' && html?.includes('<img'))
+                    return false;
+                return !html?.replace(/<[^>]*>/g, '').trim();
+            }
+            sub() {
+                return null;
+            }
+            is_image() {
+                return this.type() === 'image';
+            }
+            auto() {
+                const node = this.dom_node();
+                const doc = this.$.$mol_dom_context.document;
+                if (this.is_image()) {
+                    node.contentEditable = 'false';
+                    const html = this.html();
+                    if (node.innerHTML !== html) {
+                        node.innerHTML = html;
+                    }
+                    return;
+                }
+                node.contentEditable = 'true';
+                if (node !== doc.activeElement) {
+                    const html = this.html();
+                    if (node.innerHTML !== html) {
+                        node.innerHTML = html;
+                    }
+                }
+            }
+            input_event(event) {
+                if (!event)
+                    return null;
+                const node = event.target;
+                this.try_markdown(node);
+                this.html(node.innerHTML);
+                return event;
+            }
+            try_markdown(container) {
+                const doc = container.ownerDocument;
+                const sel = doc.defaultView?.getSelection();
+                if (!sel || sel.rangeCount === 0)
+                    return;
+                const cursor = sel.getRangeAt(0);
+                const text_node = cursor.startContainer;
+                if (text_node.nodeType !== 3)
+                    return;
+                const text = text_node.textContent ?? '';
+                const link_match = link_pattern.exec(text);
+                if (link_match) {
+                    const link_text = link_match[1];
+                    const url = link_match[2];
+                    if (link_text && url) {
+                        const el = doc.createElement('a');
+                        el.href = url;
+                        el.textContent = link_text;
+                        this.replace_match_in_text(text_node, link_match, el, sel);
+                        return;
+                    }
+                }
+                const wiki_match = wiki_link_pattern.exec(text);
+                if (wiki_match) {
+                    const page_id = wiki_match[1];
+                    if (page_id) {
+                        const el = doc.createElement('a');
+                        el.href = '#' + page_id;
+                        el.setAttribute('data-wiki-link', page_id);
+                        el.className = 'bog_wysiwyg_wiki_link';
+                        el.textContent = page_id;
+                        this.replace_match_in_text(text_node, wiki_match, el, sel);
+                        return;
+                    }
+                }
+                for (const pattern of markdown_patterns) {
+                    const match = pattern.regex.exec(text);
+                    if (!match)
+                        continue;
+                    const content = match[1];
+                    if (!content)
+                        continue;
+                    const el = doc.createElement(pattern.tag);
+                    el.textContent = content;
+                    this.replace_match_in_text(text_node, match, el, sel);
+                    return;
+                }
+            }
+            replace_match_in_text(text_node, match, el, sel) {
+                const start = match.index;
+                const end = start + match[0].length;
+                const range = text_node.ownerDocument.createRange();
+                range.setStart(text_node, start);
+                range.setEnd(text_node, end);
+                range.deleteContents();
+                range.insertNode(el);
+                const after = text_node.ownerDocument.createRange();
+                after.setStartAfter(el);
+                after.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(after);
+            }
+            bold_exec(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                document.execCommand('bold');
+                this.html(this.dom_node().innerHTML);
+                return event;
+            }
+            italic_exec(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                document.execCommand('italic');
+                this.html(this.dom_node().innerHTML);
+                return event;
+            }
+            underline_exec(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                document.execCommand('underline');
+                this.html(this.dom_node().innerHTML);
+                return event;
+            }
+            strike_exec(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                document.execCommand('strikeThrough');
+                this.html(this.dom_node().innerHTML);
+                return event;
+            }
+            link_exec(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                const url = prompt(this.$.$mol_locale.text('$bog_wysiwyg_block_link_url_prompt'));
+                if (!url)
+                    return event;
+                const sel = this.$.$mol_dom_context.document.defaultView?.getSelection();
+                if (sel && sel.toString().length > 0) {
+                    document.execCommand('createLink', false, url);
+                }
+                else {
+                    const a = this.$.$mol_dom_context.document.createElement('a');
+                    a.href = url;
+                    a.textContent = url;
+                    document.execCommand('insertHTML', false, a.outerHTML);
+                }
+                this.html(this.dom_node().innerHTML);
+                return event;
+            }
+            paste_event(event) {
+                if (!event)
+                    return null;
+                const items = event.clipboardData?.items;
+                if (!items)
+                    return event;
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        event.preventDefault();
+                        const file = item.getAsFile();
+                        if (file)
+                            this.insert_image_file(file);
+                        return event;
+                    }
+                }
+                const text = event.clipboardData?.getData('text/plain') ?? '';
+                if (text.includes('\n')) {
+                    event.preventDefault();
+                    const blocks = $.$bog_wysiwyg_parse_markdown(text);
+                    if (blocks.length > 0) {
+                        this.on_paste_blocks(blocks);
+                    }
+                    return event;
+                }
+                return event;
+            }
+            drop_event(event) {
+                if (!event)
+                    return null;
+                const files = event.dataTransfer?.files;
+                if (!files)
+                    return event;
+                for (const file of files) {
+                    if (file.type.startsWith('image/')) {
+                        event.preventDefault();
+                        this.insert_image_file(file);
+                        return event;
+                    }
+                }
+                return event;
+            }
+            dragover_event(event) {
+                if (!event)
+                    return null;
+                event.preventDefault();
+                return event;
+            }
+            insert_image_file(file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const src = reader.result;
+                    this.on_image(src);
+                };
+                reader.readAsDataURL(file);
+            }
+            keydown_event(event) {
+                if (!event)
+                    return null;
+                const node = event.target;
+                if (this.is_image()) {
+                    if (event.key === 'Backspace' || event.key === 'Delete') {
+                        event.preventDefault();
+                        this.on_remove(event);
+                        return event;
+                    }
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        this.on_enter(event);
+                        return event;
+                    }
+                    return event;
+                }
+                if (this.ai_open()) {
+                    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
+                        event.preventDefault();
+                        this.on_ai_key(event);
+                        return event;
+                    }
+                    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+                        this.on_ai_key(event);
+                        return event;
+                    }
+                }
+                if (this.menu_open()) {
+                    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
+                        event.preventDefault();
+                        this.on_menu_key(event);
+                        return event;
+                    }
+                    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+                        this.on_menu_key(event);
+                        return event;
+                    }
+                }
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    this.on_enter(event);
+                    return event;
+                }
+                if (event.key === 'Backspace' && !node.textContent?.trim()) {
+                    event.preventDefault();
+                    this.on_remove(event);
+                    return event;
+                }
+                if (event.key === '/' && !node.textContent?.trim()) {
+                    event.preventDefault();
+                    this.on_slash(event);
+                    return event;
+                }
+                if (event.key === 'j' && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
+                    event.preventDefault();
+                    this.on_ai(event);
+                    return event;
+                }
+                if (event.key === 'k' && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
+                    this.link_exec(event);
+                    return event;
+                }
+                return event;
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_block.prototype, "is_empty", null);
+        $$.$bog_wysiwyg_block = $bog_wysiwyg_block;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_define($bog_wysiwyg_block, {
+        display: 'block',
+        outline: 'none',
+        padding: {
+            top: '0.25rem',
+            bottom: '0.25rem',
+            left: '0.5rem',
+            right: '0.5rem',
+        },
+        minHeight: '1.5em',
+        lineHeight: '1.6',
+        borderRadius: '0.25rem',
+        cursor: 'text',
+        position: 'relative',
+        overflowWrap: 'break-word',
+        ':hover': {
+            background: {
+                color: $mol_theme.hover,
+            },
+        },
+        ':focus': {
+            outline: 'none',
+            background: {
+                color: $mol_theme.hover,
+            },
+        },
+        '[bog_wysiwyg_block_empty]': {
+            'true': {
+                '::before': {
+                    content: 'attr(bog_wysiwyg_block_placeholder)',
+                    color: $mol_theme.shade,
+                    pointerEvents: 'none',
+                    position: 'absolute',
+                },
+            },
+        },
+        '[bog_wysiwyg_block_type]': {
+            heading: {
+                '[bog_wysiwyg_block_level]': {
+                    '1': {
+                        font: { size: '2rem', weight: 700 },
+                        lineHeight: '1.2',
+                        margin: { top: '1rem' },
+                    },
+                    '2': {
+                        font: { size: '1.5rem', weight: 700 },
+                        lineHeight: '1.3',
+                        margin: { top: '0.75rem' },
+                    },
+                    '3': {
+                        font: { size: '1.25rem', weight: 600 },
+                        lineHeight: '1.4',
+                        margin: { top: '0.5rem' },
+                    },
+                },
+            },
+            code: {
+                font: { family: 'monospace' },
+                background: { color: $mol_theme.card },
+                padding: {
+                    top: '1rem',
+                    bottom: '1rem',
+                    left: '1rem',
+                    right: '1rem',
+                },
+                borderRadius: '0.5rem',
+                whiteSpace: 'pre-wrap',
+            },
+            quote: {
+                border: {
+                    left: {
+                        width: '3px',
+                        style: 'solid',
+                        color: $mol_theme.focus,
+                    },
+                },
+                padding: { left: '1rem' },
+                color: $mol_theme.shade,
+                font: { style: 'italic' },
+            },
+            divider: {
+                border: {
+                    top: {
+                        width: '1px',
+                        style: 'solid',
+                        color: $mol_theme.line,
+                    },
+                },
+                minHeight: 0,
+                padding: {
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                },
+                margin: { top: '0.5rem', bottom: '0.5rem' },
+                pointerEvents: 'none',
+            },
+            image: {
+                cursor: 'default',
+                padding: {
+                    top: '0.5rem',
+                    bottom: '0.5rem',
+                    left: 0,
+                    right: 0,
+                },
+                textAlign: 'center',
+            },
+        },
+    });
+    $mol_style_attach('bog_wysiwyg_block_inner', `
+		[bog_wysiwyg_block_type="image"] img {
+			max-width: 100%;
+			height: auto;
+			border-radius: 0.5rem;
+			display: block;
+			margin: 0 auto;
+		}
+
+		[bog_wysiwyg_block_type="image"][bog_wysiwyg_block_empty="true"] {
+			border: 2px dashed var(--mol_theme_line);
+			border-radius: 0.5rem;
+			min-height: 6rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+		}
+
+		[bog_wysiwyg_block_type="image"][bog_wysiwyg_block_empty="true"]::before {
+			content: "\\1F5BC  \\0414\\043E\\0431\\0430\\0432\\044C\\0442\\0435 \\043A\\0430\\0440\\0442\\0438\\043D\\043A\\0443";
+		}
+
+		.bog_wysiwyg_wiki_link {
+			color: var(--mol_theme_focus);
+			text-decoration: none;
+			border-bottom: 1px dashed var(--mol_theme_focus);
+			cursor: pointer;
+		}
+
+		.bog_wysiwyg_wiki_link:hover {
+			border-bottom-style: solid;
+		}
+	`);
+})($ || ($ = {}));
+
+;
 "use strict";
 
 ;
@@ -22559,13 +22881,6 @@ var $;
                 shrink: 0,
             },
             width: '14rem',
-            border: {
-                right: {
-                    width: '1px',
-                    style: 'solid',
-                    color: $mol_theme.line,
-                },
-            },
             overflow: {
                 y: 'auto',
                 x: 'hidden',

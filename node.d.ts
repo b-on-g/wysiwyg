@@ -9407,116 +9407,6 @@ declare namespace $ {
 
 declare namespace $ {
 
-	type $mol_hotkey__mod_ctrl_bog_wysiwyg_block_1 = $mol_type_enforce<
-		boolean
-		,
-		ReturnType< $mol_hotkey['mod_ctrl'] >
-	>
-	type $mol_hotkey__key_bog_wysiwyg_block_2 = $mol_type_enforce<
-		({ 
-			B( next?: ReturnType< $bog_wysiwyg_block['bold_exec'] > ): ReturnType< $bog_wysiwyg_block['bold_exec'] >,
-			I( next?: ReturnType< $bog_wysiwyg_block['italic_exec'] > ): ReturnType< $bog_wysiwyg_block['italic_exec'] >,
-			U( next?: ReturnType< $bog_wysiwyg_block['underline_exec'] > ): ReturnType< $bog_wysiwyg_block['underline_exec'] >,
-		}) 
-		,
-		ReturnType< $mol_hotkey['key'] >
-	>
-	type $mol_hotkey__mod_ctrl_bog_wysiwyg_block_3 = $mol_type_enforce<
-		boolean
-		,
-		ReturnType< $mol_hotkey['mod_ctrl'] >
-	>
-	type $mol_hotkey__mod_shift_bog_wysiwyg_block_4 = $mol_type_enforce<
-		boolean
-		,
-		ReturnType< $mol_hotkey['mod_shift'] >
-	>
-	type $mol_hotkey__key_bog_wysiwyg_block_5 = $mol_type_enforce<
-		({ 
-			S( next?: ReturnType< $bog_wysiwyg_block['strike_exec'] > ): ReturnType< $bog_wysiwyg_block['strike_exec'] >,
-		}) 
-		,
-		ReturnType< $mol_hotkey['key'] >
-	>
-	export class $bog_wysiwyg_block extends $mol_view {
-		is_empty( ): boolean
-		Hotkey_format( ): $mol_hotkey
-		Hotkey_strike( ): $mol_hotkey
-		input_event( next?: any ): any
-		keydown_event( next?: any ): any
-		paste_event( next?: any ): any
-		drop_event( next?: any ): any
-		dragover_event( next?: any ): any
-		html( next?: string ): string
-		type( next?: string ): string
-		level( next?: number ): number
-		menu_open( ): boolean
-		placeholder( ): string
-		on_enter( next?: any ): any
-		on_remove( next?: any ): any
-		on_slash( next?: any ): any
-		on_menu_key( next?: any ): any
-		on_image( next?: any ): any
-		ai_open( ): boolean
-		on_ai( next?: any ): any
-		on_ai_key( next?: any ): any
-		bold_exec( next?: any ): any
-		italic_exec( next?: any ): any
-		underline_exec( next?: any ): any
-		strike_exec( next?: any ): any
-		link_exec( next?: any ): any
-		attr( ): ({ 
-			'contenteditable': string,
-			'bog_wysiwyg_block_type': ReturnType< $bog_wysiwyg_block['type'] >,
-			'bog_wysiwyg_block_level': ReturnType< $bog_wysiwyg_block['level'] >,
-			'bog_wysiwyg_block_empty': ReturnType< $bog_wysiwyg_block['is_empty'] >,
-			'bog_wysiwyg_block_placeholder': ReturnType< $bog_wysiwyg_block['placeholder'] >,
-		})  & ReturnType< $mol_view['attr'] >
-		plugins( ): readonly(any)[]
-		event( ): ({ 
-			input( next?: ReturnType< $bog_wysiwyg_block['input_event'] > ): ReturnType< $bog_wysiwyg_block['input_event'] >,
-			keydown( next?: ReturnType< $bog_wysiwyg_block['keydown_event'] > ): ReturnType< $bog_wysiwyg_block['keydown_event'] >,
-			paste( next?: ReturnType< $bog_wysiwyg_block['paste_event'] > ): ReturnType< $bog_wysiwyg_block['paste_event'] >,
-			drop( next?: ReturnType< $bog_wysiwyg_block['drop_event'] > ): ReturnType< $bog_wysiwyg_block['drop_event'] >,
-			dragover( next?: ReturnType< $bog_wysiwyg_block['dragover_event'] > ): ReturnType< $bog_wysiwyg_block['dragover_event'] >,
-		})  & ReturnType< $mol_view['event'] >
-		sub( ): readonly(any)[]
-	}
-	
-}
-
-//# sourceMappingURL=block.view.tree.d.ts.map
-declare namespace $.$$ {
-    class $bog_wysiwyg_block extends $.$bog_wysiwyg_block {
-        minimal_height(): number;
-        is_empty(): boolean;
-        sub(): any;
-        is_image(): boolean;
-        auto(): void;
-        input_event(event?: Event): Event | null;
-        try_markdown(container: HTMLElement): void;
-        replace_match_in_text(text_node: Text, match: RegExpExecArray, el: HTMLElement, sel: Selection): void;
-        bold_exec(event?: KeyboardEvent): KeyboardEvent | null;
-        italic_exec(event?: KeyboardEvent): KeyboardEvent | null;
-        underline_exec(event?: KeyboardEvent): KeyboardEvent | null;
-        strike_exec(event?: KeyboardEvent): KeyboardEvent | null;
-        link_exec(event?: KeyboardEvent): KeyboardEvent | null;
-        paste_event(event?: ClipboardEvent): ClipboardEvent | null;
-        drop_event(event?: DragEvent): DragEvent | null;
-        dragover_event(event?: DragEvent): DragEvent | null;
-        insert_image_file(file: File): void;
-        keydown_event(event?: KeyboardEvent): KeyboardEvent | null;
-    }
-}
-
-declare namespace $ {
-}
-
-declare namespace $ {
-}
-
-declare namespace $ {
-
 	type $mol_view__attr_bog_wysiwyg_1 = $mol_type_enforce<
 		({ 
 			'draggable': string,
@@ -9696,7 +9586,12 @@ declare namespace $ {
 		,
 		ReturnType< $bog_wysiwyg_block['on_ai_key'] >
 	>
-	type $mol_view__attr_bog_wysiwyg_36 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_paste_blocks_bog_wysiwyg_36 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg['block_paste_blocks'] >
+		,
+		ReturnType< $bog_wysiwyg_block['on_paste_blocks'] >
+	>
+	type $mol_view__attr_bog_wysiwyg_37 = $mol_type_enforce<
 		({ 
 			'bog_wysiwyg_drag_over': ReturnType< $bog_wysiwyg['row_is_drag_over'] >,
 			'bog_wysiwyg_drag_pos': ReturnType< $bog_wysiwyg['row_drag_position'] >,
@@ -9705,7 +9600,7 @@ declare namespace $ {
 		,
 		ReturnType< $mol_view['attr'] >
 	>
-	type $mol_view__event_bog_wysiwyg_37 = $mol_type_enforce<
+	type $mol_view__event_bog_wysiwyg_38 = $mol_type_enforce<
 		({ 
 			dragover( next?: ReturnType< $bog_wysiwyg['row_dragover'] > ): ReturnType< $bog_wysiwyg['row_dragover'] >,
 			drop( next?: ReturnType< $bog_wysiwyg['row_drop'] > ): ReturnType< $bog_wysiwyg['row_drop'] >,
@@ -9714,7 +9609,7 @@ declare namespace $ {
 		,
 		ReturnType< $mol_view['event'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_38 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_39 = $mol_type_enforce<
 		readonly(any)[]
 		,
 		ReturnType< $mol_view['sub'] >
@@ -9732,6 +9627,7 @@ declare namespace $ {
 		block_image( id: any, next?: any ): any
 		block_ai( id: any, next?: any ): any
 		block_ai_key( id: any, next?: any ): any
+		block_paste_blocks( id: any, next?: any ): any
 		row_is_drag_over( id: any): boolean
 		row_drag_position( id: any): string
 		row_is_dragging( id: any): boolean
@@ -9743,6 +9639,8 @@ declare namespace $ {
 		block_comment_land_link( id: any): string
 		block_comment_open( id: any, next?: boolean ): boolean
 		Block_comment( id: any): $bog_wysiwyg_comment
+		editor_keydown( next?: any ): any
+		editor_copy( next?: any ): any
 		Status( ): $giper_baza_status
 		block_row_views( ): readonly(any)[]
 		Block_list( ): $mol_list
@@ -9770,12 +9668,19 @@ declare namespace $ {
 		drag_over_id( next?: string ): string
 		drag_over_position( next?: string ): string
 		all_pages( ): readonly(any)[]
+		event( ): ({ 
+			keydown( next?: ReturnType< $bog_wysiwyg['editor_keydown'] > ): ReturnType< $bog_wysiwyg['editor_keydown'] >,
+			copy( next?: ReturnType< $bog_wysiwyg['editor_copy'] > ): ReturnType< $bog_wysiwyg['editor_copy'] >,
+		})  & ReturnType< $mol_view['event'] >
 		sub( ): readonly(any)[]
 	}
 	
 }
 
 //# sourceMappingURL=wysiwyg.view.tree.d.ts.map
+declare namespace $ {
+    function $bog_wysiwyg_html_to_md(html: string): string;
+}
 declare namespace $.$$ {
     class $bog_wysiwyg extends $.$bog_wysiwyg {
         has_baza(): boolean;
@@ -9797,6 +9702,15 @@ declare namespace $.$$ {
         block_slash(id: string, event?: Event): Event | null;
         block_menu_key(id: string, event?: KeyboardEvent): KeyboardEvent | null;
         apply_menu_command(cmd: string): void;
+        block_paste_blocks(id: string, val?: {
+            type: string;
+            content: string;
+            level?: number;
+        }[]): {
+            type: string;
+            content: string;
+            level?: number;
+        }[] | null;
         block_image(id: string, src?: string): string | null;
         menu_picked(next?: string): string;
         block_ai(id: string, event?: Event): Event | null;
@@ -9843,6 +9757,9 @@ declare namespace $.$$ {
         block_comment_land_link(id: string): string;
         block_comment_open(id: string, next?: boolean): boolean;
         comment_land_ensure(block_id: string): void;
+        editor_keydown(event?: KeyboardEvent): KeyboardEvent | null;
+        select_all_blocks(): void;
+        editor_copy(event?: ClipboardEvent): ClipboardEvent | null;
         row_is_drag_over(id: string): boolean;
         row_drag_position(id: string): string;
         row_is_dragging(id: string): boolean;
@@ -9853,9 +9770,6 @@ declare namespace $.$$ {
         clear_drag_state(): void;
         move_block(from_id: string, to_id: string, position: 'before' | 'after'): void;
     }
-}
-
-declare namespace $ {
 }
 
 declare namespace $ {
@@ -10111,11 +10025,17 @@ declare namespace $.$$ {
             text: string;
             shade: string;
         };
-        render_canvas(): void;
         node_at(x: number, y: number): Graph_node | null;
-        _events_bound: boolean;
-        bind_events(): void;
         auto(): void;
+        paint(ctx: CanvasRenderingContext2D, dpr: number, w: number, h: number, nodes: readonly Graph_node[], edges: readonly Graph_edge[], current: string, colors: {
+            focus: string;
+            card: string;
+            line: string;
+            text: string;
+            shade: string;
+        }): void;
+        _events_bound: boolean;
+        bind_events(canvas: HTMLCanvasElement): void;
     }
     export {};
 }
@@ -10125,6 +10045,121 @@ declare namespace $ {
 
 declare namespace $ {
     function $mol_offline(): void;
+}
+
+declare namespace $ {
+}
+
+declare namespace $ {
+
+	type $mol_hotkey__mod_ctrl_bog_wysiwyg_block_1 = $mol_type_enforce<
+		boolean
+		,
+		ReturnType< $mol_hotkey['mod_ctrl'] >
+	>
+	type $mol_hotkey__key_bog_wysiwyg_block_2 = $mol_type_enforce<
+		({ 
+			B( next?: ReturnType< $bog_wysiwyg_block['bold_exec'] > ): ReturnType< $bog_wysiwyg_block['bold_exec'] >,
+			I( next?: ReturnType< $bog_wysiwyg_block['italic_exec'] > ): ReturnType< $bog_wysiwyg_block['italic_exec'] >,
+			U( next?: ReturnType< $bog_wysiwyg_block['underline_exec'] > ): ReturnType< $bog_wysiwyg_block['underline_exec'] >,
+		}) 
+		,
+		ReturnType< $mol_hotkey['key'] >
+	>
+	type $mol_hotkey__mod_ctrl_bog_wysiwyg_block_3 = $mol_type_enforce<
+		boolean
+		,
+		ReturnType< $mol_hotkey['mod_ctrl'] >
+	>
+	type $mol_hotkey__mod_shift_bog_wysiwyg_block_4 = $mol_type_enforce<
+		boolean
+		,
+		ReturnType< $mol_hotkey['mod_shift'] >
+	>
+	type $mol_hotkey__key_bog_wysiwyg_block_5 = $mol_type_enforce<
+		({ 
+			S( next?: ReturnType< $bog_wysiwyg_block['strike_exec'] > ): ReturnType< $bog_wysiwyg_block['strike_exec'] >,
+		}) 
+		,
+		ReturnType< $mol_hotkey['key'] >
+	>
+	export class $bog_wysiwyg_block extends $mol_view {
+		is_empty( ): boolean
+		Hotkey_format( ): $mol_hotkey
+		Hotkey_strike( ): $mol_hotkey
+		input_event( next?: any ): any
+		keydown_event( next?: any ): any
+		paste_event( next?: any ): any
+		drop_event( next?: any ): any
+		dragover_event( next?: any ): any
+		html( next?: string ): string
+		type( next?: string ): string
+		level( next?: number ): number
+		menu_open( ): boolean
+		placeholder( ): string
+		on_enter( next?: any ): any
+		on_remove( next?: any ): any
+		on_slash( next?: any ): any
+		on_menu_key( next?: any ): any
+		on_image( next?: any ): any
+		ai_open( ): boolean
+		on_ai( next?: any ): any
+		on_ai_key( next?: any ): any
+		on_paste_blocks( next?: any ): any
+		bold_exec( next?: any ): any
+		italic_exec( next?: any ): any
+		underline_exec( next?: any ): any
+		strike_exec( next?: any ): any
+		link_exec( next?: any ): any
+		attr( ): ({ 
+			'contenteditable': string,
+			'bog_wysiwyg_block_type': ReturnType< $bog_wysiwyg_block['type'] >,
+			'bog_wysiwyg_block_level': ReturnType< $bog_wysiwyg_block['level'] >,
+			'bog_wysiwyg_block_empty': ReturnType< $bog_wysiwyg_block['is_empty'] >,
+			'bog_wysiwyg_block_placeholder': ReturnType< $bog_wysiwyg_block['placeholder'] >,
+		})  & ReturnType< $mol_view['attr'] >
+		plugins( ): readonly(any)[]
+		event( ): ({ 
+			input( next?: ReturnType< $bog_wysiwyg_block['input_event'] > ): ReturnType< $bog_wysiwyg_block['input_event'] >,
+			keydown( next?: ReturnType< $bog_wysiwyg_block['keydown_event'] > ): ReturnType< $bog_wysiwyg_block['keydown_event'] >,
+			paste( next?: ReturnType< $bog_wysiwyg_block['paste_event'] > ): ReturnType< $bog_wysiwyg_block['paste_event'] >,
+			drop( next?: ReturnType< $bog_wysiwyg_block['drop_event'] > ): ReturnType< $bog_wysiwyg_block['drop_event'] >,
+			dragover( next?: ReturnType< $bog_wysiwyg_block['dragover_event'] > ): ReturnType< $bog_wysiwyg_block['dragover_event'] >,
+		})  & ReturnType< $mol_view['event'] >
+		sub( ): readonly(any)[]
+	}
+	
+}
+
+//# sourceMappingURL=block.view.tree.d.ts.map
+declare namespace $ {
+    function $bog_wysiwyg_parse_markdown(text: string): {
+        type: string;
+        content: string;
+        level?: number;
+    }[];
+}
+declare namespace $.$$ {
+    class $bog_wysiwyg_block extends $.$bog_wysiwyg_block {
+        minimal_height(): number;
+        is_empty(): boolean;
+        sub(): any;
+        is_image(): boolean;
+        auto(): void;
+        input_event(event?: Event): Event | null;
+        try_markdown(container: HTMLElement): void;
+        replace_match_in_text(text_node: Text, match: RegExpExecArray, el: HTMLElement, sel: Selection): void;
+        bold_exec(event?: KeyboardEvent): KeyboardEvent | null;
+        italic_exec(event?: KeyboardEvent): KeyboardEvent | null;
+        underline_exec(event?: KeyboardEvent): KeyboardEvent | null;
+        strike_exec(event?: KeyboardEvent): KeyboardEvent | null;
+        link_exec(event?: KeyboardEvent): KeyboardEvent | null;
+        paste_event(event?: ClipboardEvent): ClipboardEvent | null;
+        drop_event(event?: DragEvent): DragEvent | null;
+        dragover_event(event?: DragEvent): DragEvent | null;
+        insert_image_file(file: File): void;
+        keydown_event(event?: KeyboardEvent): KeyboardEvent | null;
+    }
 }
 
 declare namespace $ {
