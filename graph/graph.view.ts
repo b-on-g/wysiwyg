@@ -19,6 +19,13 @@ namespace $.$$ {
 
 	export class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
 
+		/** Show canvas when pages exist, otherwise show empty message */
+		content() {
+			return this.pages().length > 0
+				? [ this.Canvas() ]
+				: [ this.Empty() ]
+		}
+
 		/** Canvas pixel dimensions (accounting for DPR) */
 		@ $mol_mem
 		canvas_width() {
@@ -269,6 +276,10 @@ namespace $.$$ {
 		}
 
 		override auto() {
+			if( this.pages().length === 0 ) {
+				this.stop_sim()
+				return
+			}
 			this.bind_events()
 			this.start_sim()
 		}

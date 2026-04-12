@@ -6,6 +6,8 @@ namespace $ {
 			opacity: 0.4,
 			transition: 'opacity 0.15s',
 			cursor: 'pointer',
+			minWidth: '1.5rem',
+			minHeight: '1.5rem',
 			padding: {
 				top: '0.25rem',
 				bottom: '0.25rem',
@@ -27,6 +29,7 @@ namespace $ {
 				direction: 'column',
 			},
 			width: '20rem',
+			maxWidth: '20rem',
 			maxHeight: '24rem',
 			background: {
 				color: $mol_theme.card,
@@ -69,6 +72,17 @@ namespace $ {
 				grow: 1,
 			},
 			overflow: 'auto',
+		},
+
+		'@': {
+			'bog_wysiwyg_comment_has_comments': {
+				'true': {
+					Comment_button: {
+						opacity: 1,
+						color: $mol_theme.focus,
+					},
+				},
+			},
 		},
 	} )
 

@@ -1,6 +1,9 @@
 $bog_wysiwyg_comment $mol_pop
 	showed? <=> panel_open? false
 	align \right_center
+	attr *
+		^
+		bog_wysiwyg_comment_has_comments <= has_comments false
 	Anchor <= Comment_button $mol_button_minor
 		sub /
 			<= Comment_icon $mol_icon_comment_outline

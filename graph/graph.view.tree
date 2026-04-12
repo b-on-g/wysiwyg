@@ -2,9 +2,12 @@ $bog_wysiwyg_graph $mol_view
 	pages /
 	current_page_id \
 	on_navigate?id null
-	sub /
-		<= Canvas $mol_view
-			dom_name \canvas
-			attr *
-				width <= canvas_width 0
-				height <= canvas_height 0
+	sub <= content /
+	Canvas $mol_view
+		dom_name \canvas
+		attr *
+			width <= canvas_width 0
+			height <= canvas_height 0
+	Empty $mol_view
+		sub /
+			<= empty_message \No pages yet

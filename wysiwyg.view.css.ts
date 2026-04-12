@@ -30,7 +30,7 @@ namespace $ {
 			},
 			width: '1.5rem',
 			cursor: 'grab',
-			opacity: 0,
+			opacity: 0.4,
 			transition: 'opacity 0.15s',
 			alignSelf: 'center',
 			textAlign: 'center',

@@ -11,7 +11,7 @@ namespace $ {
 			left: '0.5rem',
 			right: '0.5rem',
 		},
-		gap: '0.25rem',
+		gap: '0.5rem',
 
 		':not([bog_wysiwyg_history_showed])': {
 			display: 'none',
@@ -20,6 +20,13 @@ namespace $ {
 		Save_button: {
 			justifyContent: 'center',
 			fontWeight: 'bold',
+			background: {
+				color: $mol_theme.control,
+			},
+			color: $mol_theme.back,
+			border: {
+				radius: $mol_gap.round,
+			},
 		},
 
 		Version_list: {
@@ -30,15 +37,26 @@ namespace $ {
 		},
 
 		Version: {
-			'[bog_wysiwyg_history_active]': {
+			border: {
+				radius: $mol_gap.round,
+			},
+		},
+
+	} )
+
+	$mol_style_define( $bog_wysiwyg_history_version, {
+		'@': {
+			'bog_wysiwyg_history_version_active': {
 				'true': {
 					background: {
 						color: $mol_theme.hover,
 					},
+					font: {
+						weight: 'bold',
+					},
 				},
 			},
 		},
-
 	} )
 
 }

@@ -3,8 +3,8 @@ namespace $ {
 	$mol_style_define( $bog_wysiwyg_links, {
 
 		padding: {
-			top: '1rem',
-			bottom: '1rem',
+			top: $mol_gap.block,
+			bottom: $mol_gap.block,
 			left: 0,
 			right: 0,
 		},
@@ -16,20 +16,34 @@ namespace $ {
 			},
 		},
 		margin: {
-			top: '2rem',
+			top: $mol_gap.block,
 		},
-		gap: '0.25rem',
+		gap: $mol_gap.text,
+
+		Header: {
+			font: {
+				weight: 'bold',
+				size: '0.875rem',
+			},
+			color: $mol_theme.shade,
+			padding: {
+				left: $mol_gap.text,
+				right: $mol_gap.text,
+			},
+		},
 
 		Link: {
 			padding: {
-				top: '0.25rem',
-				bottom: '0.25rem',
-				left: '0.5rem',
-				right: '0.5rem',
+				top: $mol_gap.text,
+				bottom: $mol_gap.text,
+				left: $mol_gap.text,
+				right: $mol_gap.text,
 			},
 			color: $mol_theme.focus,
 			cursor: 'pointer',
-			borderRadius: '0.25rem',
+			border: {
+				radius: $mol_gap.round,
+			},
 		},
 
 	} )

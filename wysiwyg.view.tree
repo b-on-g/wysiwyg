@@ -40,8 +40,7 @@ $bog_wysiwyg $mol_view
 	drag_over_position? \after
 	all_pages /
 	sub /
-		<= Collab_bar $bog_wysiwyg_collab
-			page_land_link <= page_land_link
+		<= Status $giper_baza_status
 		<= Block_list $mol_list
 			rows <= block_row_views /
 		<= Backlinks $bog_wysiwyg_links

@@ -24,6 +24,19 @@ namespace $.$$ {
 		}
 
 		@ $mol_mem
+		rows() {
+			const links = this.backlink_pages()
+			if( !links.length ) return []
+			return [ this.Header(), this.Links() ]
+		}
+
+		@ $mol_mem
+		header_text() {
+			const count = this.backlink_pages().length
+			return `Backlinks (${ count })`
+		}
+
+		@ $mol_mem
 		link_views() {
 			return this.backlink_pages().map( page => this.Link( page.id ) )
 		}

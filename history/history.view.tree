@@ -1,12 +1,10 @@
 $bog_wysiwyg_history $mol_view
 	page_land_link \
 	showed? false
-	Version* $mol_button_minor
+	Version* $bog_wysiwyg_history_version
 		title <= version_title* \
 		click?event <=> version_click*?event null
-		attr *
-			^
-			bog_wysiwyg_history_active <= version_active* false
+		active <= version_active* false
 	sub /
 		<= Save_button $mol_button_minor
 			title @ \Save version
@@ -16,3 +14,9 @@ $bog_wysiwyg_history $mol_view
 	attr *
 		^
 		bog_wysiwyg_history_showed <= showed?
+
+$bog_wysiwyg_history_version $mol_button_minor
+	active false
+	attr *
+		^
+		bog_wysiwyg_history_version_active <= active

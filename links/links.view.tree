@@ -1,7 +1,12 @@
 $bog_wysiwyg_links $mol_list
 	page_id \
 	all_pages /
-	rows <= link_views /
+	rows /
+		<= Header $mol_view
+			sub /
+				<= header_text \Backlinks
+		<= Links $mol_list
+			rows <= link_views /
 	Link*id $mol_link
 		arg *
 			page <= link_page_id* \

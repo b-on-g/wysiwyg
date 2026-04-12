@@ -8,6 +8,11 @@ namespace $.$$ {
 			return count > 0 ? String( count ) : ''
 		}
 
+		@ $mol_mem
+		has_comments() {
+			return this.Thread().comment_count() > 0
+		}
+
 		toggle( event?: Event ) {
 			if( !event ) return null
 			this.panel_open( !this.panel_open() )

@@ -35,7 +35,9 @@ namespace $ {
 			background: {
 				color: $mol_theme.hover,
 			},
-			borderRadius: '0.25rem',
+			border: {
+				radius: $mol_gap.round,
+			},
 		},
 
 		Comment_author: {
