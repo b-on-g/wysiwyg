@@ -373,7 +373,7 @@ $bog_wysiwyg_comment_thread $mol_view
 
 $bog_wysiwyg_comment $mol_pop
 	showed? <=> panel_open? false
-	align \right_center
+	align \left_center
 	attr *
 		^
 		bog_wysiwyg_comment_has_comments <= has_comments false
@@ -778,66 +778,6 @@ $bog_wysiwyg_graph $mol_view
 	pages /
 	current_page_id \
 	on_navigate?id null
-	sub <= content /
-	Canvas $mol_view
-		dom_name \canvas
-		attr *
-			width <= canvas_width 0
-			height <= canvas_height 0
-	Empty $mol_view
-		sub /
-			<= empty_message \No pages yet
-
-$bog_wysiwyg_app $mol_page
-	title @ \WikiLive
-	plugins /
-		<= Theme $mol_theme_auto
-	tools /
-		<= History_toggle $mol_check_icon
-			Icon <= History_icon $mol_icon_history
-			hint @ \Version history
-			checked? <=> history_showed? false
-		<= Graph_toggle $mol_check_icon
-			Icon <= Graph_icon $mol_icon_graph_outline
-			hint @ \Page graph
-			checked? <=> graph_showed? false
-		<= Lights $mol_lights_toggle
-	body /
-		<= Layout $mol_view
-			sub <= body_content /
-				<= Sidebar $mol_view
-					sub /
-						<= Sidebar_head $mol_view
-							sub /
-								<= Sidebar_title $mol_paragraph
-									title @ \Pages
-								<= New_page $mol_button_minor
-									title @ \+ New
-									click?event <=> page_create?event null
-						<= Page_list $mol_list
-							rows <= page_rows /
-				<= Main $mol_view
-					sub <= main_content /
-						<= Editor $bog_wysiwyg
-							page_land_link <= page_land_link \
-							all_pages <= all_pages_info /
-							history_showed? <=> history_showed? false
-				<= Graph_panel $mol_view
-					sub /
-						<= Graph $bog_wysiwyg_graph
-							pages <= graph_pages /
-							current_page_id <= page_land_link
-							on_navigate?id <=> page_navigate?id null
-	Page_item*0 $bog_wysiwyg_app_page
-		title <= page_item_title* \
-		click?event <=> page_item_click*?event null
-		active <= page_item_active* false
-
-$bog_wysiwyg_app_page $mol_button_minor
-	active false
-	attr *
-		^
-		bog_wysiwyg_app_page_active <= active
 
 $bog_wysiwyg_block $mol_view
 	html? \
@@ -886,3 +826,55 @@ $bog_wysiwyg_block $mol_view
 		drop?event <=> drop_event?event null
 		dragover?event <=> dragover_event?event null
 	sub /
+
+$bog_wysiwyg_app $mol_page
+	title @ \WikiLive
+	plugins /
+		<= Theme $mol_theme_auto
+		<= Status $giper_baza_status
+	tools /
+		<= History_toggle $mol_check_icon
+			Icon <= History_icon $mol_icon_history
+			hint @ \Version history
+			checked? <=> history_showed? false
+		<= Graph_toggle $mol_check_icon
+			Icon <= Graph_icon $mol_icon_graph_outline
+			hint @ \Page graph
+			checked? <=> graph_showed? false
+		<= Lights $mol_lights_toggle
+	body /
+		<= Layout $mol_view
+			sub <= body_content /
+				<= Sidebar $mol_view
+					sub /
+						<= Sidebar_head $mol_view
+							sub /
+								<= Sidebar_title $mol_paragraph
+									title @ \Pages
+								<= New_page $mol_button_minor
+									title @ \+ New
+									click?event <=> page_create?event null
+						<= Page_list $mol_list
+							rows <= page_rows /
+				<= Main $mol_view
+					sub <= main_content /
+						<= Editor $bog_wysiwyg
+							page_land_link <= page_land_link \
+							all_pages <= all_pages_info /
+							history_showed? <=> history_showed? false
+				<= Graph_panel $mol_view
+					sub /
+						<= Graph $bog_wysiwyg_graph
+							pages <= graph_pages /
+							current_page_id <= page_land_link
+							on_navigate?id <=> page_navigate?id null
+	Page_item*0 $bog_wysiwyg_app_page
+		title <= page_item_title* \
+		click?event <=> page_item_click*?event null
+		active <= page_item_active* false
+
+$bog_wysiwyg_app_page $mol_button_minor
+	active false
+	attr *
+		^
+		bog_wysiwyg_app_page_active <= active

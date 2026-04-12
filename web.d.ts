@@ -14526,100 +14526,6 @@ declare namespace $.$$ {
 
 declare namespace $ {
 
-	type $mol_view__dom_name_bog_wysiwyg_graph_1 = $mol_type_enforce<
-		string
-		,
-		ReturnType< $mol_view['dom_name'] >
-	>
-	type $mol_view__attr_bog_wysiwyg_graph_2 = $mol_type_enforce<
-		({ 
-			'width': ReturnType< $bog_wysiwyg_graph['canvas_width'] >,
-			'height': ReturnType< $bog_wysiwyg_graph['canvas_height'] >,
-		}) 
-		,
-		ReturnType< $mol_view['attr'] >
-	>
-	type $mol_view__sub_bog_wysiwyg_graph_3 = $mol_type_enforce<
-		readonly(any)[]
-		,
-		ReturnType< $mol_view['sub'] >
-	>
-	export class $bog_wysiwyg_graph extends $mol_view {
-		content( ): readonly(any)[]
-		canvas_width( ): number
-		canvas_height( ): number
-		empty_message( ): string
-		pages( ): readonly(any)[]
-		current_page_id( ): string
-		on_navigate( next?: any ): any
-		sub( ): ReturnType< $bog_wysiwyg_graph['content'] >
-		Canvas( ): $mol_view
-		Empty( ): $mol_view
-	}
-	
-}
-
-//# sourceMappingURL=graph.view.tree.d.ts.map
-declare namespace $.$$ {
-    interface Graph_node {
-        id: string;
-        title: string;
-        x: number;
-        y: number;
-        vx: number;
-        vy: number;
-    }
-    interface Graph_edge {
-        source: string;
-        target: string;
-    }
-    export class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
-        content(): $mol_view[];
-        canvas_width(): number;
-        canvas_height(): number;
-        logical_width(): number;
-        logical_height(): number;
-        nodes(): Graph_node[];
-        edges(): Graph_edge[];
-        sim_nodes(): Graph_node[];
-        read_theme_colors(): {
-            focus: string;
-            card: string;
-            line: string;
-            text: string;
-            shade: string;
-        };
-        node_at(x: number, y: number): Graph_node | null;
-        auto(): void;
-        paint(ctx: CanvasRenderingContext2D, dpr: number, w: number, h: number, nodes: readonly Graph_node[], edges: readonly Graph_edge[], current: string, colors: {
-            focus: string;
-            card: string;
-            line: string;
-            text: string;
-            shade: string;
-        }): void;
-        _events_bound: boolean;
-        bind_events(canvas: HTMLCanvasElement): void;
-    }
-    export {};
-}
-
-declare namespace $ {
-}
-
-declare namespace $ {
-    function $mol_offline(): void;
-}
-
-declare namespace $ {
-    function $mol_offline_web(): void;
-}
-
-declare namespace $ {
-}
-
-declare namespace $ {
-
 	type $mol_hotkey__mod_ctrl_bog_wysiwyg_block_1 = $mol_type_enforce<
 		boolean
 		,
@@ -14728,6 +14634,60 @@ declare namespace $.$$ {
         insert_image_file(file: File): void;
         keydown_event(event?: KeyboardEvent): KeyboardEvent | null;
     }
+}
+
+declare namespace $ {
+}
+
+declare namespace $ {
+
+	export class $bog_wysiwyg_graph extends $mol_view {
+		pages( ): readonly(any)[]
+		current_page_id( ): string
+		on_navigate( next?: any ): any
+	}
+	
+}
+
+//# sourceMappingURL=graph.view.tree.d.ts.map
+declare namespace $.$$ {
+    interface Graph_node {
+        id: string;
+        title: string;
+        x: number;
+        y: number;
+        vx: number;
+        vy: number;
+    }
+    interface Graph_edge {
+        source: string;
+        target: string;
+    }
+    export class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
+        sub(): any;
+        auto(): void;
+        _logical_width: number;
+        _logical_height: number;
+        nodes(): Graph_node[];
+        edges(): Graph_edge[];
+        sim_nodes(): Graph_node[];
+        node_at(x: number, y: number): Graph_node | null;
+        paint(ctx: CanvasRenderingContext2D, dpr: number, w: number, h: number, nodes: readonly Graph_node[], edges: readonly Graph_edge[], current: string): void;
+        _events_bound: boolean;
+        bind_events(canvas: HTMLCanvasElement): void;
+    }
+    export {};
+}
+
+declare namespace $ {
+}
+
+declare namespace $ {
+    function $mol_offline(): void;
+}
+
+declare namespace $ {
+    function $mol_offline_web(): void;
 }
 
 declare namespace $ {
@@ -14876,6 +14836,7 @@ declare namespace $ {
 	>
 	export class $bog_wysiwyg_app extends $mol_page {
 		Theme( ): $mol_theme_auto
+		Status( ): $giper_baza_status
 		History_icon( ): $mol_icon_history
 		history_showed( next?: boolean ): boolean
 		History_toggle( ): $mol_check_icon
@@ -14944,7 +14905,7 @@ declare namespace $.$$ {
         page_create(event?: Event): Event | null;
         page_navigate(id?: string): string | null;
         auto(): void;
-        body_content(): any[];
+        body_content(): $mol_view[];
         graph_pages(): {
             id(): string;
             title(): string;

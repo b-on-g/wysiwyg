@@ -26534,7 +26534,7 @@ var $;
 			return (this.panel_open(next));
 		}
 		align(){
-			return "right_center";
+			return "left_center";
 		}
 		attr(){
 			return {...(super.attr()), "bog_wysiwyg_comment_has_comments": (this.has_comments())};
@@ -29098,9 +29098,6 @@ var $;
                 grow: 1,
             },
             minWidth: 0,
-            overflow: {
-                x: 'hidden',
-            },
         },
         Block_comment: {
             flex: {
@@ -29289,18 +29286,6 @@ var $;
 
 ;
 	($.$bog_wysiwyg_graph) = class $bog_wysiwyg_graph extends ($.$mol_view) {
-		content(){
-			return [];
-		}
-		canvas_width(){
-			return 0;
-		}
-		canvas_height(){
-			return 0;
-		}
-		empty_message(){
-			return "No pages yet";
-		}
 		pages(){
 			return [];
 		}
@@ -29311,654 +29296,9 @@ var $;
 			if(next !== undefined) return next;
 			return null;
 		}
-		sub(){
-			return (this.content());
-		}
-		Canvas(){
-			const obj = new this.$.$mol_view();
-			(obj.dom_name) = () => ("canvas");
-			(obj.attr) = () => ({"width": (this.canvas_width()), "height": (this.canvas_height())});
-			return obj;
-		}
-		Empty(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ([(this.empty_message())]);
-			return obj;
-		}
 	};
 	($mol_mem(($.$bog_wysiwyg_graph.prototype), "on_navigate"));
-	($mol_mem(($.$bog_wysiwyg_graph.prototype), "Canvas"));
-	($mol_mem(($.$bog_wysiwyg_graph.prototype), "Empty"));
 
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        const wiki_link_re = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
-        class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
-            content() {
-                return this.pages().length > 0
-                    ? [this.Canvas()]
-                    : [this.Empty()];
-            }
-            canvas_width() {
-                return Math.ceil((this.view_rect()?.width ?? 600) * (this.$.$mol_dom_context.devicePixelRatio || 1));
-            }
-            canvas_height() {
-                return Math.ceil((this.view_rect()?.height ?? 400) * (this.$.$mol_dom_context.devicePixelRatio || 1));
-            }
-            logical_width() {
-                return this.canvas_width() / (this.$.$mol_dom_context.devicePixelRatio || 1);
-            }
-            logical_height() {
-                return this.canvas_height() / (this.$.$mol_dom_context.devicePixelRatio || 1);
-            }
-            nodes() {
-                const pages = this.pages();
-                const w = this.logical_width();
-                const h = this.logical_height();
-                const cx = w / 2;
-                const cy = h / 2;
-                const r = Math.min(w, h) * 0.3;
-                return pages.map((page, i) => ({
-                    id: page.id(),
-                    title: page.title() || page.id().slice(0, 8),
-                    x: cx + r * Math.cos(2 * Math.PI * i / Math.max(pages.length, 1)),
-                    y: cy + r * Math.sin(2 * Math.PI * i / Math.max(pages.length, 1)),
-                    vx: 0,
-                    vy: 0,
-                }));
-            }
-            edges() {
-                const pages = this.pages();
-                const page_ids = new Set(pages.map(p => p.id()));
-                const result = [];
-                for (const page of pages) {
-                    if (!page.block_ids || !page.block_html)
-                        continue;
-                    const seen = new Set();
-                    for (const bid of page.block_ids()) {
-                        const html = page.block_html(bid) ?? '';
-                        let match;
-                        wiki_link_re.lastIndex = 0;
-                        while ((match = wiki_link_re.exec(html)) !== null) {
-                            const target = match[1].trim();
-                            if (page_ids.has(target) && target !== page.id() && !seen.has(target)) {
-                                seen.add(target);
-                                result.push({ source: page.id(), target });
-                            }
-                        }
-                    }
-                }
-                return result;
-            }
-            sim_nodes() {
-                const nodes = this.nodes().map(n => ({ ...n }));
-                const edges = this.edges();
-                if (nodes.length === 0)
-                    return nodes;
-                const w = this.logical_width();
-                const h = this.logical_height();
-                const cx = w / 2;
-                const cy = h / 2;
-                const node_map = new Map(nodes.map(n => [n.id, n]));
-                const iterations = 80;
-                for (let iter = 0; iter < iterations; iter++) {
-                    for (let i = 0; i < nodes.length; i++) {
-                        for (let j = i + 1; j < nodes.length; j++) {
-                            const a = nodes[i];
-                            const b = nodes[j];
-                            let dx = b.x - a.x;
-                            let dy = b.y - a.y;
-                            let dist = Math.sqrt(dx * dx + dy * dy);
-                            if (dist < 1) {
-                                dx = 1;
-                                dy = 1;
-                                dist = 1.41;
-                            }
-                            const force = 5000 / (dist * dist);
-                            const fx = dx / dist * force;
-                            const fy = dy / dist * force;
-                            a.vx -= fx;
-                            a.vy -= fy;
-                            b.vx += fx;
-                            b.vy += fy;
-                        }
-                    }
-                    for (const edge of edges) {
-                        const a = node_map.get(edge.source);
-                        const b = node_map.get(edge.target);
-                        if (!a || !b)
-                            continue;
-                        const dx = b.x - a.x;
-                        const dy = b.y - a.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < 1)
-                            continue;
-                        const force = (dist - 120) * 0.02;
-                        const fx = dx / dist * force;
-                        const fy = dy / dist * force;
-                        a.vx += fx;
-                        a.vy += fy;
-                        b.vx -= fx;
-                        b.vy -= fy;
-                    }
-                    for (const n of nodes) {
-                        n.vx += (cx - n.x) * 0.005;
-                        n.vy += (cy - n.y) * 0.005;
-                    }
-                    for (const n of nodes) {
-                        n.vx *= 0.85;
-                        n.vy *= 0.85;
-                        n.x += n.vx;
-                        n.y += n.vy;
-                        n.x = Math.max(40, Math.min(w - 40, n.x));
-                        n.y = Math.max(40, Math.min(h - 40, n.y));
-                    }
-                }
-                return nodes;
-            }
-            read_theme_colors() {
-                try {
-                    const el = this.dom_node();
-                    const style = this.$.$mol_dom_context.getComputedStyle(el);
-                    return {
-                        focus: style.getPropertyValue('--mol_theme_focus').trim() || '#3b82f6',
-                        card: style.getPropertyValue('--mol_theme_card').trim() || '#ffffff',
-                        line: style.getPropertyValue('--mol_theme_line').trim() || '#cccccc',
-                        text: style.getPropertyValue('--mol_theme_text').trim() || '#333333',
-                        shade: style.getPropertyValue('--mol_theme_shade').trim() || '#888888',
-                    };
-                }
-                catch {
-                    return { focus: '#3b82f6', card: '#ffffff', line: '#cccccc', text: '#333333', shade: '#888888' };
-                }
-            }
-            node_at(x, y) {
-                const nodes = this.sim_nodes();
-                for (let i = nodes.length - 1; i >= 0; i--) {
-                    const n = nodes[i];
-                    const dx = n.x - x;
-                    const dy = n.y - y;
-                    if (dx * dx + dy * dy < 24 * 24)
-                        return n;
-                }
-                return null;
-            }
-            auto() {
-                const nodes = this.sim_nodes();
-                const edges = this.edges();
-                const current = this.current_page_id();
-                const dpr = this.$.$mol_dom_context.devicePixelRatio || 1;
-                const w = this.logical_width();
-                const h = this.logical_height();
-                const colors = this.read_theme_colors();
-                requestAnimationFrame(() => {
-                    try {
-                        const canvas = this.Canvas().dom_node();
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx)
-                            return;
-                        this.paint(ctx, dpr, w, h, nodes, edges, current, colors);
-                        this.bind_events(canvas);
-                    }
-                    catch { }
-                });
-            }
-            paint(ctx, dpr, w, h, nodes, edges, current, colors) {
-                ctx.save();
-                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                ctx.clearRect(0, 0, w, h);
-                const node_map = new Map(nodes.map(n => [n.id, n]));
-                ctx.strokeStyle = colors.shade + '66';
-                ctx.lineWidth = 1.5;
-                for (const edge of edges) {
-                    const a = node_map.get(edge.source);
-                    const b = node_map.get(edge.target);
-                    if (!a || !b)
-                        continue;
-                    ctx.beginPath();
-                    ctx.moveTo(a.x, a.y);
-                    ctx.lineTo(b.x, b.y);
-                    ctx.stroke();
-                    const angle = Math.atan2(b.y - a.y, b.x - a.x);
-                    const ax = b.x - 20 * Math.cos(angle);
-                    const ay = b.y - 20 * Math.sin(angle);
-                    ctx.beginPath();
-                    ctx.moveTo(ax, ay);
-                    ctx.lineTo(ax - 8 * Math.cos(angle - 0.4), ay - 8 * Math.sin(angle - 0.4));
-                    ctx.lineTo(ax - 8 * Math.cos(angle + 0.4), ay - 8 * Math.sin(angle + 0.4));
-                    ctx.closePath();
-                    ctx.fillStyle = colors.shade + '66';
-                    ctx.fill();
-                }
-                for (const n of nodes) {
-                    const is_current = n.id === current;
-                    const radius = is_current ? 20 : 16;
-                    ctx.beginPath();
-                    ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
-                    ctx.fillStyle = is_current ? colors.focus : colors.card;
-                    ctx.fill();
-                    ctx.strokeStyle = is_current ? colors.focus : colors.line;
-                    ctx.lineWidth = is_current ? 2.5 : 1.5;
-                    ctx.stroke();
-                    ctx.fillStyle = colors.text;
-                    ctx.font = is_current ? 'bold 12px system-ui' : '11px system-ui';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-                    const label = n.title.length > 18 ? n.title.slice(0, 16) + '..' : n.title;
-                    ctx.fillText(label, n.x, n.y + radius + 4);
-                }
-                ctx.restore();
-            }
-            _events_bound = false;
-            bind_events(canvas) {
-                if (this._events_bound)
-                    return;
-                this._events_bound = true;
-                canvas.addEventListener('click', (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    const node = this.node_at(e.clientX - rect.left, e.clientY - rect.top);
-                    if (node)
-                        this.on_navigate(node.id);
-                });
-                canvas.addEventListener('mousemove', (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    canvas.style.cursor = this.node_at(x, y) ? 'pointer' : 'default';
-                });
-            }
-        }
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_graph.prototype, "content", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_graph.prototype, "canvas_width", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_graph.prototype, "canvas_height", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_graph.prototype, "nodes", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_graph.prototype, "edges", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_graph.prototype, "sim_nodes", null);
-        $$.$bog_wysiwyg_graph = $bog_wysiwyg_graph;
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_define($bog_wysiwyg_graph, {
-        flex: {
-            direction: 'column',
-            grow: 1,
-        },
-        position: 'relative',
-        minHeight: '24rem',
-        minWidth: '100%',
-        overflow: 'hidden',
-        border: {
-            radius: $mol_gap.round,
-        },
-        background: {
-            color: $mol_theme.card,
-        },
-        Canvas: {
-            flex: {
-                grow: 1,
-            },
-            width: '100%',
-            height: '100%',
-        },
-        Empty: {
-            flex: {
-                grow: 1,
-            },
-            align: {
-                items: 'center',
-                self: 'center',
-            },
-            justify: {
-                content: 'center',
-            },
-            color: $mol_theme.shade,
-            font: {
-                size: '1rem',
-            },
-        },
-    });
-})($ || ($ = {}));
-
-;
-	($.$bog_wysiwyg_app) = class $bog_wysiwyg_app extends ($.$mol_page) {
-		Theme(){
-			const obj = new this.$.$mol_theme_auto();
-			return obj;
-		}
-		History_icon(){
-			const obj = new this.$.$mol_icon_history();
-			return obj;
-		}
-		history_showed(next){
-			if(next !== undefined) return next;
-			return false;
-		}
-		History_toggle(){
-			const obj = new this.$.$mol_check_icon();
-			(obj.Icon) = () => ((this.History_icon()));
-			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_History_toggle_hint")));
-			(obj.checked) = (next) => ((this.history_showed(next)));
-			return obj;
-		}
-		Graph_icon(){
-			const obj = new this.$.$mol_icon_graph_outline();
-			return obj;
-		}
-		graph_showed(next){
-			if(next !== undefined) return next;
-			return false;
-		}
-		Graph_toggle(){
-			const obj = new this.$.$mol_check_icon();
-			(obj.Icon) = () => ((this.Graph_icon()));
-			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Graph_toggle_hint")));
-			(obj.checked) = (next) => ((this.graph_showed(next)));
-			return obj;
-		}
-		Lights(){
-			const obj = new this.$.$mol_lights_toggle();
-			return obj;
-		}
-		Sidebar_title(){
-			const obj = new this.$.$mol_paragraph();
-			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Sidebar_title_title")));
-			return obj;
-		}
-		page_create(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		New_page(){
-			const obj = new this.$.$mol_button_minor();
-			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_New_page_title")));
-			(obj.click) = (next) => ((this.page_create(next)));
-			return obj;
-		}
-		Sidebar_head(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ([(this.Sidebar_title()), (this.New_page())]);
-			return obj;
-		}
-		page_rows(){
-			return [];
-		}
-		Page_list(){
-			const obj = new this.$.$mol_list();
-			(obj.rows) = () => ((this.page_rows()));
-			return obj;
-		}
-		Sidebar(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ([(this.Sidebar_head()), (this.Page_list())]);
-			return obj;
-		}
-		page_land_link(){
-			return "";
-		}
-		all_pages_info(){
-			return [];
-		}
-		Editor(){
-			const obj = new this.$.$bog_wysiwyg();
-			(obj.page_land_link) = () => ((this.page_land_link()));
-			(obj.all_pages) = () => ((this.all_pages_info()));
-			(obj.history_showed) = (next) => ((this.history_showed(next)));
-			return obj;
-		}
-		main_content(){
-			return [(this.Editor())];
-		}
-		Main(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ((this.main_content()));
-			return obj;
-		}
-		graph_pages(){
-			return [];
-		}
-		page_navigate(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		Graph(){
-			const obj = new this.$.$bog_wysiwyg_graph();
-			(obj.pages) = () => ((this.graph_pages()));
-			(obj.current_page_id) = () => ((this.page_land_link()));
-			(obj.on_navigate) = (next) => ((this.page_navigate(next)));
-			return obj;
-		}
-		Graph_panel(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ([(this.Graph())]);
-			return obj;
-		}
-		body_content(){
-			return [
-				(this.Sidebar()), 
-				(this.Main()), 
-				(this.Graph_panel())
-			];
-		}
-		Layout(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ((this.body_content()));
-			return obj;
-		}
-		page_item_title(id){
-			return "";
-		}
-		page_item_click(id, next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		page_item_active(id){
-			return false;
-		}
-		title(){
-			return (this.$.$mol_locale.text("$bog_wysiwyg_app_title"));
-		}
-		plugins(){
-			return [(this.Theme())];
-		}
-		tools(){
-			return [
-				(this.History_toggle()), 
-				(this.Graph_toggle()), 
-				(this.Lights())
-			];
-		}
-		body(){
-			return [(this.Layout())];
-		}
-		Page_item(id){
-			const obj = new this.$.$bog_wysiwyg_app_page();
-			(obj.title) = () => ((this.page_item_title(id)));
-			(obj.click) = (next) => ((this.page_item_click(id, next)));
-			(obj.active) = () => ((this.page_item_active(id)));
-			return obj;
-		}
-	};
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Theme"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "History_icon"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "history_showed"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "History_toggle"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_icon"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "graph_showed"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_toggle"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Lights"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar_title"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "page_create"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "New_page"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar_head"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Page_list"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Editor"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Main"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "page_navigate"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_panel"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Layout"));
-	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "page_item_click"));
-	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Page_item"));
-	($.$bog_wysiwyg_app_page) = class $bog_wysiwyg_app_page extends ($.$mol_button_minor) {
-		active(){
-			return false;
-		}
-		attr(){
-			return {...(super.attr()), "bog_wysiwyg_app_page_active": (this.active())};
-		}
-	};
-
-
-;
-"use strict";
-var $;
-(function ($) {
-    function $mol_offline() { }
-    $.$mol_offline = $mol_offline;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    const blacklist = new Set([
-        '//cse.google.com/adsense/search/async-ads.js'
-    ]);
-    function $mol_offline_web() {
-        if (typeof window === 'undefined') {
-            self.addEventListener('install', (event) => {
-                ;
-                self.skipWaiting();
-            });
-            self.addEventListener('activate', (event) => {
-                ;
-                self.clients.claim();
-                $$.$mol_log3_done({
-                    place: '$mol_offline',
-                    message: 'Activated',
-                });
-            });
-            self.addEventListener('fetch', (event) => {
-                const request = event.request;
-                if (blacklist.has(request.url.replace(/^https?:/, ''))) {
-                    return event.respondWith(new Response(null, {
-                        status: 418,
-                        statusText: 'Blocked'
-                    }));
-                }
-                if (request.method !== 'GET')
-                    return;
-                if (!/^https?:/.test(request.url))
-                    return;
-                if (/\?/.test(request.url))
-                    return;
-                if (request.cache === 'no-store')
-                    return;
-                const fetch_data = () => fetch(new Request(request, { credentials: 'omit' })).then(response => {
-                    if (response.status !== 200)
-                        return response;
-                    event.waitUntil(caches.open('$mol_offline').then(cache => cache.put(request, response)));
-                    return response.clone();
-                });
-                const enrich = (response) => {
-                    if (!response.status)
-                        return response;
-                    const headers = new Headers(response.headers);
-                    headers.set("$mol_offline", "");
-                    headers.set("Origin-Agent-Cluster", "?1");
-                    return new Response(response.body, {
-                        status: response.status,
-                        statusText: response.statusText,
-                        headers,
-                    });
-                };
-                const fresh = request.cache === 'force-cache' ? null : fetch_data();
-                if (fresh)
-                    event.waitUntil(fresh.then(enrich));
-                event.respondWith(caches.match(request).then(cached => request.cache === 'no-cache' || request.cache === 'reload'
-                    ? (cached
-                        ? fresh
-                            .then(actual => {
-                            if (actual.status === cached.status)
-                                return actual;
-                            throw new Error(`${actual.status}${actual.statusText ? ` ${actual.statusText}` : ''}`, { cause: actual });
-                        })
-                            .catch((err) => {
-                            const cloned = cached.clone();
-                            const message = `${err.cause instanceof Response ? '' : '500 '}${err.message} $mol_offline fallback to cache`;
-                            cloned.headers.set('$mol_offline_remote_status', message);
-                            return cloned;
-                        })
-                        : fresh)
-                    : (cached || fresh || fetch_data())).then(enrich));
-            });
-            self.addEventListener('beforeinstallprompt', (event) => event.prompt());
-        }
-        else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-            console.warn('HTTPS or localhost is required for service workers.');
-        }
-        else if (!navigator.serviceWorker) {
-            console.warn('Service Worker is not supported.');
-        }
-        else {
-            $mol_dom.addEventListener('DOMContentLoaded', () => {
-                navigator.serviceWorker.register('web.js').then(reg => {
-                    reg.addEventListener('updatefound', () => {
-                        $$.$mol_log3_rise({
-                            place: '$mol_offline',
-                            message: 'Outdated',
-                        });
-                        const worker = reg.installing;
-                        worker.addEventListener('statechange', () => {
-                            if (worker.state !== 'activated')
-                                return;
-                            window.location.reload();
-                        });
-                    });
-                });
-            });
-        }
-    }
-    $.$mol_offline_web = $mol_offline_web;
-    $.$mol_offline = $mol_offline_web;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    try {
-        $mol_offline();
-    }
-    catch (error) {
-        console.error(error);
-    }
-})($ || ($ = {}));
 
 ;
 	($.$bog_wysiwyg_block) = class $bog_wysiwyg_block extends ($.$mol_view) {
@@ -30669,6 +30009,595 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    var $$;
+    (function ($$) {
+        const wiki_link_re = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+        class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
+            sub() {
+                return null;
+            }
+            auto() {
+                const node = this.dom_node();
+                const pages = this.pages();
+                if (pages.length === 0) {
+                    node.textContent = 'No pages yet';
+                    return;
+                }
+                let canvas = node.querySelector('canvas');
+                if (!canvas) {
+                    node.textContent = '';
+                    canvas = this.$.$mol_dom_context.document.createElement('canvas');
+                    canvas.style.width = '100%';
+                    canvas.style.height = '100%';
+                    canvas.style.display = 'block';
+                    node.appendChild(canvas);
+                    this.bind_events(canvas);
+                }
+                const rect = node.getBoundingClientRect();
+                if (rect.width < 1 || rect.height < 1)
+                    return;
+                const dpr = this.$.$mol_dom_context.devicePixelRatio || 1;
+                const w = rect.width;
+                const h = rect.height;
+                canvas.width = Math.ceil(w * dpr);
+                canvas.height = Math.ceil(h * dpr);
+                this._logical_width = w;
+                this._logical_height = h;
+                const nodes = this.sim_nodes();
+                const edges = this.edges();
+                const current = this.current_page_id();
+                const ctx = canvas.getContext('2d');
+                if (!ctx)
+                    return;
+                this.paint(ctx, dpr, w, h, nodes, edges, current);
+            }
+            _logical_width = 600;
+            _logical_height = 400;
+            nodes() {
+                const pages = this.pages();
+                const w = this._logical_width;
+                const h = this._logical_height;
+                const cx = w / 2;
+                const cy = h / 2;
+                const r = Math.min(w, h) * 0.3;
+                return pages.map((page, i) => ({
+                    id: page.id(),
+                    title: page.title() || page.id().slice(0, 8),
+                    x: cx + r * Math.cos(2 * Math.PI * i / Math.max(pages.length, 1)),
+                    y: cy + r * Math.sin(2 * Math.PI * i / Math.max(pages.length, 1)),
+                    vx: 0,
+                    vy: 0,
+                }));
+            }
+            edges() {
+                const pages = this.pages();
+                const page_ids = new Set(pages.map(p => p.id()));
+                const result = [];
+                for (const page of pages) {
+                    if (!page.block_ids || !page.block_html)
+                        continue;
+                    const seen = new Set();
+                    for (const bid of page.block_ids()) {
+                        const html = page.block_html(bid) ?? '';
+                        let match;
+                        wiki_link_re.lastIndex = 0;
+                        while ((match = wiki_link_re.exec(html)) !== null) {
+                            const target = match[1].trim();
+                            if (page_ids.has(target) && target !== page.id() && !seen.has(target)) {
+                                seen.add(target);
+                                result.push({ source: page.id(), target });
+                            }
+                        }
+                    }
+                }
+                return result;
+            }
+            sim_nodes() {
+                const nodes = this.nodes().map(n => ({ ...n }));
+                const edges = this.edges();
+                if (nodes.length === 0)
+                    return nodes;
+                const w = this._logical_width;
+                const h = this._logical_height;
+                const cx = w / 2;
+                const cy = h / 2;
+                const node_map = new Map(nodes.map(n => [n.id, n]));
+                const iterations = 80;
+                for (let iter = 0; iter < iterations; iter++) {
+                    for (let i = 0; i < nodes.length; i++) {
+                        for (let j = i + 1; j < nodes.length; j++) {
+                            const a = nodes[i];
+                            const b = nodes[j];
+                            let dx = b.x - a.x;
+                            let dy = b.y - a.y;
+                            let dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < 1) {
+                                dx = 1;
+                                dy = 1;
+                                dist = 1.41;
+                            }
+                            const force = 5000 / (dist * dist);
+                            const fx = dx / dist * force;
+                            const fy = dy / dist * force;
+                            a.vx -= fx;
+                            a.vy -= fy;
+                            b.vx += fx;
+                            b.vy += fy;
+                        }
+                    }
+                    for (const edge of edges) {
+                        const a = node_map.get(edge.source);
+                        const b = node_map.get(edge.target);
+                        if (!a || !b)
+                            continue;
+                        const dx = b.x - a.x;
+                        const dy = b.y - a.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 1)
+                            continue;
+                        const force = (dist - 120) * 0.02;
+                        const fx = dx / dist * force;
+                        const fy = dy / dist * force;
+                        a.vx += fx;
+                        a.vy += fy;
+                        b.vx -= fx;
+                        b.vy -= fy;
+                    }
+                    for (const n of nodes) {
+                        n.vx += (cx - n.x) * 0.005;
+                        n.vy += (cy - n.y) * 0.005;
+                    }
+                    for (const n of nodes) {
+                        n.vx *= 0.85;
+                        n.vy *= 0.85;
+                        n.x += n.vx;
+                        n.y += n.vy;
+                        n.x = Math.max(40, Math.min(w - 40, n.x));
+                        n.y = Math.max(40, Math.min(h - 40, n.y));
+                    }
+                }
+                return nodes;
+            }
+            node_at(x, y) {
+                const nodes = this.sim_nodes();
+                for (let i = nodes.length - 1; i >= 0; i--) {
+                    const n = nodes[i];
+                    const dx = n.x - x;
+                    const dy = n.y - y;
+                    if (dx * dx + dy * dy < 24 * 24)
+                        return n;
+                }
+                return null;
+            }
+            paint(ctx, dpr, w, h, nodes, edges, current) {
+                ctx.save();
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.clearRect(0, 0, w, h);
+                const node_map = new Map(nodes.map(n => [n.id, n]));
+                ctx.strokeStyle = '#88888866';
+                ctx.lineWidth = 1.5;
+                for (const edge of edges) {
+                    const a = node_map.get(edge.source);
+                    const b = node_map.get(edge.target);
+                    if (!a || !b)
+                        continue;
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                    ctx.stroke();
+                    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+                    const ax = b.x - 20 * Math.cos(angle);
+                    const ay = b.y - 20 * Math.sin(angle);
+                    ctx.beginPath();
+                    ctx.moveTo(ax, ay);
+                    ctx.lineTo(ax - 8 * Math.cos(angle - 0.4), ay - 8 * Math.sin(angle - 0.4));
+                    ctx.lineTo(ax - 8 * Math.cos(angle + 0.4), ay - 8 * Math.sin(angle + 0.4));
+                    ctx.closePath();
+                    ctx.fillStyle = '#88888866';
+                    ctx.fill();
+                }
+                for (const n of nodes) {
+                    const is_current = n.id === current;
+                    const radius = is_current ? 20 : 16;
+                    ctx.beginPath();
+                    ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = is_current ? '#3b82f6' : '#ffffff';
+                    ctx.fill();
+                    ctx.strokeStyle = is_current ? '#3b82f6' : '#cccccc';
+                    ctx.lineWidth = is_current ? 2.5 : 1.5;
+                    ctx.stroke();
+                    ctx.fillStyle = '#333333';
+                    ctx.font = is_current ? 'bold 12px system-ui' : '11px system-ui';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    const label = n.title.length > 18 ? n.title.slice(0, 16) + '..' : n.title;
+                    ctx.fillText(label, n.x, n.y + radius + 4);
+                }
+                ctx.restore();
+            }
+            _events_bound = false;
+            bind_events(canvas) {
+                if (this._events_bound)
+                    return;
+                this._events_bound = true;
+                canvas.addEventListener('click', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const node = this.node_at(e.clientX - rect.left, e.clientY - rect.top);
+                    if (node)
+                        this.on_navigate(node.id);
+                });
+                canvas.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    canvas.style.cursor = this.node_at(x, y) ? 'pointer' : 'default';
+                });
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "nodes", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "edges", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "sim_nodes", null);
+        $$.$bog_wysiwyg_graph = $bog_wysiwyg_graph;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_define($bog_wysiwyg_graph, {
+        flex: {
+            direction: 'column',
+            grow: 1,
+        },
+        position: 'relative',
+        minHeight: '24rem',
+        minWidth: '100%',
+        overflow: 'hidden',
+        border: {
+            radius: $mol_gap.round,
+        },
+        background: {
+            color: $mol_theme.card,
+        },
+    });
+})($ || ($ = {}));
+
+;
+	($.$bog_wysiwyg_app) = class $bog_wysiwyg_app extends ($.$mol_page) {
+		Theme(){
+			const obj = new this.$.$mol_theme_auto();
+			return obj;
+		}
+		Status(){
+			const obj = new this.$.$giper_baza_status();
+			return obj;
+		}
+		History_icon(){
+			const obj = new this.$.$mol_icon_history();
+			return obj;
+		}
+		history_showed(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		History_toggle(){
+			const obj = new this.$.$mol_check_icon();
+			(obj.Icon) = () => ((this.History_icon()));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_History_toggle_hint")));
+			(obj.checked) = (next) => ((this.history_showed(next)));
+			return obj;
+		}
+		Graph_icon(){
+			const obj = new this.$.$mol_icon_graph_outline();
+			return obj;
+		}
+		graph_showed(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		Graph_toggle(){
+			const obj = new this.$.$mol_check_icon();
+			(obj.Icon) = () => ((this.Graph_icon()));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Graph_toggle_hint")));
+			(obj.checked) = (next) => ((this.graph_showed(next)));
+			return obj;
+		}
+		Lights(){
+			const obj = new this.$.$mol_lights_toggle();
+			return obj;
+		}
+		Sidebar_title(){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Sidebar_title_title")));
+			return obj;
+		}
+		page_create(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		New_page(){
+			const obj = new this.$.$mol_button_minor();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_New_page_title")));
+			(obj.click) = (next) => ((this.page_create(next)));
+			return obj;
+		}
+		Sidebar_head(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Sidebar_title()), (this.New_page())]);
+			return obj;
+		}
+		page_rows(){
+			return [];
+		}
+		Page_list(){
+			const obj = new this.$.$mol_list();
+			(obj.rows) = () => ((this.page_rows()));
+			return obj;
+		}
+		Sidebar(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Sidebar_head()), (this.Page_list())]);
+			return obj;
+		}
+		page_land_link(){
+			return "";
+		}
+		all_pages_info(){
+			return [];
+		}
+		Editor(){
+			const obj = new this.$.$bog_wysiwyg();
+			(obj.page_land_link) = () => ((this.page_land_link()));
+			(obj.all_pages) = () => ((this.all_pages_info()));
+			(obj.history_showed) = (next) => ((this.history_showed(next)));
+			return obj;
+		}
+		main_content(){
+			return [(this.Editor())];
+		}
+		Main(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ((this.main_content()));
+			return obj;
+		}
+		graph_pages(){
+			return [];
+		}
+		page_navigate(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		Graph(){
+			const obj = new this.$.$bog_wysiwyg_graph();
+			(obj.pages) = () => ((this.graph_pages()));
+			(obj.current_page_id) = () => ((this.page_land_link()));
+			(obj.on_navigate) = (next) => ((this.page_navigate(next)));
+			return obj;
+		}
+		Graph_panel(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Graph())]);
+			return obj;
+		}
+		body_content(){
+			return [
+				(this.Sidebar()), 
+				(this.Main()), 
+				(this.Graph_panel())
+			];
+		}
+		Layout(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ((this.body_content()));
+			return obj;
+		}
+		page_item_title(id){
+			return "";
+		}
+		page_item_click(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		page_item_active(id){
+			return false;
+		}
+		title(){
+			return (this.$.$mol_locale.text("$bog_wysiwyg_app_title"));
+		}
+		plugins(){
+			return [(this.Theme()), (this.Status())];
+		}
+		tools(){
+			return [
+				(this.History_toggle()), 
+				(this.Graph_toggle()), 
+				(this.Lights())
+			];
+		}
+		body(){
+			return [(this.Layout())];
+		}
+		Page_item(id){
+			const obj = new this.$.$bog_wysiwyg_app_page();
+			(obj.title) = () => ((this.page_item_title(id)));
+			(obj.click) = (next) => ((this.page_item_click(id, next)));
+			(obj.active) = () => ((this.page_item_active(id)));
+			return obj;
+		}
+	};
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Theme"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Status"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "History_icon"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "history_showed"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "History_toggle"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_icon"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "graph_showed"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_toggle"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Lights"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar_title"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "page_create"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "New_page"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar_head"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Page_list"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Editor"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Main"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "page_navigate"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_panel"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Layout"));
+	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "page_item_click"));
+	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Page_item"));
+	($.$bog_wysiwyg_app_page) = class $bog_wysiwyg_app_page extends ($.$mol_button_minor) {
+		active(){
+			return false;
+		}
+		attr(){
+			return {...(super.attr()), "bog_wysiwyg_app_page_active": (this.active())};
+		}
+	};
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    function $mol_offline() { }
+    $.$mol_offline = $mol_offline;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    const blacklist = new Set([
+        '//cse.google.com/adsense/search/async-ads.js'
+    ]);
+    function $mol_offline_web() {
+        if (typeof window === 'undefined') {
+            self.addEventListener('install', (event) => {
+                ;
+                self.skipWaiting();
+            });
+            self.addEventListener('activate', (event) => {
+                ;
+                self.clients.claim();
+                $$.$mol_log3_done({
+                    place: '$mol_offline',
+                    message: 'Activated',
+                });
+            });
+            self.addEventListener('fetch', (event) => {
+                const request = event.request;
+                if (blacklist.has(request.url.replace(/^https?:/, ''))) {
+                    return event.respondWith(new Response(null, {
+                        status: 418,
+                        statusText: 'Blocked'
+                    }));
+                }
+                if (request.method !== 'GET')
+                    return;
+                if (!/^https?:/.test(request.url))
+                    return;
+                if (/\?/.test(request.url))
+                    return;
+                if (request.cache === 'no-store')
+                    return;
+                const fetch_data = () => fetch(new Request(request, { credentials: 'omit' })).then(response => {
+                    if (response.status !== 200)
+                        return response;
+                    event.waitUntil(caches.open('$mol_offline').then(cache => cache.put(request, response)));
+                    return response.clone();
+                });
+                const enrich = (response) => {
+                    if (!response.status)
+                        return response;
+                    const headers = new Headers(response.headers);
+                    headers.set("$mol_offline", "");
+                    headers.set("Origin-Agent-Cluster", "?1");
+                    return new Response(response.body, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        headers,
+                    });
+                };
+                const fresh = request.cache === 'force-cache' ? null : fetch_data();
+                if (fresh)
+                    event.waitUntil(fresh.then(enrich));
+                event.respondWith(caches.match(request).then(cached => request.cache === 'no-cache' || request.cache === 'reload'
+                    ? (cached
+                        ? fresh
+                            .then(actual => {
+                            if (actual.status === cached.status)
+                                return actual;
+                            throw new Error(`${actual.status}${actual.statusText ? ` ${actual.statusText}` : ''}`, { cause: actual });
+                        })
+                            .catch((err) => {
+                            const cloned = cached.clone();
+                            const message = `${err.cause instanceof Response ? '' : '500 '}${err.message} $mol_offline fallback to cache`;
+                            cloned.headers.set('$mol_offline_remote_status', message);
+                            return cloned;
+                        })
+                        : fresh)
+                    : (cached || fresh || fetch_data())).then(enrich));
+            });
+            self.addEventListener('beforeinstallprompt', (event) => event.prompt());
+        }
+        else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+            console.warn('HTTPS or localhost is required for service workers.');
+        }
+        else if (!navigator.serviceWorker) {
+            console.warn('Service Worker is not supported.');
+        }
+        else {
+            $mol_dom.addEventListener('DOMContentLoaded', () => {
+                navigator.serviceWorker.register('web.js').then(reg => {
+                    reg.addEventListener('updatefound', () => {
+                        $$.$mol_log3_rise({
+                            place: '$mol_offline',
+                            message: 'Outdated',
+                        });
+                        const worker = reg.installing;
+                        worker.addEventListener('statechange', () => {
+                            if (worker.state !== 'activated')
+                                return;
+                            window.location.reload();
+                        });
+                    });
+                });
+            });
+        }
+    }
+    $.$mol_offline_web = $mol_offline_web;
+    $.$mol_offline = $mol_offline_web;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    try {
+        $mol_offline();
+    }
+    catch (error) {
+        console.error(error);
+    }
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
     class $bog_wysiwyg_plugin_registry {
         static plugins = new Map();
         static register(config) {
@@ -30811,14 +30740,12 @@ var $;
                 }
             }
             body_content() {
-                const content = [this.Sidebar()];
                 if (this.graph_showed()) {
-                    content.push(this.Graph_panel());
+                    return [this.Sidebar(), this.Graph_panel()];
                 }
                 else {
-                    content.push(this.Main());
+                    return [this.Sidebar(), this.Main()];
                 }
-                return content;
             }
             graph_pages() {
                 const self = this;
@@ -30869,6 +30796,11 @@ var $;
 var $;
 (function ($) {
     $mol_style_define($bog_wysiwyg_app, {
+        Editor: {
+            margin: {
+                top: '3rem'
+            }
+        },
         Layout: {
             flex: {
                 direction: 'row',
@@ -30917,10 +30849,6 @@ var $;
             flex: {
                 direction: 'column',
                 grow: 1,
-            },
-            overflow: {
-                x: 'hidden',
-                y: 'auto',
             },
             minWidth: 0,
         },
