@@ -415,6 +415,13 @@ namespace $.$$ {
 				return event
 			}
 
+			// @ : open AI menu
+			if( event.key === '@' ) {
+				event.preventDefault()
+				this.on_ai( event )
+				return event
+			}
+
 			// Ctrl/Cmd+J: open AI menu
 			if( event.key === 'j' && ( event.ctrlKey || event.metaKey ) && !event.shiftKey ) {
 				event.preventDefault()

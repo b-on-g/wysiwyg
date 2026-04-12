@@ -7,6 +7,8 @@ $bog_wysiwyg_ai $mol_view
 	index? 0
 	pos_y? 0
 	pos_x? 0
+	Model $mol_github_model
+		rules \You are a writing assistant. Respond in JSON: {"text": "your result"}. Return only the result text, no explanations.
 	commands /
 	Option* $mol_button_minor
 		title <= option_title* \

@@ -6,8 +6,8 @@ namespace $ {
 			grow: 1,
 		},
 		position: 'relative',
-		minHeight: '24rem',
-		minWidth: '100%',
+		minWidth: 0,
+		height: '30rem',
 		overflow: 'hidden',
 		border: {
 			radius: $mol_gap.round,

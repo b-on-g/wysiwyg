@@ -83,7 +83,7 @@ namespace $ {
 				grow: 1,
 			},
 			minWidth: 0,
-			width: '0',
+			width: '0px',
 		},
 
 

@@ -19,20 +19,10 @@ namespace $.$$ {
 
 	export class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
 
-		/**
-		 * sub()→null pattern: $mol skips child rendering.
-		 * We manage the canvas DOM manually in auto().
-		 * Same pattern as $bog_wysiwyg_block (contenteditable).
-		 */
 		override sub() {
 			return null as any
 		}
 
-		/**
-		 * auto() runs inside dom_tree() after render().
-		 * Since sub()→null, render() does nothing (no children).
-		 * We create/manage the canvas element ourselves.
-		 */
 		override auto() {
 			const node = this.dom_node() as HTMLElement
 			const pages = this.pages()
@@ -47,8 +37,9 @@ namespace $.$$ {
 			if( !canvas ) {
 				node.textContent = ''
 				canvas = this.$.$mol_dom_context.document.createElement( 'canvas' )
-				canvas.style.width = '100%'
-				canvas.style.height = '100%'
+				canvas.style.position = 'absolute'
+				canvas.style.top = '0'
+				canvas.style.left = '0'
 				canvas.style.display = 'block'
 				node.appendChild( canvas )
 				this.bind_events( canvas )
@@ -61,20 +52,18 @@ namespace $.$$ {
 			const w = rect.width
 			const h = rect.height
 
+			canvas.style.width = w + 'px'
+			canvas.style.height = h + 'px'
 			canvas.width = Math.ceil( w * dpr )
 			canvas.height = Math.ceil( h * dpr )
 
-			this._logical_width = w
-			this._logical_height = h
-
-			const nodes = this.sim_nodes()
-			const edges = this.edges()
+			const nodes = this.compute_nodes( w, h )
+			const sim = this.simulate( nodes, this.edges(), w, h )
 			const current = this.current_page_id()
 
 			const ctx = canvas.getContext( '2d' )
 			if( !ctx ) return
 
-			// Read theme colors from CSS variables
 			const style = this.$.$mol_dom_context.getComputedStyle( node )
 			const colors = {
 				edge: style.getPropertyValue( '--mol_theme_line' ).trim() || '#88888866',
@@ -84,22 +73,18 @@ namespace $.$$ {
 				text: style.getPropertyValue( '--mol_theme_text' ).trim() || '#333333',
 			}
 
-			this.paint( ctx, dpr, w, h, nodes, edges, current, colors )
+			this._sim_cache = sim
+			this.paint( ctx, dpr, w, h, sim, this.edges(), current, colors )
 		}
 
-		_logical_width = 600
-		_logical_height = 400
+		_sim_cache: Graph_node[] = []
 
-		/** Extract page info as graph nodes in a circle layout */
-		@ $mol_mem
-		nodes(): Graph_node[] {
+		compute_nodes( w: number, h: number ): Graph_node[] {
 			const pages = this.pages() as {
 				id(): string
 				title(): string
 			}[]
 
-			const w = this._logical_width
-			const h = this._logical_height
 			const cx = w / 2
 			const cy = h / 2
 			const r = Math.min( w, h ) * 0.3
@@ -146,28 +131,20 @@ namespace $.$$ {
 			return result
 		}
 
-		/** Run force simulation for a fixed number of iterations */
-		@ $mol_mem
-		sim_nodes(): Graph_node[] {
-			const nodes = this.nodes().map( n => ({ ...n }) )
-			const edges = this.edges()
+		simulate( nodes: Graph_node[], edges: Graph_edge[], w: number, h: number ): Graph_node[] {
+			const result = nodes.map( n => ({ ...n }) )
+			if( result.length === 0 ) return result
 
-			if( nodes.length === 0 ) return nodes
-
-			const w = this._logical_width
-			const h = this._logical_height
 			const cx = w / 2
 			const cy = h / 2
+			const node_map = new Map( result.map( n => [ n.id, n ] ) )
 
-			const node_map = new Map( nodes.map( n => [ n.id, n ] ) )
+			for( let iter = 0; iter < 80; iter++ ) {
 
-			const iterations = 80
-			for( let iter = 0; iter < iterations; iter++ ) {
-
-				for( let i = 0; i < nodes.length; i++ ) {
-					for( let j = i + 1; j < nodes.length; j++ ) {
-						const a = nodes[ i ]
-						const b = nodes[ j ]
+				for( let i = 0; i < result.length; i++ ) {
+					for( let j = i + 1; j < result.length; j++ ) {
+						const a = result[ i ]
+						const b = result[ j ]
 						let dx = b.x - a.x
 						let dy = b.y - a.y
 						let dist = Math.sqrt( dx * dx + dy * dy )
@@ -199,12 +176,12 @@ namespace $.$$ {
 					b.vy -= fy
 				}
 
-				for( const n of nodes ) {
+				for( const n of result ) {
 					n.vx += ( cx - n.x ) * 0.005
 					n.vy += ( cy - n.y ) * 0.005
 				}
 
-				for( const n of nodes ) {
+				for( const n of result ) {
 					n.vx *= 0.85
 					n.vy *= 0.85
 					n.x += n.vx
@@ -214,12 +191,12 @@ namespace $.$$ {
 				}
 			}
 
-			return nodes
+			return result
 		}
 
 		/** Find node at (x, y) in CSS pixel coords */
 		node_at( x: number, y: number ): Graph_node | null {
-			const nodes = this.sim_nodes()
+			const nodes = this._sim_cache
 			for( let i = nodes.length - 1; i >= 0; i-- ) {
 				const n = nodes[ i ]
 				const dx = n.x - x
@@ -229,7 +206,6 @@ namespace $.$$ {
 			return null
 		}
 
-		/** Pure drawing — no reactive reads */
 		paint(
 			ctx: CanvasRenderingContext2D,
 			dpr: number,
@@ -246,7 +222,6 @@ namespace $.$$ {
 
 			const node_map = new Map( nodes.map( n => [ n.id, n ] ) )
 
-			// Edges
 			ctx.strokeStyle = colors.edge
 			ctx.lineWidth = 1.5
 			for( const edge of edges ) {
@@ -270,7 +245,6 @@ namespace $.$$ {
 				ctx.fill()
 			}
 
-			// Nodes
 			for( const n of nodes ) {
 				const is_current = n.id === current
 				const radius = is_current ? 20 : 16
@@ -294,7 +268,6 @@ namespace $.$$ {
 			ctx.restore()
 		}
 
-		/** Attach native mouse events once */
 		_events_bound = false
 
 		bind_events( canvas: HTMLCanvasElement ) {

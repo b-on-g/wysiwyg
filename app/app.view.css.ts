@@ -39,7 +39,7 @@ namespace $ {
 				grow: 1,
 			},
 			minWidth: 0,
-			width: '0',
+			width: '0px',
 			overflow: {
 				y: 'auto',
 			},
@@ -50,7 +50,7 @@ namespace $ {
 				grow: 1,
 			},
 			minWidth: 0,
-			minHeight: '400px',
+			overflow: 'hidden',
 		},
 
 	} )

@@ -35,56 +35,27 @@ namespace $.$$ {
 			return event
 		}
 
-		@ $mol_action
 		run_command( id: string ) {
 			const cmd = this.commands().find( c => c.id === id )
 			if( !cmd ) return
 
 			const context = this.context()
-			if( !context ) return
-
 			this.loading( true )
 
-			try {
-				const keys = this.$.$mol_github_model_keys
-				const key = keys[ Math.floor( Math.random() * keys.length ) ]
-				const models = this.$.$mol_github_model_polyglots
-				const model_name = models[ Math.floor( Math.random() * models.length ) ]
-
-				const data = this.$.$mol_fetch.json( 'https://models.github.ai/inference/chat/completions', {
-					method: 'POST',
-					headers: {
-						'Authorization': 'Bearer ' + key,
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify( {
-						model: model_name,
-						stream: false,
-						response_format: { type: 'json_object' },
-						messages: [
-							{ role: 'system', content: 'You are a writing assistant. Respond in JSON: {"text": "your result"}. Return only the result text, no explanations.' },
-							{ role: 'user', content: `${ cmd.prompt }\n\n\u0422\u0435\u043A\u0441\u0442:\n${ context }` },
-						],
-					} ),
-				} )
-
-				const content = data?.choices?.[ 0 ]?.message?.content ?? ''
-				let text: string
-				try {
-					const parsed = JSON.parse( content )
-					text = parsed?.text ?? content
-				} catch {
-					text = content
-				}
-
-				this.loading( false )
-				this.showed( false )
-				this.on_result( text )
-			} catch( error: unknown ) {
-				this.loading( false )
-				this.showed( false )
-				$mol_fail_log( error )
-			}
+			$mol_wire_async( this.Model() ).shot(
+				[ `${ cmd.prompt }\n\n\u0422\u0435\u043A\u0441\u0442:\n${ context }` ]
+			).then(
+				( result: any ) => {
+					this.loading( false )
+					this.showed( false )
+					this.on_result( result?.text ?? '' )
+				},
+				( error: any ) => {
+					this.loading( false )
+					this.showed( false )
+					$mol_fail_log( error )
+				},
+			)
 		}
 
 		pos_y_str() {
