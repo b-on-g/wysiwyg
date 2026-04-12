@@ -15,13 +15,6 @@ namespace $ {
 				shrink: 0,
 			},
 			width: '14rem',
-			border: {
-				right: {
-					width: '1px',
-					style: 'solid',
-					color: $mol_theme.line,
-				},
-			},
 			overflow: {
 				y: 'auto',
 				x: 'hidden',

@@ -196,25 +196,63 @@ namespace $.$$ {
 			}
 		}
 
-		/** Render the graph onto the canvas — called reactively from auto() */
-		render_canvas() {
-			const canvas = this.Canvas().dom_node() as HTMLCanvasElement
-			const ctx = canvas.getContext( '2d' )
-			if( !ctx ) return
+		/** Find node at (x, y) in CSS pixel coords */
+		node_at( x: number, y: number ): Graph_node | null {
+			const nodes = this.sim_nodes()
+			for( let i = nodes.length - 1; i >= 0; i-- ) {
+				const n = nodes[ i ]
+				const dx = n.x - x
+				const dy = n.y - y
+				if( dx * dx + dy * dy < 24 * 24 ) return n
+			}
+			return null
+		}
 
+		/**
+		 * Collect all reactive data in auto() (which runs in a reactive context),
+		 * then schedule a NON-reactive paint via requestAnimationFrame.
+		 * This avoids the circular dependency:
+		 *   render() → auto() → Canvas().dom_node() → render()
+		 */
+		override auto() {
+			// Read all reactive inputs HERE (inside reactive context)
+			const nodes = this.sim_nodes()
+			const edges = this.edges()
+			const current = this.current_page_id()
 			const dpr = this.$.$mol_dom_context.devicePixelRatio || 1
 			const w = this.logical_width()
 			const h = this.logical_height()
+			const colors = this.read_theme_colors()
 
+			// Schedule paint OUTSIDE reactive context
+			requestAnimationFrame( () => {
+				try {
+					const canvas = ( this.Canvas().dom_node() as HTMLCanvasElement )
+					const ctx = canvas.getContext( '2d' )
+					if( !ctx ) return
+
+					this.paint( ctx, dpr, w, h, nodes, edges, current, colors )
+					this.bind_events( canvas )
+				} catch {}
+			} )
+		}
+
+		/** Pure drawing function — no reactive reads */
+		paint(
+			ctx: CanvasRenderingContext2D,
+			dpr: number,
+			w: number,
+			h: number,
+			nodes: readonly Graph_node[],
+			edges: readonly Graph_edge[],
+			current: string,
+			colors: { focus: string, card: string, line: string, text: string, shade: string },
+		) {
 			ctx.save()
 			ctx.setTransform( dpr, 0, 0, dpr, 0, 0 )
 			ctx.clearRect( 0, 0, w, h )
 
-			const nodes = this.sim_nodes()
-			const edges = this.edges()
 			const node_map = new Map( nodes.map( n => [ n.id, n ] ) )
-			const current = this.current_page_id()
-			const colors = this.read_theme_colors()
 
 			// Draw edges
 			ctx.strokeStyle = colors.shade + '66'
@@ -272,26 +310,12 @@ namespace $.$$ {
 			ctx.restore()
 		}
 
-		/** Find node at (x, y) in CSS pixel coords */
-		node_at( x: number, y: number ): Graph_node | null {
-			const nodes = this.sim_nodes()
-			for( let i = nodes.length - 1; i >= 0; i-- ) {
-				const n = nodes[ i ]
-				const dx = n.x - x
-				const dy = n.y - y
-				if( dx * dx + dy * dy < 24 * 24 ) return n
-			}
-			return null
-		}
-
 		/** Attach native mouse events once to the canvas */
 		_events_bound = false
 
-		bind_events() {
+		bind_events( canvas: HTMLCanvasElement ) {
 			if( this._events_bound ) return
 			this._events_bound = true
-
-			const canvas = this.Canvas().dom_node() as HTMLCanvasElement
 
 			canvas.addEventListener( 'click', ( e: MouseEvent ) => {
 				const rect = canvas.getBoundingClientRect()
@@ -305,11 +329,6 @@ namespace $.$$ {
 				const y = e.clientY - rect.top
 				canvas.style.cursor = this.node_at( x, y ) ? 'pointer' : 'default'
 			})
-		}
-
-		override auto() {
-			this.render_canvas()
-			this.bind_events()
 		}
 
 	}
