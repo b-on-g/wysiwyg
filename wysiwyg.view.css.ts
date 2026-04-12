@@ -83,10 +83,8 @@ namespace $ {
 				grow: 1,
 			},
 			minWidth: 0,
-			overflow: {
-				x: 'hidden',
-			},
 		},
+
 
 		Block_comment: {
 			flex: {
@@ -96,7 +94,6 @@ namespace $ {
 		},
 	} )
 
-	// Hover rules using child combinators — not expressible in $mol_style_define
 	$mol_style_attach( 'bog_wysiwyg_hover', `
 		.bog_wysiwyg_block_row:hover > .bog_wysiwyg_drag_handle,
 		.bog_wysiwyg_block_row:hover > .bog_wysiwyg_comment .bog_wysiwyg_comment_comment_button {

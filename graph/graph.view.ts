@@ -19,33 +19,66 @@ namespace $.$$ {
 
 	export class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
 
-		/** Show canvas when pages exist, otherwise show empty message */
-		@ $mol_mem
-		content() {
-			return this.pages().length > 0
-				? [ this.Canvas() ]
-				: [ this.Empty() ]
+		/**
+		 * sub()→null pattern: $mol skips child rendering.
+		 * We manage the canvas DOM manually in auto().
+		 * Same pattern as $bog_wysiwyg_block (contenteditable).
+		 */
+		override sub() {
+			return null as any
 		}
 
-		/** Canvas pixel dimensions (accounting for DPR) */
-		@ $mol_mem
-		canvas_width() {
-			return Math.ceil( ( this.view_rect()?.width ?? 600 ) * ( this.$.$mol_dom_context.devicePixelRatio || 1 ) )
+		/**
+		 * auto() runs inside dom_tree() after render().
+		 * Since sub()→null, render() does nothing (no children).
+		 * We create/manage the canvas element ourselves.
+		 */
+		override auto() {
+			const node = this.dom_node() as HTMLElement
+			const pages = this.pages()
+
+			if( pages.length === 0 ) {
+				node.textContent = 'No pages yet'
+				return
+			}
+
+			// Ensure canvas exists
+			let canvas = node.querySelector( 'canvas' ) as HTMLCanvasElement | null
+			if( !canvas ) {
+				node.textContent = ''
+				canvas = this.$.$mol_dom_context.document.createElement( 'canvas' )
+				canvas.style.width = '100%'
+				canvas.style.height = '100%'
+				canvas.style.display = 'block'
+				node.appendChild( canvas )
+				this.bind_events( canvas )
+			}
+
+			const rect = node.getBoundingClientRect()
+			if( rect.width < 1 || rect.height < 1 ) return
+
+			const dpr = this.$.$mol_dom_context.devicePixelRatio || 1
+			const w = rect.width
+			const h = rect.height
+
+			canvas.width = Math.ceil( w * dpr )
+			canvas.height = Math.ceil( h * dpr )
+
+			this._logical_width = w
+			this._logical_height = h
+
+			const nodes = this.sim_nodes()
+			const edges = this.edges()
+			const current = this.current_page_id()
+
+			const ctx = canvas.getContext( '2d' )
+			if( !ctx ) return
+
+			this.paint( ctx, dpr, w, h, nodes, edges, current )
 		}
 
-		@ $mol_mem
-		canvas_height() {
-			return Math.ceil( ( this.view_rect()?.height ?? 400 ) * ( this.$.$mol_dom_context.devicePixelRatio || 1 ) )
-		}
-
-		/** Logical canvas size (CSS pixels) */
-		logical_width() {
-			return this.canvas_width() / ( this.$.$mol_dom_context.devicePixelRatio || 1 )
-		}
-
-		logical_height() {
-			return this.canvas_height() / ( this.$.$mol_dom_context.devicePixelRatio || 1 )
-		}
+		_logical_width = 600
+		_logical_height = 400
 
 		/** Extract page info as graph nodes in a circle layout */
 		@ $mol_mem
@@ -55,8 +88,8 @@ namespace $.$$ {
 				title(): string
 			}[]
 
-			const w = this.logical_width()
-			const h = this.logical_height()
+			const w = this._logical_width
+			const h = this._logical_height
 			const cx = w / 2
 			const cy = h / 2
 			const r = Math.min( w, h ) * 0.3
@@ -103,7 +136,7 @@ namespace $.$$ {
 			return result
 		}
 
-		/** Run force simulation for a fixed number of iterations, return final positions */
+		/** Run force simulation for a fixed number of iterations */
 		@ $mol_mem
 		sim_nodes(): Graph_node[] {
 			const nodes = this.nodes().map( n => ({ ...n }) )
@@ -111,18 +144,16 @@ namespace $.$$ {
 
 			if( nodes.length === 0 ) return nodes
 
-			const w = this.logical_width()
-			const h = this.logical_height()
+			const w = this._logical_width
+			const h = this._logical_height
 			const cx = w / 2
 			const cy = h / 2
 
 			const node_map = new Map( nodes.map( n => [ n.id, n ] ) )
 
-			// Run fixed iterations of force simulation
 			const iterations = 80
 			for( let iter = 0; iter < iterations; iter++ ) {
 
-				// Repulsion between all node pairs
 				for( let i = 0; i < nodes.length; i++ ) {
 					for( let j = i + 1; j < nodes.length; j++ ) {
 						const a = nodes[ i ]
@@ -141,7 +172,6 @@ namespace $.$$ {
 					}
 				}
 
-				// Attraction along edges
 				for( const edge of edges ) {
 					const a = node_map.get( edge.source )
 					const b = node_map.get( edge.target )
@@ -159,13 +189,11 @@ namespace $.$$ {
 					b.vy -= fy
 				}
 
-				// Center gravity
 				for( const n of nodes ) {
 					n.vx += ( cx - n.x ) * 0.005
 					n.vy += ( cy - n.y ) * 0.005
 				}
 
-				// Damping and position update
 				for( const n of nodes ) {
 					n.vx *= 0.85
 					n.vy *= 0.85
@@ -177,23 +205,6 @@ namespace $.$$ {
 			}
 
 			return nodes
-		}
-
-		/** Read theme colors from computed style of own DOM node */
-		read_theme_colors() {
-			try {
-				const el = this.dom_node()
-				const style = this.$.$mol_dom_context.getComputedStyle( el )
-				return {
-					focus: style.getPropertyValue( '--mol_theme_focus' ).trim() || '#3b82f6',
-					card: style.getPropertyValue( '--mol_theme_card' ).trim() || '#ffffff',
-					line: style.getPropertyValue( '--mol_theme_line' ).trim() || '#cccccc',
-					text: style.getPropertyValue( '--mol_theme_text' ).trim() || '#333333',
-					shade: style.getPropertyValue( '--mol_theme_shade' ).trim() || '#888888',
-				}
-			} catch {
-				return { focus: '#3b82f6', card: '#ffffff', line: '#cccccc', text: '#333333', shade: '#888888' }
-			}
 		}
 
 		/** Find node at (x, y) in CSS pixel coords */
@@ -208,36 +219,7 @@ namespace $.$$ {
 			return null
 		}
 
-		/**
-		 * Collect all reactive data in auto() (which runs in a reactive context),
-		 * then schedule a NON-reactive paint via requestAnimationFrame.
-		 * This avoids the circular dependency:
-		 *   render() → auto() → Canvas().dom_node() → render()
-		 */
-		override auto() {
-			// Read all reactive inputs HERE (inside reactive context)
-			const nodes = this.sim_nodes()
-			const edges = this.edges()
-			const current = this.current_page_id()
-			const dpr = this.$.$mol_dom_context.devicePixelRatio || 1
-			const w = this.logical_width()
-			const h = this.logical_height()
-			const colors = this.read_theme_colors()
-
-			// Schedule paint OUTSIDE reactive context
-			requestAnimationFrame( () => {
-				try {
-					const canvas = ( this.Canvas().dom_node() as HTMLCanvasElement )
-					const ctx = canvas.getContext( '2d' )
-					if( !ctx ) return
-
-					this.paint( ctx, dpr, w, h, nodes, edges, current, colors )
-					this.bind_events( canvas )
-				} catch {}
-			} )
-		}
-
-		/** Pure drawing function — no reactive reads */
+		/** Pure drawing — no reactive reads */
 		paint(
 			ctx: CanvasRenderingContext2D,
 			dpr: number,
@@ -246,7 +228,6 @@ namespace $.$$ {
 			nodes: readonly Graph_node[],
 			edges: readonly Graph_edge[],
 			current: string,
-			colors: { focus: string, card: string, line: string, text: string, shade: string },
 		) {
 			ctx.save()
 			ctx.setTransform( dpr, 0, 0, dpr, 0, 0 )
@@ -254,8 +235,8 @@ namespace $.$$ {
 
 			const node_map = new Map( nodes.map( n => [ n.id, n ] ) )
 
-			// Draw edges
-			ctx.strokeStyle = colors.shade + '66'
+			// Edges
+			ctx.strokeStyle = '#88888866'
 			ctx.lineWidth = 1.5
 			for( const edge of edges ) {
 				const a = node_map.get( edge.source )
@@ -266,40 +247,32 @@ namespace $.$$ {
 				ctx.lineTo( b.x, b.y )
 				ctx.stroke()
 
-				// Arrow head
 				const angle = Math.atan2( b.y - a.y, b.x - a.x )
 				const ax = b.x - 20 * Math.cos( angle )
 				const ay = b.y - 20 * Math.sin( angle )
 				ctx.beginPath()
 				ctx.moveTo( ax, ay )
-				ctx.lineTo(
-					ax - 8 * Math.cos( angle - 0.4 ),
-					ay - 8 * Math.sin( angle - 0.4 ),
-				)
-				ctx.lineTo(
-					ax - 8 * Math.cos( angle + 0.4 ),
-					ay - 8 * Math.sin( angle + 0.4 ),
-				)
+				ctx.lineTo( ax - 8 * Math.cos( angle - 0.4 ), ay - 8 * Math.sin( angle - 0.4 ) )
+				ctx.lineTo( ax - 8 * Math.cos( angle + 0.4 ), ay - 8 * Math.sin( angle + 0.4 ) )
 				ctx.closePath()
-				ctx.fillStyle = colors.shade + '66'
+				ctx.fillStyle = '#88888866'
 				ctx.fill()
 			}
 
-			// Draw nodes
+			// Nodes
 			for( const n of nodes ) {
 				const is_current = n.id === current
 				const radius = is_current ? 20 : 16
 
 				ctx.beginPath()
 				ctx.arc( n.x, n.y, radius, 0, Math.PI * 2 )
-				ctx.fillStyle = is_current ? colors.focus : colors.card
+				ctx.fillStyle = is_current ? '#3b82f6' : '#ffffff'
 				ctx.fill()
-				ctx.strokeStyle = is_current ? colors.focus : colors.line
+				ctx.strokeStyle = is_current ? '#3b82f6' : '#cccccc'
 				ctx.lineWidth = is_current ? 2.5 : 1.5
 				ctx.stroke()
 
-				// Title label
-				ctx.fillStyle = colors.text
+				ctx.fillStyle = '#333333'
 				ctx.font = is_current ? 'bold 12px system-ui' : '11px system-ui'
 				ctx.textAlign = 'center'
 				ctx.textBaseline = 'top'
@@ -310,7 +283,7 @@ namespace $.$$ {
 			ctx.restore()
 		}
 
-		/** Attach native mouse events once to the canvas */
+		/** Attach native mouse events once */
 		_events_bound = false
 
 		bind_events( canvas: HTMLCanvasElement ) {

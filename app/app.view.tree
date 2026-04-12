@@ -2,6 +2,7 @@ $bog_wysiwyg_app $mol_page
 	title @ \WikiLive
 	plugins /
 		<= Theme $mol_theme_auto
+		<= Status $giper_baza_status
 	tools /
 		<= History_toggle $mol_check_icon
 			Icon <= History_icon $mol_icon_history

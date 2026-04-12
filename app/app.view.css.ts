@@ -1,6 +1,12 @@
 namespace $ {
 
 	$mol_style_define( $bog_wysiwyg_app, {
+		Editor: {
+			margin: {
+				top:'3rem'
+			}
+			
+		},
 
 		Layout: {
 			flex: {
@@ -56,10 +62,6 @@ namespace $ {
 			flex: {
 				direction: 'column',
 				grow: 1,
-			},
-			overflow: {
-				x: 'hidden',
-				y: 'auto',
 			},
 			minWidth: 0,
 		},

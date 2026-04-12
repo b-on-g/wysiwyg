@@ -16,30 +16,6 @@ namespace $ {
 			color: $mol_theme.card,
 		},
 
-		Canvas: {
-			flex: {
-				grow: 1,
-			},
-			width: '100%',
-			height: '100%',
-		},
-
-		Empty: {
-			flex: {
-				grow: 1,
-			},
-			align: {
-				items: 'center',
-				self: 'center',
-			},
-			justify: {
-				content: 'center',
-			},
-			color: $mol_theme.shade,
-			font: {
-				size: '1rem',
-			},
-		},
 	} )
 
 }

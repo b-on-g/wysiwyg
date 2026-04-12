@@ -173,13 +173,11 @@ namespace $.$$ {
 		/** Body content depends on graph toggle */
 		@ $mol_mem
 		override body_content() {
-			const content: any[] = [ this.Sidebar() ]
 			if( this.graph_showed() ) {
-				content.push( this.Graph_panel() )
+				return [ this.Sidebar(), this.Graph_panel() ]
 			} else {
-				content.push( this.Main() )
+				return [ this.Sidebar(), this.Main() ]
 			}
-			return content
 		}
 
 		/** Graph pages — proxy objects with methods matching graph interface */
