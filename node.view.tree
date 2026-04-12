@@ -859,17 +859,17 @@ $bog_wysiwyg_app $mol_page
 						<= Page_list $mol_list
 							rows <= page_rows /
 				<= Main $mol_view
-					sub /
+					sub <= main_content /
 						<= Editor $bog_wysiwyg
 							page_land_link <= page_land_link \
 							all_pages <= all_pages_info /
 							history_showed? <=> history_showed? false
-						<= Graph_panel $mol_view
-							sub /
-								<= Graph $bog_wysiwyg_graph
-									pages <= graph_pages /
-									current_page_id <= page_land_link
-									on_navigate?id <=> page_navigate?id null
+				<= Graph_panel $mol_view
+					sub /
+						<= Graph $bog_wysiwyg_graph
+							pages <= graph_pages /
+							current_page_id <= page_land_link
+							on_navigate?id <=> page_navigate?id null
 	Page_item*0 $bog_wysiwyg_app_page
 		title <= page_item_title* \
 		click?event <=> page_item_click*?event null

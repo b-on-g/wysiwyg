@@ -10104,11 +10104,6 @@ declare namespace $.$$ {
         nodes(): Graph_node[];
         edges(): Graph_edge[];
         sim_nodes(): Graph_node[];
-        sim_tick(): void;
-        drag_id(next?: string | null): string | null;
-        _events_bound: boolean;
-        bind_events(): void;
-        node_at(x: number, y: number): Graph_node | null;
         read_theme_colors(): {
             focus: string;
             card: string;
@@ -10116,14 +10111,11 @@ declare namespace $.$$ {
             text: string;
             shade: string;
         };
-        _anim_id: number;
-        _running: boolean;
-        start_sim(): void;
-        tick_loop(): void;
-        stop_sim(): void;
-        auto(): void;
         render_canvas(): void;
-        destructor(): void;
+        node_at(x: number, y: number): Graph_node | null;
+        _events_bound: boolean;
+        bind_events(): void;
+        auto(): void;
     }
     export {};
 }
@@ -10234,25 +10226,25 @@ declare namespace $ {
 		,
 		ReturnType< $bog_wysiwyg['history_showed'] >
 	>
-	type $bog_wysiwyg_graph__pages_bog_wysiwyg_app_16 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_app_16 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['main_content'] >
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $bog_wysiwyg_graph__pages_bog_wysiwyg_app_17 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['graph_pages'] >
 		,
 		ReturnType< $bog_wysiwyg_graph['pages'] >
 	>
-	type $bog_wysiwyg_graph__current_page_id_bog_wysiwyg_app_17 = $mol_type_enforce<
+	type $bog_wysiwyg_graph__current_page_id_bog_wysiwyg_app_18 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_land_link'] >
 		,
 		ReturnType< $bog_wysiwyg_graph['current_page_id'] >
 	>
-	type $bog_wysiwyg_graph__on_navigate_bog_wysiwyg_app_18 = $mol_type_enforce<
+	type $bog_wysiwyg_graph__on_navigate_bog_wysiwyg_app_19 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_navigate'] >
 		,
 		ReturnType< $bog_wysiwyg_graph['on_navigate'] >
-	>
-	type $mol_view__sub_bog_wysiwyg_app_19 = $mol_type_enforce<
-		readonly(any)[]
-		,
-		ReturnType< $mol_view['sub'] >
 	>
 	type $mol_view__sub_bog_wysiwyg_app_20 = $mol_type_enforce<
 		readonly(any)[]
@@ -10298,11 +10290,12 @@ declare namespace $ {
 		page_land_link( ): string
 		all_pages_info( ): readonly(any)[]
 		Editor( ): $bog_wysiwyg
+		main_content( ): readonly(any)[]
+		Main( ): $mol_view
 		graph_pages( ): readonly(any)[]
 		page_navigate( next?: any ): any
 		Graph( ): $bog_wysiwyg_graph
 		Graph_panel( ): $mol_view
-		Main( ): $mol_view
 		body_content( ): readonly(any)[]
 		Layout( ): $mol_view
 		page_item_title( id: any): string
@@ -10328,9 +10321,10 @@ declare namespace $ {
 declare namespace $.$$ {
     class $bog_wysiwyg_app extends $.$bog_wysiwyg_app {
         page_land_link(next?: string): string;
-        registry_land_link(): string;
+        registry_land_link(next?: string): string;
         registry_land(): $giper_baza_land | null;
         registry_list(): $giper_baza_list_link | null;
+        registry_ensure(): $giper_baza_list_link;
         page_links(): readonly string[];
         page_title_by_link(link: string): string;
         page_block_ids(link: string): readonly string[];

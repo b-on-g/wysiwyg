@@ -26629,8 +26629,8 @@ var $;
             flex: {
                 direction: 'column',
             },
-            width: '20rem',
-            maxWidth: '20rem',
+            width: '18rem',
+            maxWidth: '90vw',
             maxHeight: '24rem',
             background: {
                 color: $mol_theme.card,
@@ -26975,7 +26975,7 @@ var $;
 var $;
 (function ($) {
     $mol_style_define($bog_wysiwyg_menu, {
-        position: 'absolute',
+        position: 'fixed',
         zIndex: 100,
         background: {
             color: $mol_theme.back,
@@ -27672,7 +27672,7 @@ var $;
 var $;
 (function ($) {
     $mol_style_define($bog_wysiwyg_ai, {
-        position: 'absolute',
+        position: 'fixed',
         zIndex: 100,
         background: {
             color: $mol_theme.back,
@@ -29083,11 +29083,9 @@ var $;
                     return null;
                 this.active_block_id(id);
                 const block_node = this.Block(id).dom_node();
-                const editor_node = this.dom_node();
                 const block_rect = block_node.getBoundingClientRect();
-                const editor_rect = editor_node.getBoundingClientRect();
-                this.menu_pos_y(block_rect.bottom - editor_rect.top);
-                this.menu_pos_x(block_rect.left - editor_rect.left);
+                this.menu_pos_y(block_rect.bottom);
+                this.menu_pos_x(block_rect.left);
                 this.menu_index(0);
                 this.menu_showed(true);
                 return event;
@@ -29178,13 +29176,11 @@ var $;
                     return null;
                 this.active_block_id(id);
                 const block_node = this.Block(id).dom_node();
-                const editor_node = this.dom_node();
                 const block_rect = block_node.getBoundingClientRect();
-                const editor_rect = editor_node.getBoundingClientRect();
                 const text = block_node.textContent ?? '';
                 this.ai_context(text);
-                this.ai_pos_y(block_rect.bottom - editor_rect.top);
-                this.ai_pos_x(block_rect.left - editor_rect.left);
+                this.ai_pos_y(block_rect.bottom);
+                this.ai_pos_x(block_rect.left);
                 this.ai_index(0);
                 this.ai_showed(true);
                 return event;
@@ -29765,6 +29761,8 @@ var $;
                 const page_ids = new Set(pages.map(p => p.id()));
                 const result = [];
                 for (const page of pages) {
+                    if (!page.block_ids || !page.block_html)
+                        continue;
                     const seen = new Set();
                     for (const bid of page.block_ids()) {
                         const html = page.block_html(bid) ?? '';
@@ -29782,122 +29780,70 @@ var $;
                 return result;
             }
             sim_nodes() {
-                return this.nodes().map(n => ({ ...n }));
-            }
-            sim_tick() {
-                const nodes = this.sim_nodes();
+                const nodes = this.nodes().map(n => ({ ...n }));
                 const edges = this.edges();
                 if (nodes.length === 0)
-                    return;
-                const node_map = new Map(nodes.map(n => [n.id, n]));
+                    return nodes;
                 const w = this.logical_width();
                 const h = this.logical_height();
                 const cx = w / 2;
                 const cy = h / 2;
-                for (let i = 0; i < nodes.length; i++) {
-                    for (let j = i + 1; j < nodes.length; j++) {
-                        const a = nodes[i];
-                        const b = nodes[j];
-                        let dx = b.x - a.x;
-                        let dy = b.y - a.y;
-                        let dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < 1) {
-                            dx = 1;
-                            dy = 1;
-                            dist = 1.41;
+                const node_map = new Map(nodes.map(n => [n.id, n]));
+                const iterations = 80;
+                for (let iter = 0; iter < iterations; iter++) {
+                    for (let i = 0; i < nodes.length; i++) {
+                        for (let j = i + 1; j < nodes.length; j++) {
+                            const a = nodes[i];
+                            const b = nodes[j];
+                            let dx = b.x - a.x;
+                            let dy = b.y - a.y;
+                            let dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < 1) {
+                                dx = 1;
+                                dy = 1;
+                                dist = 1.41;
+                            }
+                            const force = 5000 / (dist * dist);
+                            const fx = dx / dist * force;
+                            const fy = dy / dist * force;
+                            a.vx -= fx;
+                            a.vy -= fy;
+                            b.vx += fx;
+                            b.vy += fy;
                         }
-                        const force = 5000 / (dist * dist);
+                    }
+                    for (const edge of edges) {
+                        const a = node_map.get(edge.source);
+                        const b = node_map.get(edge.target);
+                        if (!a || !b)
+                            continue;
+                        const dx = b.x - a.x;
+                        const dy = b.y - a.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 1)
+                            continue;
+                        const force = (dist - 120) * 0.02;
                         const fx = dx / dist * force;
                         const fy = dy / dist * force;
-                        a.vx -= fx;
-                        a.vy -= fy;
-                        b.vx += fx;
-                        b.vy += fy;
+                        a.vx += fx;
+                        a.vy += fy;
+                        b.vx -= fx;
+                        b.vy -= fy;
+                    }
+                    for (const n of nodes) {
+                        n.vx += (cx - n.x) * 0.005;
+                        n.vy += (cy - n.y) * 0.005;
+                    }
+                    for (const n of nodes) {
+                        n.vx *= 0.85;
+                        n.vy *= 0.85;
+                        n.x += n.vx;
+                        n.y += n.vy;
+                        n.x = Math.max(40, Math.min(w - 40, n.x));
+                        n.y = Math.max(40, Math.min(h - 40, n.y));
                     }
                 }
-                for (const edge of edges) {
-                    const a = node_map.get(edge.source);
-                    const b = node_map.get(edge.target);
-                    if (!a || !b)
-                        continue;
-                    const dx = b.x - a.x;
-                    const dy = b.y - a.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 1)
-                        continue;
-                    const force = (dist - 120) * 0.02;
-                    const fx = dx / dist * force;
-                    const fy = dy / dist * force;
-                    a.vx += fx;
-                    a.vy += fy;
-                    b.vx -= fx;
-                    b.vy -= fy;
-                }
-                for (const n of nodes) {
-                    n.vx += (cx - n.x) * 0.005;
-                    n.vy += (cy - n.y) * 0.005;
-                }
-                for (const n of nodes) {
-                    n.vx *= 0.85;
-                    n.vy *= 0.85;
-                    n.x += n.vx;
-                    n.y += n.vy;
-                    n.x = Math.max(40, Math.min(w - 40, n.x));
-                    n.y = Math.max(40, Math.min(h - 40, n.y));
-                }
-            }
-            drag_id(next) {
-                return next ?? null;
-            }
-            _events_bound = false;
-            bind_events() {
-                if (this._events_bound)
-                    return;
-                this._events_bound = true;
-                const canvas = this.Canvas().dom_node();
-                canvas.addEventListener('mousedown', (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    const node = this.node_at(e.clientX - rect.left, e.clientY - rect.top);
-                    if (node)
-                        this.drag_id(node.id);
-                });
-                canvas.addEventListener('mousemove', (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const id = this.drag_id();
-                    if (!id) {
-                        canvas.style.cursor = this.node_at(x, y) ? 'pointer' : 'default';
-                        return;
-                    }
-                    const node = this.sim_nodes().find(n => n.id === id);
-                    if (!node)
-                        return;
-                    node.x = x;
-                    node.y = y;
-                    node.vx = 0;
-                    node.vy = 0;
-                });
-                canvas.addEventListener('mouseup', () => {
-                    this.drag_id(null);
-                });
-                canvas.addEventListener('click', (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    const node = this.node_at(e.clientX - rect.left, e.clientY - rect.top);
-                    if (node)
-                        this.on_navigate(node.id);
-                });
-            }
-            node_at(x, y) {
-                const nodes = this.sim_nodes();
-                for (let i = nodes.length - 1; i >= 0; i--) {
-                    const n = nodes[i];
-                    const dx = n.x - x;
-                    const dy = n.y - y;
-                    if (dx * dx + dy * dy < 24 * 24)
-                        return n;
-                }
-                return null;
+                return nodes;
             }
             read_theme_colors() {
                 try {
@@ -29914,35 +29860,6 @@ var $;
                 catch {
                     return { focus: '#3b82f6', card: '#ffffff', line: '#cccccc', text: '#333333', shade: '#888888' };
                 }
-            }
-            _anim_id = 0;
-            _running = false;
-            start_sim() {
-                if (this._running)
-                    return;
-                this._running = true;
-                this.tick_loop();
-            }
-            tick_loop() {
-                if (!this._running)
-                    return;
-                this.sim_tick();
-                this.render_canvas();
-                this._anim_id = requestAnimationFrame(() => this.tick_loop());
-            }
-            stop_sim() {
-                this._running = false;
-                if (this._anim_id)
-                    cancelAnimationFrame(this._anim_id);
-                this._anim_id = 0;
-            }
-            auto() {
-                if (this.pages().length === 0) {
-                    this.stop_sim();
-                    return;
-                }
-                this.bind_events();
-                this.start_sim();
             }
             render_canvas() {
                 const canvas = this.Canvas().dom_node();
@@ -30001,11 +29918,44 @@ var $;
                 }
                 ctx.restore();
             }
-            destructor() {
-                this.stop_sim();
-                super.destructor();
+            node_at(x, y) {
+                const nodes = this.sim_nodes();
+                for (let i = nodes.length - 1; i >= 0; i--) {
+                    const n = nodes[i];
+                    const dx = n.x - x;
+                    const dy = n.y - y;
+                    if (dx * dx + dy * dy < 24 * 24)
+                        return n;
+                }
+                return null;
+            }
+            _events_bound = false;
+            bind_events() {
+                if (this._events_bound)
+                    return;
+                this._events_bound = true;
+                const canvas = this.Canvas().dom_node();
+                canvas.addEventListener('click', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const node = this.node_at(e.clientX - rect.left, e.clientY - rect.top);
+                    if (node)
+                        this.on_navigate(node.id);
+                });
+                canvas.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    canvas.style.cursor = this.node_at(x, y) ? 'pointer' : 'default';
+                });
+            }
+            auto() {
+                this.render_canvas();
+                this.bind_events();
             }
         }
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_graph.prototype, "content", null);
         __decorate([
             $mol_mem
         ], $bog_wysiwyg_graph.prototype, "canvas_width", null);
@@ -30021,9 +29971,6 @@ var $;
         __decorate([
             $mol_mem
         ], $bog_wysiwyg_graph.prototype, "sim_nodes", null);
-        __decorate([
-            $mol_mem
-        ], $bog_wysiwyg_graph.prototype, "drag_id", null);
         $$.$bog_wysiwyg_graph = $bog_wysiwyg_graph;
     })($$ = $.$$ || ($.$$ = {}));
 })($ || ($ = {}));
@@ -30159,6 +30106,14 @@ var $;
 			(obj.history_showed) = (next) => ((this.history_showed(next)));
 			return obj;
 		}
+		main_content(){
+			return [(this.Editor())];
+		}
+		Main(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ((this.main_content()));
+			return obj;
+		}
 		graph_pages(){
 			return [];
 		}
@@ -30178,13 +30133,12 @@ var $;
 			(obj.sub) = () => ([(this.Graph())]);
 			return obj;
 		}
-		Main(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ([(this.Editor()), (this.Graph_panel())]);
-			return obj;
-		}
 		body_content(){
-			return [(this.Sidebar()), (this.Main())];
+			return [
+				(this.Sidebar()), 
+				(this.Main()), 
+				(this.Graph_panel())
+			];
 		}
 		Layout(){
 			const obj = new this.$.$mol_view();
@@ -30240,10 +30194,10 @@ var $;
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Page_list"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Sidebar"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Editor"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Main"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "page_navigate"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_panel"));
-	($mol_mem(($.$bog_wysiwyg_app.prototype), "Main"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Layout"));
 	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "page_item_click"));
 	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Page_item"));
@@ -30423,7 +30377,11 @@ var $;
                 }
                 return this.$.$mol_state_arg.value('page') ?? '';
             }
-            registry_land_link() {
+            registry_land_link(next) {
+                if (next !== undefined) {
+                    this.$.$mol_state_arg.value('registry', next || null);
+                    return next;
+                }
                 return this.$.$mol_state_arg.value('registry') ?? '';
             }
             registry_land() {
@@ -30436,6 +30394,14 @@ var $;
                 const land = this.registry_land();
                 if (!land)
                     return null;
+                return land.Data(Registry);
+            }
+            registry_ensure() {
+                let list = this.registry_list();
+                if (list)
+                    return list;
+                const land = this.$.$giper_baza_glob.land_grab([[null, $giper_baza_rank_post('just')]]);
+                this.registry_land_link(land.link().str);
                 return land.Data(Registry);
             }
             page_links() {
@@ -30496,9 +30462,7 @@ var $;
             page_create(event) {
                 if (!event)
                     return null;
-                const list = this.registry_list();
-                if (!list)
-                    return null;
+                const list = this.registry_ensure();
                 const land = this.$.$giper_baza_glob.land_grab([[null, $giper_baza_rank_post('just')]]);
                 const data = land.Data($bog_wysiwyg_model_page);
                 data.Title('auto')?.val('');
@@ -30546,6 +30510,12 @@ var $;
         ], $bog_wysiwyg_app.prototype, "page_land_link", null);
         __decorate([
             $mol_mem
+        ], $bog_wysiwyg_app.prototype, "registry_land_link", null);
+        __decorate([
+            $mol_action
+        ], $bog_wysiwyg_app.prototype, "registry_ensure", null);
+        __decorate([
+            $mol_mem
         ], $bog_wysiwyg_app.prototype, "page_links", null);
         __decorate([
             $mol_mem
@@ -30579,7 +30549,6 @@ var $;
                 direction: 'row',
                 grow: 1,
             },
-            overflow: 'hidden',
         },
         Sidebar: {
             flex: {

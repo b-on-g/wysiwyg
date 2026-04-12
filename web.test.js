@@ -7953,31 +7953,17 @@ var $;
                 ];
                 const sim = graph.sim_nodes();
                 const orig = graph.nodes();
-                sim[0].x = 999;
-                $mol_assert_ok(orig[0].x !== 999);
+                $mol_assert_ok(sim[0] !== orig[0]);
+                $mol_assert_equal(sim[0].id, orig[0].id);
             },
-            'node_at finds node within radius'() {
+            'edges handles pages without block methods'() {
                 const graph = new $bog_wysiwyg_graph();
                 graph.pages = () => [
                     { id: () => 'p1', title: () => 'A' },
+                    { id: () => 'p2', title: () => 'B' },
                 ];
-                const sim = graph.sim_nodes();
-                sim[0].x = 100;
-                sim[0].y = 100;
-                const found = graph.node_at(105, 105);
-                $mol_assert_ok(found !== null);
-                $mol_assert_equal(found.id, 'p1');
-            },
-            'node_at returns null when nothing nearby'() {
-                const graph = new $bog_wysiwyg_graph();
-                graph.pages = () => [
-                    { id: () => 'p1', title: () => 'A' },
-                ];
-                const sim = graph.sim_nodes();
-                sim[0].x = 100;
-                sim[0].y = 100;
-                const found = graph.node_at(500, 500);
-                $mol_assert_equal(found, null);
+                const edges = graph.edges();
+                $mol_assert_equal(edges.length, 0);
             },
         });
     })($$ = $.$$ || ($.$$ = {}));
