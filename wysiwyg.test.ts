@@ -782,6 +782,125 @@ namespace $.$$ {
 			$mol_assert_equal( rows.length, 3 )
 		},
 
+		// === html_to_md ===
+
+		'html_to_md: bold to markdown'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '<b>hello</b>' ), '**hello**' )
+		},
+
+		'html_to_md: strong to markdown'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '<strong>hello</strong>' ), '**hello**' )
+		},
+
+		'html_to_md: italic to markdown'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '<i>hello</i>' ), '*hello*' )
+		},
+
+		'html_to_md: em to markdown'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '<em>hello</em>' ), '*hello*' )
+		},
+
+		'html_to_md: code to markdown'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '<code>x</code>' ), '`x`' )
+		},
+
+		'html_to_md: strike to markdown'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '<s>old</s>' ), '~~old~~' )
+		},
+
+		'html_to_md: del to markdown'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '<del>old</del>' ), '~~old~~' )
+		},
+
+		'html_to_md: link to markdown'() {
+			$mol_assert_equal(
+				$bog_wysiwyg_html_to_md( '<a href="https://example.com">click</a>' ),
+				'[click](https://example.com)',
+			)
+		},
+
+		'html_to_md: br to newline'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( 'line1<br>line2' ), 'line1\nline2' )
+		},
+
+		'html_to_md: strips unknown tags'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '<div>hello</div>' ), 'hello' )
+		},
+
+		'html_to_md: decodes HTML entities'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( '&amp; &lt; &gt; &quot;' ), '& < > "' )
+		},
+
+		'html_to_md: mixed inline formatting'() {
+			$mol_assert_equal(
+				$bog_wysiwyg_html_to_md( 'hello <b>bold</b> and <i>italic</i>' ),
+				'hello **bold** and *italic*',
+			)
+		},
+
+		'html_to_md: plain text unchanged'() {
+			$mol_assert_equal( $bog_wysiwyg_html_to_md( 'just text' ), 'just text' )
+		},
+
+		// === block_paste_blocks ===
+
+		'block_paste_blocks replaces current and inserts new blocks'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a', 'b' ] )
+			editor.focus_block = () => {}
+
+			editor.block_paste_blocks( 'a', [
+				{ type: 'heading', content: 'Title', level: 1 },
+				{ type: 'paragraph', content: 'text' },
+				{ type: 'code', content: 'x = 1' },
+			] )
+
+			const ids = editor.block_ids()
+			$mol_assert_equal( ids.length, 4 )
+			$mol_assert_equal( ids[ 0 ], 'a' )
+			$mol_assert_equal( ids[ 3 ], 'b' )
+			$mol_assert_equal( editor.block_type( 'a' ), 'heading' )
+			$mol_assert_equal( editor.block_html( 'a' ), 'Title' )
+			$mol_assert_equal( editor.block_level( 'a' ), 1 )
+			$mol_assert_equal( editor.block_type( ids[ 1 ] ), 'paragraph' )
+			$mol_assert_equal( editor.block_html( ids[ 1 ] ), 'text' )
+			$mol_assert_equal( editor.block_type( ids[ 2 ] ), 'code' )
+			$mol_assert_equal( editor.block_html( ids[ 2 ] ), 'x = 1' )
+		},
+
+		'block_paste_blocks with single block replaces current only'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a', 'b' ] )
+			editor.focus_block = () => {}
+
+			editor.block_paste_blocks( 'a', [
+				{ type: 'quote', content: 'quoted' },
+			] )
+
+			$mol_assert_equal( editor.block_ids().length, 2 )
+			$mol_assert_equal( editor.block_type( 'a' ), 'quote' )
+			$mol_assert_equal( editor.block_html( 'a' ), 'quoted' )
+		},
+
+		'block_paste_blocks with empty array returns null'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a' ] )
+
+			$mol_assert_equal( editor.block_paste_blocks( 'a', [] ), null )
+			$mol_assert_equal( editor.block_ids().length, 1 )
+		},
+
+		'block_paste_blocks without val returns null'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'a' ] )
+
+			$mol_assert_equal( editor.block_paste_blocks( 'a' ), null )
+		},
+
 	})
 
 }
