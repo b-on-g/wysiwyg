@@ -1,5 +1,6 @@
 $bog_wysiwyg_comment_thread $mol_view
 	comment_land_link \
+	comment_count 0
 	sub /
 		<= Comments $mol_list
 			rows <= comment_views /

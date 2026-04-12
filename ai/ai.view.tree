@@ -7,6 +7,7 @@ $bog_wysiwyg_ai $mol_view
 	index? 0
 	pos_y? 0
 	pos_x? 0
+	commands /
 	Option* $mol_button_minor
 		title <= option_title* \
 		click?event <=> option_click*?event null

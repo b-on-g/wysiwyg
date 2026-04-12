@@ -3,6 +3,8 @@ $bog_wysiwyg_graph $mol_view
 	current_page_id \
 	on_navigate?id null
 	sub /
-		<= Canvas $mol_canvas
-			width <= canvas_width 0
-			height <= canvas_height 0
+		<= Canvas $mol_view
+			dom_name \canvas
+			attr *
+				width <= canvas_width 0
+				height <= canvas_height 0

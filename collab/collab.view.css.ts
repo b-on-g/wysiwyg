@@ -43,7 +43,7 @@ namespace $ {
 			},
 			color: $mol_theme.text,
 			fontSize: '0.7rem',
-			fontWeight: 600,
+			fontWeight: 'bold',
 			textAlign: 'center',
 			lineHeight: '1.75rem',
 			cursor: 'default',

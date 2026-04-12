@@ -19,7 +19,7 @@ namespace $.$$ {
 
 			return all.filter( page => {
 				if( page.id === target ) return false
-				return page.blocks_html.some( html => html.includes( pattern ) )
+				return page.blocks_html.some( ( html: string ) => html.includes( pattern ) )
 			} )
 		}
 

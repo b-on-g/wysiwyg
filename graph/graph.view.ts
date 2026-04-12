@@ -275,7 +275,8 @@ namespace $.$$ {
 
 		/** Main canvas draw routine (called from animation loop, not reactive) */
 		render_canvas() {
-			const ctx = this.Canvas().context()
+			const canvas = this.Canvas().dom_node() as HTMLCanvasElement
+			const ctx = canvas.getContext( '2d' )
 			if( !ctx ) return
 
 			const dpr = this.$.$mol_dom_context.devicePixelRatio || 1
