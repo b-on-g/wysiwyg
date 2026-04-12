@@ -40,6 +40,10 @@ $bog_wysiwyg $mol_view
 	drag_over_id? \
 	drag_over_position? \after
 	all_pages /
+	event *
+		^
+		keydown?event <=> editor_keydown?event null
+		copy?event <=> editor_copy?event null
 	sub /
 		<= Status $giper_baza_status
 		<= Block_list $mol_list

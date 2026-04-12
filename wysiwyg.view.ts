@@ -484,6 +484,96 @@ namespace $.$$ {
 			if( atom ) atom.val( land.link().str )
 		}
 
+		// === Select All & Copy as Markdown ===
+
+		editor_keydown( event?: KeyboardEvent ) {
+			if( !event ) return null
+			if( ( event.ctrlKey || event.metaKey ) && event.key === 'a' ) {
+				event.preventDefault()
+				this.select_all_blocks()
+				return event
+			}
+			return event
+		}
+
+		select_all_blocks() {
+			const ids = this.block_ids()
+			if( !ids.length ) return
+
+			const first = this.Block( ids[ 0 ] ).dom_node() as HTMLElement
+			const last = this.Block( ids[ ids.length - 1 ] ).dom_node() as HTMLElement
+
+			const sel = this.$.$mol_dom_context.document.defaultView?.getSelection()
+			if( !sel ) return
+
+			sel.removeAllRanges()
+			const range = this.$.$mol_dom_context.document.createRange()
+			range.setStart( first, 0 )
+			range.setEnd( last, last.childNodes.length )
+			sel.addRange( range )
+		}
+
+		editor_copy( event?: ClipboardEvent ) {
+			if( !event ) return null
+
+			const sel = this.$.$mol_dom_context.document.defaultView?.getSelection()
+			if( !sel || sel.isCollapsed ) return event
+
+			const ids = this.block_ids()
+			const md_parts: string[] = []
+
+			for( const id of ids ) {
+				const node = this.Block( id ).dom_node() as HTMLElement
+				if( !sel.containsNode( node, true ) ) continue
+
+				const type = this.block_type( id )
+				const html = node.innerHTML
+
+				switch( type ) {
+					case 'heading': {
+						const level = this.block_level( id )
+						md_parts.push( '#'.repeat( level ) + ' ' + $bog_wysiwyg_html_to_md( html ) )
+						break
+					}
+					case 'code':
+						md_parts.push( '```\n' + ( node.textContent ?? '' ) + '\n```' )
+						break
+					case 'quote':
+						md_parts.push(
+							$bog_wysiwyg_html_to_md( html )
+								.split( '\n' )
+								.map( l => '> ' + l )
+								.join( '\n' )
+						)
+						break
+					case 'divider':
+						md_parts.push( '---' )
+						break
+					case 'image': {
+						const img = node.querySelector( 'img' )
+						if( img ) md_parts.push( `![](${img.src})` )
+						break
+					}
+					default:
+						md_parts.push( $bog_wysiwyg_html_to_md( html ) )
+				}
+			}
+
+			if( md_parts.length > 1 ) {
+				event.preventDefault()
+				const md = md_parts.join( '\n\n' )
+				event.clipboardData?.setData( 'text/plain', md )
+				// Also set HTML for rich paste targets
+				const html = ids
+					.filter( id => sel.containsNode( this.Block( id ).dom_node(), true ) )
+					.map( id => ( this.Block( id ).dom_node() as HTMLElement ).outerHTML )
+					.join( '' )
+				event.clipboardData?.setData( 'text/html', html )
+			}
+
+			return event
+		}
+
 		// === Drag & Drop ===
 
 		row_is_drag_over( id: string ) {
