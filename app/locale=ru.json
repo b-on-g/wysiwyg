@@ -1,7 +1,11 @@
 {
 	"$bog_wysiwyg_app_title": "WikiLive",
+	"$bog_wysiwyg_app_Registry_toggle_hint": "Реестры",
+	"$bog_wysiwyg_app_Registry_title_title": "Реестры",
+	"$bog_wysiwyg_app_New_registry_title": "+ Новый реестр",
 	"$bog_wysiwyg_app_Sidebar_title_title": "Страницы",
 	"$bog_wysiwyg_app_New_page_title": "+ Новая",
 	"$bog_wysiwyg_app_History_toggle_hint": "История версий",
-	"$bog_wysiwyg_app_Graph_toggle_hint": "Граф страниц"
+	"$bog_wysiwyg_app_Graph_toggle_hint": "Граф страниц",
+	"$bog_wysiwyg_app_Profile_toggle_hint": "Профиль"
 }

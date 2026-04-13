@@ -27,13 +27,38 @@ namespace $.$$ {
 			return this.comment_items().map( ( _: any, i: number ) => this.Comment_row( i ) )
 		}
 
+		/** Lord ID for avatar */
+		comment_author_id( index: number ) {
+			const item = this.comment_items()[ index ]
+			if( !item ) return ''
+			return item.Author()?.val() ?? ''
+		}
+
+		/** Display name + date */
 		comment_author( index: number ) {
 			const item = this.comment_items()[ index ]
 			if( !item ) return ''
-			const author = item.Author()?.val() ?? ''
+
+			const lord_id = item.Author()?.val() ?? ''
+			const name = this.author_name( lord_id )
+
 			const time = item.Time()?.val() ?? 0
 			const date = time ? new Date( time ).toLocaleString() : ''
-			return author + ( date ? ' \u00b7 ' + date : '' )
+			return name + ( date ? ' \u00b7 ' + date : '' )
+		}
+
+		/** Resolve lord ID to profile name */
+		author_name( lord_id: string ) {
+			if( !lord_id ) return ''
+			try {
+				const home_land = this.$.$giper_baza_glob.Land(
+					new $giper_baza_link( lord_id )
+				)
+				const profile = home_land.Data( $bog_blitz_profile )
+				const name = profile.Name()?.val()
+				if( name ) return name
+			} catch {}
+			return lord_id.slice( 0, 8 )
 		}
 
 		comment_text( index: number ) {

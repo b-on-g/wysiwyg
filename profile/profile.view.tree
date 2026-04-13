@@ -1,0 +1,14 @@
+$bog_wysiwyg_profile $bog_blitz_profile_page
+	Stats null
+	Fun_card null
+	Games_section null
+	Avatar_label $mol_paragraph
+		title @ \Change photo
+	body /
+		<= Card
+		<= Id_row $mol_view
+			sub /
+				<= Id_label $mol_paragraph
+					title \ID:
+				<= Id_value $mol_paragraph
+					title <= id_display \

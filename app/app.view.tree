@@ -4,6 +4,10 @@ $bog_wysiwyg_app $mol_page
 		<= Theme $mol_theme_auto
 		<= Status $giper_baza_status
 	tools /
+		<= Registry_toggle $mol_check_icon
+			Icon <= Registry_icon $mol_icon_notebook_multiple
+			hint @ \Registries
+			checked? <=> registry_panel_showed? false
 		<= History_toggle $mol_check_icon
 			Icon <= History_icon $mol_icon_history
 			hint @ \Version history
@@ -12,11 +16,26 @@ $bog_wysiwyg_app $mol_page
 			Icon <= Graph_icon $mol_icon_graph_outline
 			hint @ \Page graph
 			checked? <=> graph_showed? false
+		<= Profile_toggle $mol_check_icon
+			Icon <= Profile_icon $mol_icon_account
+			hint @ \Profile
+			checked? <=> profile_showed? false
 		<= Lights $mol_lights_toggle
 	sub /
 		<= Head
 		<= Layout $mol_view
 			sub <= layout_content /
+				<= Registry_panel $mol_view
+					sub /
+						<= Registry_head $mol_view
+							sub /
+								<= Registry_title $mol_paragraph
+									title @ \Registries
+								<= New_registry $mol_button_minor
+									title @ \+ New registry
+									click?event <=> registry_create?event null
+						<= Registry_list $mol_list
+							rows <= registry_rows /
 				<= Sidebar $bog_ui_sidebar
 					items <= page_rows /
 					Header <= Sidebar_head $mol_view
@@ -38,11 +57,29 @@ $bog_wysiwyg_app $mol_page
 							pages <= graph_pages /
 							current_page_id <= page_land_link
 							on_navigate?id <=> page_navigate?id null
+				<= Profile_panel $mol_view
+					sub /
+						<= Profile $bog_wysiwyg_profile
+	Registry_item* $bog_wysiwyg_app_registry
+		title <= registry_item_title* \
+		click?event <=> registry_item_click*?event null
+		active <= registry_item_active* false
 	Page_item* $bog_wysiwyg_app_page
 		title <= page_item_title* \
 		click?event <=> page_item_click*?event null
 		active <= page_item_active* false
 		on_rename?val <=> page_item_rename*?val null
+
+$bog_wysiwyg_app_registry $mol_view
+	active false
+	title \
+	click?event null
+	attr *
+		bog_wysiwyg_app_registry_active <= active
+	sub /
+		<= Title_nav $mol_button_minor
+			title <= title
+			click?event <=> click?event null
 
 $bog_wysiwyg_app_page $mol_view
 	active false

@@ -14,7 +14,11 @@ $bog_wysiwyg_comment_thread $mol_view
 					click?event <=> send?event null
 	Comment_row* $mol_view
 		sub /
-			<= Comment_author* $mol_paragraph
-				title <= comment_author* \
+			<= Comment_head* $mol_view
+				sub /
+					<= Comment_avatar* $mol_avatar
+						id <= comment_author_id* \
+					<= Comment_author* $mol_paragraph
+						title <= comment_author* \
 			<= Comment_text* $mol_paragraph
 				title <= comment_text* \

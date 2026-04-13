@@ -5,10 +5,7 @@ namespace $ {
 		title: '🔗 Ссылка',
 		on_select: ( editor, block_id ) => {
 			const url = editor.$.$mol_dom_context.prompt( 'URL:' )
-			if( !url ) {
-				editor.focus_block( block_id )
-				return
-			}
+			if( !url ) return
 
 			const safe = url.replace( /"/g, '&quot;' ).replace( /</g, '&lt;' )
 			let display = url.replace( /^https?:\/\//, '' )

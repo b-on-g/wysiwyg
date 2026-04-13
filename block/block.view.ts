@@ -119,6 +119,8 @@ namespace $.$$ {
 			const html = this.html()
 			if( this.type() === 'image' && html?.includes( '<img' ) ) return false
 			if( this.type() === 'embed' && html?.includes( '<a' ) ) return false
+			const plugin = $bog_wysiwyg_plugin_registry.get( this.type() )
+			if( plugin?.render && html ) return false
 			return !html?.replace( /<[^>]*>/g, '' ).trim()
 		}
 
@@ -131,12 +133,35 @@ namespace $.$$ {
 		}
 
 		is_static() {
-			return this.type() === 'image' || this.type() === 'embed'
+			if( this.type() === 'image' || this.type() === 'embed' ) return true
+			const plugin = $bog_wysiwyg_plugin_registry.get( this.type() )
+			return !!plugin?.render
 		}
+
+		static render_cache = new WeakMap< $bog_wysiwyg_block, $mol_view >()
 
 		override auto() {
 			const node = this.dom_node() as HTMLElement
 			const doc = this.$.$mol_dom_context.document
+
+			// Plugin with custom render
+			const plugin = $bog_wysiwyg_plugin_registry.get( this.type() )
+			if( plugin?.render ) {
+				node.contentEditable = 'false'
+				let component = $bog_wysiwyg_block.render_cache.get( this )
+				if( !component ) {
+					component = plugin.render( this )!
+					if( component ) $bog_wysiwyg_block.render_cache.set( this, component )
+				}
+				if( component ) {
+					const rendered = component.dom_tree()
+					if( node.firstChild !== rendered ) {
+						node.textContent = ''
+						node.appendChild( rendered )
+					}
+				}
+				return
+			}
 
 			if( this.is_static() ) {
 				node.contentEditable = 'false'
@@ -357,8 +382,8 @@ namespace $.$$ {
 
 			const node = event.target as HTMLElement
 
-			// Image blocks: only allow Backspace to remove
-			if( this.is_image() ) {
+			// Static rendered blocks (image, plugin render): only Backspace/Enter
+			if( this.is_image() || $bog_wysiwyg_plugin_registry.get( this.type() )?.render ) {
 				if( event.key === 'Backspace' || event.key === 'Delete' ) {
 					event.preventDefault()
 					this.on_remove( event )

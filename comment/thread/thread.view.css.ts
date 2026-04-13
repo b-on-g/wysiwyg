@@ -38,6 +38,24 @@ namespace $ {
 			border: {
 				radius: $mol_gap.round,
 			},
+			gap: '0.25rem',
+		},
+
+		Comment_head: {
+			flex: {
+				direction: 'row',
+			},
+			alignItems: 'center',
+			gap: '0.375rem',
+		},
+
+		Comment_avatar: {
+			width: '1.25rem',
+			height: '1.25rem',
+			flex: {
+				shrink: 0,
+				grow: 0,
+			},
 		},
 
 		Comment_author: {

@@ -1,8 +1,5 @@
 namespace $.$$ {
 
-	/** Registry land stores a list of page land links */
-	const Registry = $giper_baza_list_link
-
 	export class $bog_wysiwyg_app extends $.$bog_wysiwyg_app {
 
 		/** Current page land link from URL */
@@ -15,7 +12,7 @@ namespace $.$$ {
 			return this.$.$mol_state_arg.value( 'page' ) ?? ''
 		}
 
-		/** Registry land link from URL or auto-created */
+		/** Registry land link from URL */
 		@ $mol_mem
 		registry_land_link( next?: string ) {
 			if( next !== undefined ) {
@@ -25,36 +22,66 @@ namespace $.$$ {
 			return this.$.$mol_state_arg.value( 'registry' ) ?? ''
 		}
 
-		/** Registry land (stores list of page links). Do NOT put @$mol_mem on land access. */
-		registry_land() {
+		/** User data from home land. Do NOT put @$mol_mem. */
+		user_data() {
+			const home = this.$.$giper_baza_glob.home()
+			if( !home ) return null
+			return home.land().Data( $bog_wysiwyg_model_user_data )
+		}
+
+		/** List of registry link strings from home land */
+		@ $mol_mem
+		user_registry_links(): readonly string[] {
+			const data = this.user_data()
+			if( !data ) return []
+			const list = data.Registries()
+			if( !list ) return []
+			const items = list.items_vary() ?? []
+			return items
+				.map( v => $giper_baza_vary_cast_link( v ) )
+				.filter( $mol_guard_defined )
+				.map( link => link.str )
+		}
+
+		/** Add a registry link to user's home land */
+		@ $mol_action
+		user_registries_add( link_str: string ) {
+			const data = this.user_data()
+			if( !data ) return
+			const list = data.Registries( 'auto' )
+			if( !list ) return
+			const current = list.items_vary() ?? []
+			list.items_vary([ ...current, new $giper_baza_link( link_str ) ])
+		}
+
+		/** Registry data (dict with Title + Pages). Do NOT put @$mol_mem. */
+		registry_data() {
 			const link = this.registry_land_link()
 			if( !link ) return null
-			return this.$.$giper_baza_glob.Land( new $giper_baza_link( link ) )
+			const land = this.$.$giper_baza_glob.Land( new $giper_baza_link( link ) )
+			return land.Data( $bog_wysiwyg_model_registry )
 		}
 
-		/** Page list from registry. Do NOT put @$mol_mem on pawn access. */
-		registry_list() {
-			const land = this.registry_land()
-			if( !land ) return null
-			return land.Data( Registry )
-		}
-
-		/** Create registry land if none exists, return registry list */
+		/** Create registry land if none exists, return registry data */
 		@ $mol_action
 		registry_ensure() {
-			let list = this.registry_list()
-			if( list ) return list
+			let data = this.registry_data()
+			if( data ) return data
 			const land = this.$.$giper_baza_glob.land_grab(
 				[[ null, $giper_baza_rank_post( 'just' ) ]]
 			)
-			this.registry_land_link( land.link().str )
-			return land.Data( Registry )
+			const link_str = land.link().str
+			this.registry_land_link( link_str )
+			this.user_registries_add( link_str )
+			return land.Data( $bog_wysiwyg_model_registry )
 		}
 
 		/** All page land link strings from registry */
 		@ $mol_mem
 		page_links(): readonly string[] {
-			const list = this.registry_list()
+			const data = this.registry_data()
+			if( !data ) return []
+			const list = data.Pages()
 			if( !list ) return []
 			const items = list.items_vary() ?? []
 			return items
@@ -88,7 +115,7 @@ namespace $.$$ {
 			return block.Content()?.val() ?? ''
 		}
 
-		/** All pages info for backlinks — array of {id, title, blocks_html} */
+		/** All pages info for backlinks */
 		@ $mol_mem
 		override all_pages_info() {
 			return this.page_links().map( link => ({
@@ -98,6 +125,81 @@ namespace $.$$ {
 					bid => this.page_block_html( link, bid )
 				),
 			}) )
+		}
+
+		/** Read registry title from a land link */
+		registry_title_by_link( link: string ): string {
+			const land = this.$.$giper_baza_glob.Land( new $giper_baza_link( link ) )
+			const data = land.Data( $bog_wysiwyg_model_registry )
+			return data.Title()?.val() ?? ''
+		}
+
+		/** Registry rows for panel */
+		@ $mol_mem
+		override registry_rows() {
+			return this.user_registry_links().map( ( _, i ) => this.Registry_item( i ) )
+		}
+
+		/** Title for registry item */
+		registry_item_title( index: number ) {
+			const link = this.user_registry_links()[ index ]
+			if( !link ) return ''
+			const title = this.registry_title_by_link( link )
+			return title || `Registry ${ index + 1 }`
+		}
+
+		/** Is this registry currently active? */
+		registry_item_active( index: number ) {
+			return this.user_registry_links()[ index ] === this.registry_land_link()
+		}
+
+		/** Click registry in panel — switch to it */
+		registry_item_click( index: number, event?: Event ) {
+			if( !event ) return null
+			const link = this.user_registry_links()[ index ]
+			if( link ) {
+				this.registry_land_link( link )
+				// Auto-select first page
+				const land = this.$.$giper_baza_glob.Land( new $giper_baza_link( link ) )
+				const data = land.Data( $bog_wysiwyg_model_registry )
+				const pages = data.Pages()
+				if( pages ) {
+					const items = pages.items_vary() ?? []
+					const first = items[0]
+					if( first ) {
+						const first_link = $giper_baza_vary_cast_link( first )
+						if( first_link ) this.page_land_link( first_link.str )
+					}
+				}
+			}
+			return event
+		}
+
+		/** Create new registry land, add to home, switch to it */
+		@ $mol_action
+		registry_create( event?: Event ) {
+			if( !event ) return null
+
+			const land = this.$.$giper_baza_glob.land_grab(
+				[[ null, $giper_baza_rank_post( 'just' ) ]]
+			)
+
+			// Init registry with empty title
+			const data = land.Data( $bog_wysiwyg_model_registry )
+			data.Title( 'auto' )?.val( '' )
+
+			const link_str = land.link().str
+
+			// Add to home
+			this.user_registries_add( link_str )
+
+			// Switch to it
+			this.registry_land_link( link_str )
+
+			// Create first page
+			this.page_create( new Event( 'auto' ) )
+
+			return event
 		}
 
 		/** Page rows for sidebar */
@@ -143,7 +245,7 @@ namespace $.$$ {
 		page_create( event?: Event ) {
 			if( !event ) return null
 
-			const list = this.registry_ensure()
+			const reg = this.registry_ensure()
 
 			const land = this.$.$giper_baza_glob.land_grab(
 				[[ null, $giper_baza_rank_post( 'just' ) ]]
@@ -153,9 +255,12 @@ namespace $.$$ {
 			const data = land.Data( $bog_wysiwyg_model_page )
 			data.Title( 'auto' )?.val( '' )
 
-			// Add to registry
-			const current = list.items_vary() ?? []
-			list.items_vary([ ...current, land.link() ])
+			// Add to registry via Pages
+			const pages = reg.Pages( 'auto' )
+			if( pages ) {
+				const current = pages.items_vary() ?? []
+				pages.items_vary([ ...current, land.link() ])
+			}
 
 			// Navigate to new page
 			this.page_land_link( land.link().str )
@@ -169,32 +274,59 @@ namespace $.$$ {
 			return id ?? null
 		}
 
-		/** Auto-navigate to first page if no page selected */
+		/** Auto-init: ensure registry + page on first visit */
 		@ $mol_mem
 		auto() {
-			const current = this.page_land_link()
-			if( current ) return
-
-			const pages = this.page_links()
-			if( pages.length > 0 ) {
-				this.page_land_link( pages[ 0 ] )
+			// If registry is set in URL, just auto-select first page
+			const reg_link = this.registry_land_link()
+			if( reg_link ) {
+				const current = this.page_land_link()
+				if( current ) return
+				const pages = this.page_links()
+				if( pages.length > 0 ) {
+					this.page_land_link( pages[0] )
+				}
+				return
 			}
+
+			// No registry in URL — check home for saved registries
+			const saved = this.user_registry_links()
+			if( saved.length > 0 ) {
+				this.registry_land_link( saved[0] )
+				return
+			}
+
+			// Nothing saved — create fresh registry + page
+			this.registry_ensure()
+			this.page_create( new Event( 'auto' ) )
 		}
 
-		/** Layout content depends on graph toggle */
+		/** Layout content depends on panels */
 		@ $mol_mem
 		override layout_content() {
-			if( this.graph_showed() ) {
+			const parts: any[] = []
+
+			if( this.registry_panel_showed() ) {
+				parts.push( this.Registry_panel() )
+			}
+
+			parts.push( this.Sidebar() )
+
+			if( this.profile_showed() ) {
+				parts.push( this.Profile_panel() )
+			} else if( this.graph_showed() ) {
 				if( this.page_links().length === 0 ) {
 					this.page_create( new Event( 'auto' ) )
 				}
-				return [ this.Sidebar(), this.Graph_panel() ]
+				parts.push( this.Graph_panel() )
 			} else {
-				return [ this.Sidebar(), this.Main() ]
+				parts.push( this.Main() )
 			}
+
+			return parts
 		}
 
-		/** Graph pages — proxy objects with methods matching graph interface */
+		/** Graph pages */
 		@ $mol_mem
 		override graph_pages() {
 			const self = this

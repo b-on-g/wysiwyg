@@ -3,7 +3,7 @@ $bog_wysiwyg_block $mol_view
 	type? \paragraph
 	level? 1
 	menu_open false
-	placeholder @ \/
+	placeholder \
 	on_enter?event null
 	on_remove?event null
 	on_slash?event null
