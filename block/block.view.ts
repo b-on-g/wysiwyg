@@ -154,11 +154,18 @@ namespace $.$$ {
 					if( component ) $bog_wysiwyg_block.render_cache.set( this, component )
 				}
 				if( component ) {
-					const rendered = component.dom_tree()
-					if( node.firstChild !== rendered ) {
-						node.textContent = ''
-						node.appendChild( rendered )
+					try {
+						const rendered = component.dom_tree()
+						if( node.firstChild !== rendered ) {
+							node.textContent = ''
+							node.appendChild( rendered )
+						}
+					} catch( error ) {
+						if( error instanceof Promise ) throw error // let $mol retry
+						node.textContent = String( error )
 					}
+				} else {
+					node.textContent = 'Loading plugin...'
 				}
 				return
 			}
