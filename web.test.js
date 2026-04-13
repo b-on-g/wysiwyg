@@ -6916,6 +6916,817 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    function check(str, query) {
+        $mol_assert_like(str, $hyoo_harp_to_string(query));
+        $mol_assert_like(query, $hyoo_harp_from_string(str));
+    }
+    $mol_test({
+        'root'() {
+            check('', {});
+        },
+        'only field'() {
+            check('user%3D777', {
+                'user=777': {},
+            });
+        },
+        'primary key'() {
+            check('user=jin%2C777!=', {
+                user: {
+                    '=': [['jin,777!']],
+                },
+            });
+        },
+        'single fetch'() {
+            check('friend(age%24)', {
+                friend: {
+                    age$: {},
+                },
+            });
+        },
+        'fetch and primary key'() {
+            check('user=jin()=(friend)', {
+                'user': {
+                    '=': [['jin()']],
+                    friend: {},
+                },
+            });
+        },
+        'multiple fetch'() {
+            check('age;friend', {
+                age: {},
+                friend: {},
+            });
+        },
+        'common query string back compatible'() {
+            $mol_assert_like($hyoo_harp_from_string('user=jin&age=100500'), {
+                user: {
+                    '=': [['jin']],
+                },
+                age: {
+                    '=': [['100500']],
+                },
+            });
+        },
+        'common pathname back compatible'() {
+            $mol_assert_like($hyoo_harp_from_string('users/jin/comments'), {
+                users: {},
+                jin: {},
+                comments: {},
+            });
+        },
+        'deep fetch'() {
+            check('my(friend(age);name);stat', {
+                my: {
+                    friend: {
+                        age: {},
+                    },
+                    name: {},
+                },
+                stat: {},
+            });
+        },
+        'orders'() {
+            check('+age;-name', {
+                age: {
+                    '+': true
+                },
+                name: {
+                    '+': false
+                },
+            });
+        },
+        'filter types'() {
+            check('sex=female=;status!=married=', {
+                sex: {
+                    '=': [['female']],
+                },
+                status: {
+                    '!=': [['married']],
+                },
+            });
+        },
+        'filter ranges'() {
+            check('sex=female=;age=18@25=;weight=@50=;height=150@=;hobby=paint=singing=', {
+                sex: {
+                    '=': [['female']],
+                },
+                age: {
+                    '=': [['18', '25']],
+                },
+                weight: {
+                    '=': [['', '50']],
+                },
+                height: {
+                    '=': [['150', '']],
+                },
+                hobby: {
+                    '=': [['paint'], ['singing']],
+                },
+            });
+        },
+        'unescaped values'() {
+            $mol_assert_like($hyoo_harp_from_string('foo=jin=777=;bar=jin!=666='), {
+                foo: {
+                    '=': [['jin'], ['777']],
+                },
+                bar: {
+                    '=': [['jin!'], ['666']],
+                },
+            });
+        },
+        'slicing'() {
+            check('friend(_num=0@100=)', {
+                friend: {
+                    _num: { '=': [['0', '100']] },
+                },
+            });
+        },
+        'complex'() {
+            check('pullRequest(state=closed=merged=;+repository(name;private);-updateTime;_num=0@100=)', {
+                pullRequest: {
+                    state: {
+                        '=': [
+                            ['closed'],
+                            ['merged'],
+                        ]
+                    },
+                    repository: {
+                        '+': true,
+                        name: {},
+                        private: {},
+                    },
+                    updateTime: {
+                        '+': false,
+                    },
+                    _num: {
+                        '=': [['0', '100']],
+                    },
+                },
+            });
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Is first'() {
+            $mol_data_variant($mol_data_number, $mol_data_string)(0);
+        },
+        'Is second'() {
+            $mol_data_variant($mol_data_number, $mol_data_string)('');
+        },
+        'Is false'() {
+            $mol_assert_fail(() => {
+                $mol_data_variant($mol_data_number, $mol_data_string)(false);
+            }, 'false is not any of variants');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    const Age = $mol_data_optional($mol_data_number);
+    const Age_or_zero = $mol_data_optional($mol_data_number, () => 0);
+    $mol_test({
+        'Is not present'() {
+            $mol_assert_equal(Age(undefined), undefined);
+        },
+        'Is present'() {
+            $mol_assert_equal(Age(0), 0);
+        },
+        'Fallbacked'() {
+            $mol_assert_equal(Age_or_zero(undefined), 0);
+        },
+        'Is null'() {
+            $mol_assert_fail(() => Age(null), 'null is not a number');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Fit to record'() {
+            const User = $mol_data_record({ age: $mol_data_number });
+            User({ age: 0 });
+        },
+        'Extends record'() {
+            const User = $mol_data_record({ age: $mol_data_number });
+            User({ age: 0, name: 'Jin' });
+        },
+        'Shrinks record'() {
+            $mol_assert_fail(() => {
+                const User = $mol_data_record({ age: $mol_data_number, name: $mol_data_string });
+                User({ age: 0 });
+            }, '["name"] undefined is not a string');
+        },
+        'Shrinks deep record'() {
+            $mol_assert_fail(() => {
+                const User = $mol_data_record({ wife: $mol_data_record({ age: $mol_data_number }) });
+                User({ wife: {} });
+            }, '["wife"] ["age"] undefined is not a number');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Is empty array'() {
+            $mol_data_array($mol_data_number)([]);
+        },
+        'Is array'() {
+            $mol_data_array($mol_data_number)([1, 2]);
+        },
+        'Is not array'() {
+            $mol_assert_fail(() => {
+                $mol_data_array($mol_data_number)({ [0]: 1, length: 1, map: () => { } });
+            }, '[object Object] is not an array');
+        },
+        'Has wrong item'() {
+            $mol_assert_fail(() => {
+                $mol_data_array($mol_data_number)([1, '1']);
+            }, '[1] 1 is not a number');
+        },
+        'Has wrong deep item'() {
+            $mol_assert_fail(() => {
+                $mol_data_array($mol_data_array($mol_data_number))([[], [0, 0, false]]);
+            }, '[1] [2] false is not a number');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Is boolean - true'() {
+            $mol_data_boolean(true);
+        },
+        'Is boolean - false'() {
+            $mol_data_boolean(false);
+        },
+        'Is not boolean'() {
+            $mol_assert_fail(() => {
+                $mol_data_boolean('x');
+            }, 'x is not a boolean');
+        },
+        'Is object boolean'() {
+            $mol_assert_fail(() => {
+                $mol_data_boolean(new Boolean(''));
+            }, 'false is not a boolean');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    function $mol_data_enum(name, dict) {
+        const index = {};
+        for (let key in dict) {
+            if (Number.isNaN(Number(key))) {
+                index[dict[key]] = key;
+            }
+        }
+        return $mol_data_setup((value) => {
+            if (typeof index[value] !== 'string') {
+                return $mol_fail(new $mol_data_error(`${value} is not value of ${name} enum`));
+            }
+            return value;
+        }, { name, dict });
+    }
+    $.$mol_data_enum = $mol_data_enum;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    let sex;
+    (function (sex) {
+        sex[sex["male"] = 0] = "male";
+        sex[sex["female"] = 1] = "female";
+    })(sex || (sex = {}));
+    let gender;
+    (function (gender) {
+        gender["bisexual"] = "bisexual";
+        gender["trans"] = "transgender";
+    })(gender || (gender = {}));
+    $mol_test({
+        'config of enum'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_like(Sex.config, {
+                name: 'sex',
+                dict: sex,
+            });
+        },
+        'name of enum'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_equal(Sex.config.name, 'sex');
+        },
+        'Is right value of enum'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_equal(Sex(0), sex.male);
+        },
+        'Is wrong value of enum'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_fail(() => Sex(2), `2 is not value of sex enum`);
+        },
+        'Is name instead of value'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_fail(() => Sex('male'), `male is not value of sex enum`);
+        },
+        'Is common object field'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_fail(() => Sex('__proto__'), `__proto__ is not value of sex enum`);
+        },
+    });
+    $mol_test({
+        'config of enum'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_like(Gender.config, {
+                name: 'gender',
+                dict: gender,
+            });
+        },
+        'Is right value of enum'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_equal(Gender('transgender'), gender.trans);
+        },
+        'Is wrong value of enum'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_fail(() => Gender('xxx'), `xxx is not value of gender enum`);
+        },
+        'Is name instead of value'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_fail(() => Gender('trans'), `trans is not value of gender enum`);
+        },
+        'Is common object field'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_fail(() => Gender('__proto__'), `__proto__ is not value of gender enum`);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'type safe build & parse'() {
+            let States;
+            (function (States) {
+                States["opened"] = "opened";
+                States["closed"] = "closed";
+            })(States || (States = {}));
+            const State = $hyoo_harp_scheme({}, $mol_data_enum('States', States));
+            const Str = $hyoo_harp_scheme({}, $mol_data_string);
+            const Bool = $hyoo_harp_scheme({}, $mol_data_boolean);
+            const Repository = $hyoo_harp_scheme({
+                name: $mol_data_optional(Str),
+                isPrivate: $mol_data_optional(Bool),
+            });
+            const PullRequest = $hyoo_harp_scheme({
+                state: $mol_data_optional(State),
+                updated_at: $mol_data_optional(Str),
+                repository: $mol_data_optional(Repository),
+            });
+            const Request = $hyoo_harp_scheme({
+                pullRequest: $mol_data_optional(PullRequest),
+            });
+            const uri = 'pullRequest(state=closed=;-updated_at;repository(name;isPrivate);_num=0@100=)';
+            let query = Request({
+                pullRequest: {
+                    state: { '=': [[States.closed]] },
+                    updated_at: { '+': false },
+                    repository: {
+                        name: {},
+                        isPrivate: {},
+                    },
+                    _num: { '=': [[0, 100]] },
+                }
+            });
+            $mol_assert_like(uri, Request.build(query));
+            $mol_assert_like(query, Request.parse(uri));
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test({
+        'save and load buffers'($) {
+            const land = $giper_baza_land.make({ $ });
+            const file = land.Data($giper_baza_file);
+            const source = new Uint8Array(2 ** 15 + 1);
+            source[2 ** 15] = 255;
+            file.buffer(source);
+            $mol_assert_equal(file.chunks().length, 2);
+            $mol_assert_equal(file.buffer(), source);
+        },
+        async 'save and load blobs'($) {
+            const land = $giper_baza_land.make({ $ });
+            const file = land.Data($giper_baza_file);
+            const source = new Uint8Array(2 ** 16 + 1);
+            source[2 ** 16 + 1] = 255;
+            await $mol_wire_async(file).blob(new $mol_blob([source], { type: 'test/test' }));
+            $mol_assert_equal('test/test', file.blob().type);
+            $mol_assert_equal(source, new Uint8Array(await file.blob().arrayBuffer()));
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'is same number'() {
+            const Nan = $mol_data_const(Number.NaN);
+            Nan(Number.NaN);
+        },
+        'is equal object'() {
+            const Tags = $mol_data_const({ tags: ['deep', 'equals'] });
+            Tags({ tags: ['deep', 'equals'] });
+        },
+        'is different number'() {
+            const Five = $mol_data_const(5);
+            $mol_assert_fail(() => Five(6), '6 is not 5');
+        },
+        'is different object'() {
+            const Tags = $mol_data_const({ tags: ['deep', 'equals'] });
+            $mol_assert_fail(() => Tags({ tags: ['shallow', 'equals'] }), `{"tags":["shallow","equals"]} is not {"tags":["deep","equals"]}`);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Is null'() {
+            $mol_data_nullable($mol_data_number)(null);
+        },
+        'Is not null'() {
+            $mol_data_nullable($mol_data_number)(0);
+        },
+        'Is undefined'() {
+            $mol_assert_fail(() => {
+                const Type = $mol_data_nullable($mol_data_number);
+                Type(undefined);
+            }, 'undefined is not a number');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        const Players_dict = $giper_baza_dict_to($bog_blitz_player);
+        $mol_test({
+            async 'Quiz entity stores title and settings'($) {
+                const land = $giper_baza_land.make({ $ });
+                const quiz = land.Data($bog_blitz_quiz);
+                quiz.Title(null).val('Test Quiz');
+                quiz.Points_base(null).val(100);
+                quiz.Time_multiplier(null).val(1.5);
+                quiz.Time_answer(null).val(10);
+                quiz.Time_read(null).val(5);
+                $mol_assert_equal(quiz.Title().val(), 'Test Quiz');
+                $mol_assert_equal(quiz.Points_base().val(), 100);
+                $mol_assert_equal(quiz.Time_multiplier().val(), 1.5);
+                $mol_assert_equal(quiz.Time_answer().val(), 10);
+            },
+            async 'Session stores game state and quiz link'($) {
+                const session_land = $giper_baza_land.make({ $ });
+                const quiz_land = $giper_baza_land.make({ $ });
+                const session = session_land.Data($bog_blitz_session);
+                session.Quiz_link(null).val(quiz_land.link().str);
+                session.Game_state(null).val('reading');
+                session.Current_question(null).val(0);
+                session.Round_start(null).val(12345);
+                $mol_assert_equal(session.Game_state().val(), 'reading');
+                $mol_assert_equal(session.Current_question().val(), 0);
+                $mol_assert_equal(session.Quiz_link().val(), quiz_land.link().str);
+                $mol_assert_equal(session.Round_start().val(), 12345);
+            },
+            async 'Session fields filter separates session keys from player keys'($) {
+                const land = $giper_baza_land.make({ $ });
+                const session = land.Data($bog_blitz_session);
+                session.Game_state(null).val('reading');
+                session.Quiz_link(null).val('some_link');
+                const dict = land.Data(Players_dict);
+                dict.key('player_lord_1', null).Name(null).val('Alice');
+                const all_keys = Array.from(dict.keys() ?? []).map(k => String(k));
+                const player_keys = all_keys.filter(k => !$bog_blitz_session_fields.has(k));
+                $mol_assert_equal(player_keys.includes('player_lord_1'), true);
+                for (const key of player_keys) {
+                    $mol_assert_equal($bog_blitz_session_fields.has(key), false);
+                }
+            },
+            async 'Player entity has Answer_land field'($) {
+                const land = $giper_baza_land.make({ $ });
+                const dict = land.Data(Players_dict);
+                const player = dict.key('lord_1', null);
+                player.Name(null).val('Bob');
+                player.Score(null).val(150);
+                player.IsHost(null).val(false);
+                player.Answer_land(null).val('answer_land_link');
+                $mol_assert_equal(player.Name().val(), 'Bob');
+                $mol_assert_equal(player.Score().val(), 150);
+                $mol_assert_equal(player.IsHost().val(), false);
+                $mol_assert_equal(player.Answer_land().val(), 'answer_land_link');
+            },
+            async 'Player answers entity stores answers and reactions'($) {
+                const land = $giper_baza_land.make({ $ });
+                const answers = land.Data($bog_blitz_player_answers);
+                answers.Answer(null).val('1,3');
+                answers.Answer_time(null).val(1000);
+                answers.React_heart(null).val(5);
+                answers.React_fire(null).val(3);
+                answers.React_smile(null).val(0);
+                $mol_assert_equal(answers.Answer().val(), '1,3');
+                $mol_assert_equal(answers.Answer_time().val(), 1000);
+                $mol_assert_equal(answers.React_heart().val(), 5);
+                $mol_assert_equal(answers.React_fire().val(), 3);
+                $mol_assert_equal(answers.React_smile().val(), 0);
+            },
+            async 'Answers key stores and parses correct answers JSON'($) {
+                const land = $giper_baza_land.make({ $ });
+                const key_entity = land.Data($bog_blitz_answers_key);
+                const data = [
+                    { type: 'choice', correct: '1,3' },
+                    { type: 'text_input', correct: 'Paris, paris, Париж' },
+                    { type: 'choice', correct: '0' },
+                ];
+                key_entity.Data(null).val(JSON.stringify(data));
+                const parsed = JSON.parse(key_entity.Data().val());
+                $mol_assert_equal(parsed.length, 3);
+                $mol_assert_equal(parsed[0].type, 'choice');
+                $mol_assert_equal(parsed[0].correct, '1,3');
+                $mol_assert_equal(parsed[1].type, 'text_input');
+                $mol_assert_equal(parsed[1].correct, 'Paris, paris, Париж');
+                $mol_assert_equal(parsed[2].correct, '0');
+            },
+            async 'Score: correct fast answer scores more than correct slow answer'($) {
+                const points_base = 100;
+                const time_multiplier = 1.5;
+                const answer_duration = 10;
+                const fast_elapsed = 1;
+                const slow_elapsed = 9;
+                const fast_ratio = Math.max(0, 1 - fast_elapsed / answer_duration);
+                const slow_ratio = Math.max(0, 1 - slow_elapsed / answer_duration);
+                const fast_score = points_base * (1 + fast_ratio * time_multiplier);
+                const slow_score = points_base * (1 + slow_ratio * time_multiplier);
+                $mol_assert_equal(fast_score > slow_score, true);
+                $mol_assert_equal(fast_score > points_base, true);
+                $mol_assert_equal(slow_score > points_base, true);
+            },
+            async 'Score: wrong answer is negative'($) {
+                const points_base = 100;
+                const time_multiplier = 1.5;
+                const answer_duration = 10;
+                const elapsed = 5;
+                const time_ratio = Math.max(0, 1 - elapsed / answer_duration);
+                const base = points_base * (1 + time_ratio * time_multiplier);
+                const correct_points = base;
+                const wrong_points = -base;
+                $mol_assert_equal(correct_points > 0, true);
+                $mol_assert_equal(wrong_points < 0, true);
+                $mol_assert_equal(correct_points, -wrong_points);
+            },
+            async 'Choice answer: order does not matter'($) {
+                const correct = '0,2';
+                const correct_set = new Set(correct.split(',').filter(Boolean));
+                function check(answer) {
+                    const answer_set = new Set(answer.split(',').filter(Boolean));
+                    return correct_set.size === answer_set.size &&
+                        [...correct_set].every(k => answer_set.has(k));
+                }
+                $mol_assert_equal(check('0,2'), true);
+                $mol_assert_equal(check('2,0'), true);
+                $mol_assert_equal(check('0'), false);
+                $mol_assert_equal(check('0,1'), false);
+                $mol_assert_equal(check('0,1,2'), false);
+                $mol_assert_equal(check(''), false);
+            },
+            async 'Text answer: case insensitive with variants'($) {
+                const correct_text = 'Paris, paris, Париж';
+                const variants = correct_text.split(',').map(v => v.trim().toLowerCase());
+                function check(answer) {
+                    return variants.includes(answer.trim().toLowerCase());
+                }
+                $mol_assert_equal(check('Paris'), true);
+                $mol_assert_equal(check('paris'), true);
+                $mol_assert_equal(check('PARIS'), true);
+                $mol_assert_equal(check('Париж'), true);
+                $mol_assert_equal(check(' paris '), true);
+                $mol_assert_equal(check('London'), false);
+                $mol_assert_equal(check(''), false);
+            },
+            async 'Multi_correct flag from answer key'($) {
+                const keys = [
+                    { type: 'choice', correct: '1,3' },
+                    { type: 'choice', correct: '0' },
+                    { type: 'text_input', correct: 'Paris' },
+                ];
+                function is_multi(key) {
+                    return key.type !== 'text_input' && key.correct.split(',').length >= 2;
+                }
+                $mol_assert_equal(is_multi(keys[0]), true);
+                $mol_assert_equal(is_multi(keys[1]), false);
+                $mol_assert_equal(is_multi(keys[2]), false);
+            },
+            async 'Game state transitions stored in session'($) {
+                const land = $giper_baza_land.make({ $ });
+                const session = land.Data($bog_blitz_session);
+                session.Game_state(null).val('reading');
+                session.Current_question(null).val(0);
+                $mol_assert_equal(session.Game_state().val(), 'reading');
+                session.Game_state(null).val('answering');
+                session.Round_start(null).val(1000);
+                $mol_assert_equal(session.Game_state().val(), 'answering');
+                session.Game_state(null).val('reveal');
+                $mol_assert_equal(session.Game_state().val(), 'reveal');
+                session.Game_state(null).val('leaderboard');
+                $mol_assert_equal(session.Game_state().val(), 'leaderboard');
+                session.Current_question(null).val(1);
+                session.Game_state(null).val('reading');
+                $mol_assert_equal(session.Current_question().val(), 1);
+                $mol_assert_equal(session.Game_state().val(), 'reading');
+                session.Game_state(null).val('final');
+                $mol_assert_equal(session.Game_state().val(), 'final');
+            },
+            async 'Pause stores timestamp, resume clears it'($) {
+                const land = $giper_baza_land.make({ $ });
+                const session = land.Data($bog_blitz_session);
+                session.Round_start(null).val(1000);
+                session.Paused_at(null).val(0);
+                $mol_assert_equal(session.Paused_at().val(), 0);
+                session.Paused_at(null).val(1500);
+                $mol_assert_equal(session.Paused_at().val() > 0, true);
+                const pause_duration = 500;
+                session.Round_start(null).val(1000 + pause_duration);
+                session.Paused_at(null).val(0);
+                $mol_assert_equal(session.Paused_at().val(), 0);
+                $mol_assert_equal(session.Round_start().val(), 1500);
+            },
+            async 'Reveal_correct published to session'($) {
+                const land = $giper_baza_land.make({ $ });
+                const session = land.Data($bog_blitz_session);
+                session.Reveal_correct(null).val('');
+                $mol_assert_equal(session.Reveal_correct().val(), '');
+                session.Reveal_correct(null).val('0,2');
+                $mol_assert_equal(session.Reveal_correct().val(), '0,2');
+                session.Reveal_correct(null).val('');
+                $mol_assert_equal(session.Reveal_correct().val(), '');
+            },
+            async 'Home ref stores quizzes land link'($) {
+                const land = $giper_baza_land.make({ $ });
+                const ref = land.Data($bog_blitz_home_ref);
+                $mol_assert_equal(ref.Quizzes_land()?.val() ?? null, null);
+                ref.Quizzes_land(null).val('quizzes_land_link');
+                $mol_assert_equal(ref.Quizzes_land().val(), 'quizzes_land_link');
+            },
+            async 'Multiple players in session land'($) {
+                const land = $giper_baza_land.make({ $ });
+                const dict = land.Data(Players_dict);
+                const host = dict.key('host_lord', null);
+                host.Name(null).val('Host');
+                host.IsHost(null).val(true);
+                const p1 = dict.key('player_1', null);
+                p1.Name(null).val('Alice');
+                p1.Score(null).val(200);
+                const p2 = dict.key('player_2', null);
+                p2.Name(null).val('Bob');
+                p2.Score(null).val(150);
+                const all_keys = Array.from(dict.keys() ?? []).map(k => String(k));
+                $mol_assert_equal(all_keys.includes('host_lord'), true);
+                $mol_assert_equal(all_keys.includes('player_1'), true);
+                $mol_assert_equal(all_keys.includes('player_2'), true);
+                $mol_assert_equal(host.IsHost().val(), true);
+                $mol_assert_equal(p1.Name().val(), 'Alice');
+                $mol_assert_equal(p1.Score().val(), 200);
+                $mol_assert_equal(p2.Name().val(), 'Bob');
+                $mol_assert_equal(p2.Score().val(), 150);
+            },
+            async 'Player name writable without profile dependency'($) {
+                const land = $giper_baza_land.make({ $ });
+                const dict = land.Data(Players_dict);
+                const player = dict.key('new_player', null);
+                const join_name = 'TestUser';
+                player.Name(null).val(join_name);
+                $mol_assert_equal(player.Name().val(), 'TestUser');
+                player.Answer_land(null).val('some_answer_land');
+                $mol_assert_equal(player.Answer_land().val(), 'some_answer_land');
+            },
+            async 'Player answers live in separate land from session'($) {
+                const session_land = $giper_baza_land.make({ $ });
+                const answer_land = $giper_baza_land.make({ $ });
+                const dict = session_land.Data(Players_dict);
+                const player = dict.key('player_lord', null);
+                player.Name(null).val('Alice');
+                player.Answer_land(null).val(answer_land.link().str);
+                const answers = answer_land.Data($bog_blitz_player_answers);
+                answers.Answer(null).val('1,3');
+                answers.Answer_time(null).val(5000);
+                answers.React_fire(null).val(2);
+                $mol_assert_equal(player.Name().val(), 'Alice');
+                $mol_assert_equal(player.Answer_land().val(), answer_land.link().str);
+                $mol_assert_equal(answers.Answer().val(), '1,3');
+                $mol_assert_equal(answers.React_fire().val(), 2);
+            },
+            async 'Multi_correct published to session, not read from encrypted land'($) {
+                const session_land = $giper_baza_land.make({ $ });
+                const key_land = $giper_baza_land.make({ $ });
+                const keys_data = [
+                    { type: 'choice', correct: '0,2' },
+                    { type: 'choice', correct: '1' },
+                ];
+                key_land.Data($bog_blitz_answers_key).Data(null).val(JSON.stringify(keys_data));
+                const session = session_land.Data($bog_blitz_session);
+                session.Answers_key_land(null).val(key_land.link().str);
+                const q0 = keys_data[0];
+                const multi0 = q0.type !== 'text_input' && q0.correct.split(',').length >= 2;
+                session.Multi_correct(null).val(multi0);
+                $mol_assert_equal(session.Multi_correct().val(), true);
+                const q1 = keys_data[1];
+                const multi1 = q1.type !== 'text_input' && q1.correct.split(',').length >= 2;
+                session.Multi_correct(null).val(multi1);
+                $mol_assert_equal(session.Multi_correct().val(), false);
+            },
+            async 'Reveal correct published to session from encrypted key'($) {
+                const session_land = $giper_baza_land.make({ $ });
+                const key_land = $giper_baza_land.make({ $ });
+                const keys_data = [
+                    { type: 'choice', correct: '1,3' },
+                    { type: 'text_input', correct: 'Paris, paris' },
+                ];
+                key_land.Data($bog_blitz_answers_key).Data(null).val(JSON.stringify(keys_data));
+                const session = session_land.Data($bog_blitz_session);
+                const parsed = JSON.parse(key_land.Data($bog_blitz_answers_key).Data().val());
+                session.Reveal_correct(null).val(parsed[0].correct);
+                $mol_assert_equal(session.Reveal_correct().val(), '1,3');
+                const my_answer = '1,3';
+                const correct_set = new Set(session.Reveal_correct().val().split(','));
+                const answer_set = new Set(my_answer.split(','));
+                const is_correct = correct_set.size === answer_set.size &&
+                    [...correct_set].every(k => answer_set.has(k));
+                $mol_assert_equal(is_correct, true);
+                session.Reveal_correct(null).val(parsed[1].correct);
+                $mol_assert_equal(session.Reveal_correct().val(), 'Paris, paris');
+            },
+            async 'Score written by host to session land player'($) {
+                const session_land = $giper_baza_land.make({ $ });
+                const answer_land = $giper_baza_land.make({ $ });
+                const dict = session_land.Data(Players_dict);
+                const player = dict.key('player_1', null);
+                player.Name(null).val('Alice');
+                player.Score(null).val(0);
+                player.Answer_land(null).val(answer_land.link().str);
+                const answers = answer_land.Data($bog_blitz_player_answers);
+                answers.Answer(null).val('0,2');
+                answers.Answer_time(null).val(3000);
+                const answer = answers.Answer().val();
+                const correct = '0,2';
+                const correct_set = new Set(correct.split(','));
+                const answer_set = new Set(answer.split(','));
+                const is_correct = correct_set.size === answer_set.size &&
+                    [...correct_set].every(k => answer_set.has(k));
+                const points = is_correct ? 175 : -175;
+                const prev_score = player.Score().val();
+                player.Score(null).val(prev_score + points);
+                $mol_assert_equal(player.Score().val(), 175);
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
     var $$;
     (function ($$) {
         $mol_test({
@@ -7042,151 +7853,6 @@ var $;
             },
         });
     })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Fit to record'() {
-            const User = $mol_data_record({ age: $mol_data_number });
-            User({ age: 0 });
-        },
-        'Extends record'() {
-            const User = $mol_data_record({ age: $mol_data_number });
-            User({ age: 0, name: 'Jin' });
-        },
-        'Shrinks record'() {
-            $mol_assert_fail(() => {
-                const User = $mol_data_record({ age: $mol_data_number, name: $mol_data_string });
-                User({ age: 0 });
-            }, '["name"] undefined is not a string');
-        },
-        'Shrinks deep record'() {
-            $mol_assert_fail(() => {
-                const User = $mol_data_record({ wife: $mol_data_record({ age: $mol_data_number }) });
-                User({ wife: {} });
-            }, '["wife"] ["age"] undefined is not a number');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'is same number'() {
-            const Nan = $mol_data_const(Number.NaN);
-            Nan(Number.NaN);
-        },
-        'is equal object'() {
-            const Tags = $mol_data_const({ tags: ['deep', 'equals'] });
-            Tags({ tags: ['deep', 'equals'] });
-        },
-        'is different number'() {
-            const Five = $mol_data_const(5);
-            $mol_assert_fail(() => Five(6), '6 is not 5');
-        },
-        'is different object'() {
-            const Tags = $mol_data_const({ tags: ['deep', 'equals'] });
-            $mol_assert_fail(() => Tags({ tags: ['shallow', 'equals'] }), `{"tags":["shallow","equals"]} is not {"tags":["deep","equals"]}`);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is first'() {
-            $mol_data_variant($mol_data_number, $mol_data_string)(0);
-        },
-        'Is second'() {
-            $mol_data_variant($mol_data_number, $mol_data_string)('');
-        },
-        'Is false'() {
-            $mol_assert_fail(() => {
-                $mol_data_variant($mol_data_number, $mol_data_string)(false);
-            }, 'false is not any of variants');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is empty array'() {
-            $mol_data_array($mol_data_number)([]);
-        },
-        'Is array'() {
-            $mol_data_array($mol_data_number)([1, 2]);
-        },
-        'Is not array'() {
-            $mol_assert_fail(() => {
-                $mol_data_array($mol_data_number)({ [0]: 1, length: 1, map: () => { } });
-            }, '[object Object] is not an array');
-        },
-        'Has wrong item'() {
-            $mol_assert_fail(() => {
-                $mol_data_array($mol_data_number)([1, '1']);
-            }, '[1] 1 is not a number');
-        },
-        'Has wrong deep item'() {
-            $mol_assert_fail(() => {
-                $mol_data_array($mol_data_array($mol_data_number))([[], [0, 0, false]]);
-            }, '[1] [2] false is not a number');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is null'() {
-            $mol_data_nullable($mol_data_number)(null);
-        },
-        'Is not null'() {
-            $mol_data_nullable($mol_data_number)(0);
-        },
-        'Is undefined'() {
-            $mol_assert_fail(() => {
-                const Type = $mol_data_nullable($mol_data_number);
-                Type(undefined);
-            }, 'undefined is not a number');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    const Age = $mol_data_optional($mol_data_number);
-    const Age_or_zero = $mol_data_optional($mol_data_number, () => 0);
-    $mol_test({
-        'Is not present'() {
-            $mol_assert_equal(Age(undefined), undefined);
-        },
-        'Is present'() {
-            $mol_assert_equal(Age(0), 0);
-        },
-        'Fallbacked'() {
-            $mol_assert_equal(Age_or_zero(undefined), 0);
-        },
-        'Is null'() {
-            $mol_assert_fail(() => Age(null), 'null is not a number');
-        },
-    });
 })($ || ($ = {}));
 
 ;
@@ -7833,13 +8499,14 @@ var $;
                 editor.block_ids(['b1']);
                 editor.menu_showed(true);
                 editor.focus_block = () => { };
-                const original_prompt = globalThis.prompt;
-                globalThis.prompt = () => 'https://example.com/img.png';
+                const ctx = editor.$.$mol_dom_context;
+                const original_prompt = ctx.prompt;
+                ctx.prompt = () => 'https://example.com/img.png';
                 editor.menu_picked('image');
                 $mol_assert_equal(editor.block_type('b1'), 'image');
                 $mol_assert_ok(editor.block_html('b1').includes('https://example.com/img.png'));
                 $mol_assert_equal(editor.menu_showed(), false);
-                globalThis.prompt = original_prompt;
+                ctx.prompt = original_prompt;
             },
             'menu_picked with image cancelled prompt keeps paragraph'() {
                 const editor = new $bog_wysiwyg();
@@ -7847,12 +8514,13 @@ var $;
                 editor.block_ids(['b1']);
                 editor.menu_showed(true);
                 editor.focus_block = () => { };
-                const original_prompt = globalThis.prompt;
-                globalThis.prompt = () => null;
+                const ctx = editor.$.$mol_dom_context;
+                const original_prompt = ctx.prompt;
+                ctx.prompt = () => null;
                 editor.menu_picked('image');
                 $mol_assert_equal(editor.block_type('b1'), 'paragraph');
                 $mol_assert_equal(editor.menu_showed(), false);
-                globalThis.prompt = original_prompt;
+                ctx.prompt = original_prompt;
             },
             'move_block moves block down (after)'() {
                 const editor = new $bog_wysiwyg();
