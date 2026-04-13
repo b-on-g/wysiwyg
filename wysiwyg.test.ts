@@ -634,8 +634,9 @@ namespace $.$$ {
 			editor.menu_showed( true )
 			editor.focus_block = () => {}
 
-			const original_prompt = globalThis.prompt
-			globalThis.prompt = () => 'https://example.com/img.png'
+			const ctx = editor.$.$mol_dom_context as any
+			const original_prompt = ctx.prompt
+			ctx.prompt = () => 'https://example.com/img.png'
 
 			editor.menu_picked( 'image' )
 
@@ -643,7 +644,7 @@ namespace $.$$ {
 			$mol_assert_ok( editor.block_html( 'b1' ).includes( 'https://example.com/img.png' ) )
 			$mol_assert_equal( editor.menu_showed(), false )
 
-			globalThis.prompt = original_prompt
+			ctx.prompt = original_prompt
 		},
 
 		'menu_picked with image cancelled prompt keeps paragraph'() {
@@ -654,15 +655,16 @@ namespace $.$$ {
 			editor.menu_showed( true )
 			editor.focus_block = () => {}
 
-			const original_prompt = globalThis.prompt
-			globalThis.prompt = () => null
+			const ctx = editor.$.$mol_dom_context as any
+			const original_prompt = ctx.prompt
+			ctx.prompt = () => null
 
 			editor.menu_picked( 'image' )
 
 			$mol_assert_equal( editor.block_type( 'b1' ), 'paragraph' )
 			$mol_assert_equal( editor.menu_showed(), false )
 
-			globalThis.prompt = original_prompt
+			ctx.prompt = original_prompt
 		},
 
 		// === Drag & Drop ===
