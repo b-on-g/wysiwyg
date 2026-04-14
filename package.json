@@ -469,6 +469,8 @@
     "$mol_icon_history",
     "$mol_icon_graph_outline",
     "$mol_icon_graph",
+    "$mol_icon_shield_lock",
+    "$mol_icon_shield",
     "$mol_icon_account",
     "$bog_ui_sidebar",
     "$bog_ui",

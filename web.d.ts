@@ -15917,7 +15917,7 @@ declare namespace $.$$ {
         my_answer(): string;
         has_answered(): boolean;
         option_enabled(key: string): boolean;
-        option_correct(key: string): "" | "true" | "false";
+        option_correct(key: string): "" | "false" | "true";
         option_selected(key: string): string;
         reveal_correct_text(): string;
         countdown_number(next?: number): number;
@@ -22537,57 +22537,62 @@ declare namespace $ {
 		,
 		ReturnType< $bog_wysiwyg_block['level'] >
 	>
-	type $bog_wysiwyg_block__menu_open_bog_wysiwyg_27 = $mol_type_enforce<
+	type $bog_wysiwyg_block__readonly_bog_wysiwyg_27 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg['readonly'] >
+		,
+		ReturnType< $bog_wysiwyg_block['readonly'] >
+	>
+	type $bog_wysiwyg_block__menu_open_bog_wysiwyg_28 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['menu_showed'] >
 		,
 		ReturnType< $bog_wysiwyg_block['menu_open'] >
 	>
-	type $bog_wysiwyg_block__ai_open_bog_wysiwyg_28 = $mol_type_enforce<
+	type $bog_wysiwyg_block__ai_open_bog_wysiwyg_29 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['ai_showed'] >
 		,
 		ReturnType< $bog_wysiwyg_block['ai_open'] >
 	>
-	type $bog_wysiwyg_block__on_enter_bog_wysiwyg_29 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_enter_bog_wysiwyg_30 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_enter'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_enter'] >
 	>
-	type $bog_wysiwyg_block__on_remove_bog_wysiwyg_30 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_remove_bog_wysiwyg_31 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_remove'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_remove'] >
 	>
-	type $bog_wysiwyg_block__on_slash_bog_wysiwyg_31 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_slash_bog_wysiwyg_32 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_slash'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_slash'] >
 	>
-	type $bog_wysiwyg_block__on_menu_key_bog_wysiwyg_32 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_menu_key_bog_wysiwyg_33 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_menu_key'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_menu_key'] >
 	>
-	type $bog_wysiwyg_block__on_image_bog_wysiwyg_33 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_image_bog_wysiwyg_34 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_image'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_image'] >
 	>
-	type $bog_wysiwyg_block__on_ai_bog_wysiwyg_34 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_ai_bog_wysiwyg_35 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_ai'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_ai'] >
 	>
-	type $bog_wysiwyg_block__on_ai_key_bog_wysiwyg_35 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_ai_key_bog_wysiwyg_36 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_ai_key'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_ai_key'] >
 	>
-	type $bog_wysiwyg_block__on_paste_blocks_bog_wysiwyg_36 = $mol_type_enforce<
+	type $bog_wysiwyg_block__on_paste_blocks_bog_wysiwyg_37 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg['block_paste_blocks'] >
 		,
 		ReturnType< $bog_wysiwyg_block['on_paste_blocks'] >
 	>
-	type $mol_view__attr_bog_wysiwyg_37 = $mol_type_enforce<
+	type $mol_view__attr_bog_wysiwyg_38 = $mol_type_enforce<
 		({ 
 			'bog_wysiwyg_drag_over': ReturnType< $bog_wysiwyg['row_is_drag_over'] >,
 			'bog_wysiwyg_drag_pos': ReturnType< $bog_wysiwyg['row_drag_position'] >,
@@ -22596,7 +22601,7 @@ declare namespace $ {
 		,
 		ReturnType< $mol_view['attr'] >
 	>
-	type $mol_view__event_bog_wysiwyg_38 = $mol_type_enforce<
+	type $mol_view__event_bog_wysiwyg_39 = $mol_type_enforce<
 		({ 
 			dragover( next?: ReturnType< $bog_wysiwyg['row_dragover'] > ): ReturnType< $bog_wysiwyg['row_dragover'] >,
 			drop( next?: ReturnType< $bog_wysiwyg['row_drop'] > ): ReturnType< $bog_wysiwyg['row_drop'] >,
@@ -22605,8 +22610,8 @@ declare namespace $ {
 		,
 		ReturnType< $mol_view['event'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_39 = $mol_type_enforce<
-		readonly(any)[]
+	type $mol_view__sub_bog_wysiwyg_40 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg['block_row_sub'] >
 		,
 		ReturnType< $mol_view['sub'] >
 	>
@@ -22635,6 +22640,7 @@ declare namespace $ {
 		block_comment_land_link( id: any): string
 		block_comment_open( id: any, next?: boolean ): boolean
 		Block_comment( id: any): $bog_wysiwyg_comment
+		block_row_sub( id: any): readonly(any)[]
 		editor_keydown( next?: any ): any
 		editor_copy( next?: any ): any
 		Status( ): $giper_baza_status
@@ -22657,6 +22663,7 @@ declare namespace $ {
 		history_showed( next?: boolean ): boolean
 		History( ): $bog_wysiwyg_history
 		page_land_link( ): string
+		readonly( ): boolean
 		block_ids( next?: readonly(any)[] ): readonly(any)[]
 		Block( id: any): $bog_wysiwyg_block
 		Block_row( id: any): $mol_view
@@ -22679,6 +22686,7 @@ declare namespace $ {
 }
 declare namespace $.$$ {
     class $bog_wysiwyg extends $.$bog_wysiwyg {
+        block_row_sub(id: string): ($mol_view | $.$bog_wysiwyg_block | $.$bog_wysiwyg_comment)[];
         has_baza(): boolean;
         page_land(): $giper_baza_land | null;
         page_data(): $bog_wysiwyg_model_page | null;
@@ -22821,6 +22829,24 @@ declare namespace $ {
 }
 
 //# sourceMappingURL=outline.view.tree.d.ts.map
+declare namespace $ {
+
+	export class $mol_icon_shield extends $mol_icon {
+		path( ): string
+	}
+	
+}
+
+//# sourceMappingURL=shield.view.tree.d.ts.map
+declare namespace $ {
+
+	export class $mol_icon_shield_lock extends $mol_icon {
+		path( ): string
+	}
+	
+}
+
+//# sourceMappingURL=lock.view.tree.d.ts.map
 declare namespace $ {
 }
 
@@ -23093,6 +23119,7 @@ declare namespace $ {
 		ReturnType< $mol_hotkey['key'] >
 	>
 	export class $bog_wysiwyg_block extends $mol_view {
+		content_editable( ): string
 		is_empty( ): boolean
 		Hotkey_format( ): $mol_hotkey
 		Hotkey_strike( ): $mol_hotkey
@@ -23104,6 +23131,7 @@ declare namespace $ {
 		html( next?: string ): string
 		type( next?: string ): string
 		level( next?: number ): number
+		readonly( ): boolean
 		menu_open( ): boolean
 		placeholder( ): string
 		on_enter( next?: any ): any
@@ -23121,7 +23149,7 @@ declare namespace $ {
 		strike_exec( next?: any ): any
 		link_exec( next?: any ): any
 		attr( ): ({ 
-			'contenteditable': string,
+			'contenteditable': ReturnType< $bog_wysiwyg_block['content_editable'] >,
 			'bog_wysiwyg_block_type': ReturnType< $bog_wysiwyg_block['type'] >,
 			'bog_wysiwyg_block_level': ReturnType< $bog_wysiwyg_block['level'] >,
 			'bog_wysiwyg_block_empty': ReturnType< $bog_wysiwyg_block['is_empty'] >,
@@ -23151,6 +23179,7 @@ declare namespace $ {
 declare namespace $.$$ {
     class $bog_wysiwyg_block extends $.$bog_wysiwyg_block {
         minimal_height(): number;
+        content_editable(): "false" | "true";
         is_empty(): boolean;
         sub(): any;
         is_image(): boolean;
@@ -23255,7 +23284,7 @@ declare namespace $ {
 		ReturnType< $mol_check_icon['checked'] >
 	>
 	type $mol_check_icon__Icon_bog_wysiwyg_app_10 = $mol_type_enforce<
-		ReturnType< $bog_wysiwyg_app['Profile_icon'] >
+		ReturnType< $bog_wysiwyg_app['Permissions_icon'] >
 		,
 		ReturnType< $mol_check_icon['Icon'] >
 	>
@@ -23265,151 +23294,256 @@ declare namespace $ {
 		ReturnType< $mol_check_icon['hint'] >
 	>
 	type $mol_check_icon__checked_bog_wysiwyg_app_12 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_showed'] >
+		,
+		ReturnType< $mol_check_icon['checked'] >
+	>
+	type $mol_check_icon__Icon_bog_wysiwyg_app_13 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['Profile_icon'] >
+		,
+		ReturnType< $mol_check_icon['Icon'] >
+	>
+	type $mol_check_icon__hint_bog_wysiwyg_app_14 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_check_icon['hint'] >
+	>
+	type $mol_check_icon__checked_bog_wysiwyg_app_15 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['profile_showed'] >
 		,
 		ReturnType< $mol_check_icon['checked'] >
 	>
-	type $mol_paragraph__title_bog_wysiwyg_app_13 = $mol_type_enforce<
+	type $mol_paragraph__title_bog_wysiwyg_app_16 = $mol_type_enforce<
 		string
 		,
 		ReturnType< $mol_paragraph['title'] >
 	>
-	type $mol_button_minor__title_bog_wysiwyg_app_14 = $mol_type_enforce<
+	type $mol_button_minor__title_bog_wysiwyg_app_17 = $mol_type_enforce<
 		string
 		,
 		ReturnType< $mol_button_minor['title'] >
 	>
-	type $mol_button_minor__click_bog_wysiwyg_app_15 = $mol_type_enforce<
+	type $mol_button_minor__click_bog_wysiwyg_app_18 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['registry_create'] >
 		,
 		ReturnType< $mol_button_minor['click'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_app_16 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_app_19 = $mol_type_enforce<
 		readonly(any)[]
 		,
 		ReturnType< $mol_view['sub'] >
 	>
-	type $mol_list__rows_bog_wysiwyg_app_17 = $mol_type_enforce<
+	type $mol_list__rows_bog_wysiwyg_app_20 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['registry_rows'] >
 		,
 		ReturnType< $mol_list['rows'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_app_18 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_app_21 = $mol_type_enforce<
 		readonly(any)[]
 		,
 		ReturnType< $mol_view['sub'] >
 	>
-	type $mol_paragraph__title_bog_wysiwyg_app_19 = $mol_type_enforce<
+	type $mol_paragraph__title_bog_wysiwyg_app_22 = $mol_type_enforce<
 		string
 		,
 		ReturnType< $mol_paragraph['title'] >
 	>
-	type $mol_button_minor__title_bog_wysiwyg_app_20 = $mol_type_enforce<
+	type $mol_button_minor__title_bog_wysiwyg_app_23 = $mol_type_enforce<
 		string
 		,
 		ReturnType< $mol_button_minor['title'] >
 	>
-	type $mol_button_minor__click_bog_wysiwyg_app_21 = $mol_type_enforce<
+	type $mol_button_minor__click_bog_wysiwyg_app_24 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_create'] >
 		,
 		ReturnType< $mol_button_minor['click'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_app_22 = $mol_type_enforce<
-		readonly(any)[]
+	type $mol_view__sub_bog_wysiwyg_app_25 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['sidebar_head_content'] >
 		,
 		ReturnType< $mol_view['sub'] >
 	>
-	type $bog_ui_sidebar__items_bog_wysiwyg_app_23 = $mol_type_enforce<
+	type $bog_ui_sidebar__items_bog_wysiwyg_app_26 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_rows'] >
 		,
 		ReturnType< $bog_ui_sidebar['items'] >
 	>
-	type $bog_ui_sidebar__Header_bog_wysiwyg_app_24 = $mol_type_enforce<
+	type $bog_ui_sidebar__Header_bog_wysiwyg_app_27 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['Sidebar_head'] >
 		,
 		ReturnType< $bog_ui_sidebar['Header'] >
 	>
-	type $bog_wysiwyg__page_land_link_bog_wysiwyg_app_25 = $mol_type_enforce<
+	type $bog_wysiwyg__page_land_link_bog_wysiwyg_app_28 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_land_link'] >
 		,
 		ReturnType< $bog_wysiwyg['page_land_link'] >
 	>
-	type $bog_wysiwyg__all_pages_bog_wysiwyg_app_26 = $mol_type_enforce<
+	type $bog_wysiwyg__readonly_bog_wysiwyg_app_29 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['editor_readonly'] >
+		,
+		ReturnType< $bog_wysiwyg['readonly'] >
+	>
+	type $bog_wysiwyg__all_pages_bog_wysiwyg_app_30 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['all_pages_info'] >
 		,
 		ReturnType< $bog_wysiwyg['all_pages'] >
 	>
-	type $bog_wysiwyg__history_showed_bog_wysiwyg_app_27 = $mol_type_enforce<
+	type $bog_wysiwyg__history_showed_bog_wysiwyg_app_31 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['history_showed'] >
 		,
 		ReturnType< $bog_wysiwyg['history_showed'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_app_28 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_app_32 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['main_content'] >
 		,
 		ReturnType< $mol_view['sub'] >
 	>
-	type $bog_wysiwyg_graph__pages_bog_wysiwyg_app_29 = $mol_type_enforce<
+	type $bog_wysiwyg_graph__pages_bog_wysiwyg_app_33 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['graph_pages'] >
 		,
 		ReturnType< $bog_wysiwyg_graph['pages'] >
 	>
-	type $bog_wysiwyg_graph__current_page_id_bog_wysiwyg_app_30 = $mol_type_enforce<
+	type $bog_wysiwyg_graph__current_page_id_bog_wysiwyg_app_34 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_land_link'] >
 		,
 		ReturnType< $bog_wysiwyg_graph['current_page_id'] >
 	>
-	type $bog_wysiwyg_graph__on_navigate_bog_wysiwyg_app_31 = $mol_type_enforce<
+	type $bog_wysiwyg_graph__on_navigate_bog_wysiwyg_app_35 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_navigate'] >
 		,
 		ReturnType< $bog_wysiwyg_graph['on_navigate'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_app_32 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_app_36 = $mol_type_enforce<
 		readonly(any)[]
 		,
 		ReturnType< $mol_view['sub'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_app_33 = $mol_type_enforce<
+	type $mol_view__sub_bog_wysiwyg_app_37 = $mol_type_enforce<
 		readonly(any)[]
 		,
 		ReturnType< $mol_view['sub'] >
 	>
-	type $mol_view__sub_bog_wysiwyg_app_34 = $mol_type_enforce<
+	type $mol_paragraph__title_bog_wysiwyg_app_38 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_paragraph['title'] >
+	>
+	type $mol_paragraph__title_bog_wysiwyg_app_39 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_role_label'] >
+		,
+		ReturnType< $mol_paragraph['title'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_40 = $mol_type_enforce<
+		readonly(any)[]
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $mol_list__rows_bog_wysiwyg_app_41 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_member_rows'] >
+		,
+		ReturnType< $mol_list['rows'] >
+	>
+	type $mol_string__hint_bog_wysiwyg_app_42 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_string['hint'] >
+	>
+	type $mol_string__value_bog_wysiwyg_app_43 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_add_link'] >
+		,
+		ReturnType< $mol_string['value'] >
+	>
+	type $mol_select__value_bog_wysiwyg_app_44 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_add_role_value'] >
+		,
+		ReturnType< $mol_select['value'] >
+	>
+	type $mol_select__dictionary_bog_wysiwyg_app_45 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_add_role_options'] >
+		,
+		ReturnType< $mol_select['dictionary'] >
+	>
+	type $mol_button_minor__title_bog_wysiwyg_app_46 = $mol_type_enforce<
+		string
+		,
+		ReturnType< $mol_button_minor['title'] >
+	>
+	type $mol_button_minor__click_bog_wysiwyg_app_47 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_add_click'] >
+		,
+		ReturnType< $mol_button_minor['click'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_48 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_add_content'] >
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_49 = $mol_type_enforce<
+		readonly(any)[]
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_50 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['layout_content'] >
 		,
 		ReturnType< $mol_view['sub'] >
 	>
-	type $bog_wysiwyg_app_registry__title_bog_wysiwyg_app_35 = $mol_type_enforce<
+	type $mol_paragraph__title_bog_wysiwyg_app_51 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_member_lord_title'] >
+		,
+		ReturnType< $mol_paragraph['title'] >
+	>
+	type $mol_select__value_bog_wysiwyg_app_52 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_member_role_value'] >
+		,
+		ReturnType< $mol_select['value'] >
+	>
+	type $mol_select__dictionary_bog_wysiwyg_app_53 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['permissions_role_dict'] >
+		,
+		ReturnType< $mol_select['dictionary'] >
+	>
+	type $mol_view__sub_bog_wysiwyg_app_54 = $mol_type_enforce<
+		readonly(any)[]
+		,
+		ReturnType< $mol_view['sub'] >
+	>
+	type $bog_wysiwyg_app_registry__title_bog_wysiwyg_app_55 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['registry_item_title'] >
 		,
 		ReturnType< $bog_wysiwyg_app_registry['title'] >
 	>
-	type $bog_wysiwyg_app_registry__click_bog_wysiwyg_app_36 = $mol_type_enforce<
+	type $bog_wysiwyg_app_registry__click_bog_wysiwyg_app_56 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['registry_item_click'] >
 		,
 		ReturnType< $bog_wysiwyg_app_registry['click'] >
 	>
-	type $bog_wysiwyg_app_registry__active_bog_wysiwyg_app_37 = $mol_type_enforce<
+	type $bog_wysiwyg_app_registry__active_bog_wysiwyg_app_57 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['registry_item_active'] >
 		,
 		ReturnType< $bog_wysiwyg_app_registry['active'] >
 	>
-	type $bog_wysiwyg_app_page__title_bog_wysiwyg_app_38 = $mol_type_enforce<
+	type $bog_wysiwyg_app_page__title_bog_wysiwyg_app_58 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_item_title'] >
 		,
 		ReturnType< $bog_wysiwyg_app_page['title'] >
 	>
-	type $bog_wysiwyg_app_page__click_bog_wysiwyg_app_39 = $mol_type_enforce<
+	type $bog_wysiwyg_app_page__click_bog_wysiwyg_app_59 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_item_click'] >
 		,
 		ReturnType< $bog_wysiwyg_app_page['click'] >
 	>
-	type $bog_wysiwyg_app_page__active_bog_wysiwyg_app_40 = $mol_type_enforce<
+	type $bog_wysiwyg_app_page__active_bog_wysiwyg_app_60 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_item_active'] >
 		,
 		ReturnType< $bog_wysiwyg_app_page['active'] >
 	>
-	type $bog_wysiwyg_app_page__on_rename_bog_wysiwyg_app_41 = $mol_type_enforce<
+	type $bog_wysiwyg_app_page__can_edit_bog_wysiwyg_app_61 = $mol_type_enforce<
+		ReturnType< $bog_wysiwyg_app['page_item_can_edit'] >
+		,
+		ReturnType< $bog_wysiwyg_app_page['can_edit'] >
+	>
+	type $bog_wysiwyg_app_page__on_rename_bog_wysiwyg_app_62 = $mol_type_enforce<
 		ReturnType< $bog_wysiwyg_app['page_item_rename'] >
 		,
 		ReturnType< $bog_wysiwyg_app_page['on_rename'] >
@@ -23426,6 +23560,9 @@ declare namespace $ {
 		Graph_icon( ): $mol_icon_graph_outline
 		graph_showed( next?: boolean ): boolean
 		Graph_toggle( ): $mol_check_icon
+		Permissions_icon( ): $mol_icon_shield_lock
+		permissions_showed( next?: boolean ): boolean
+		Permissions_toggle( ): $mol_check_icon
 		Profile_icon( ): $mol_icon_account
 		profile_showed( next?: boolean ): boolean
 		Profile_toggle( ): $mol_check_icon
@@ -23441,9 +23578,11 @@ declare namespace $ {
 		Sidebar_title( ): $mol_paragraph
 		page_create( next?: any ): any
 		New_page( ): $mol_button_minor
+		sidebar_head_content( ): readonly(any)[]
 		Sidebar_head( ): $mol_view
 		Sidebar( ): $bog_ui_sidebar
 		page_land_link( ): string
+		editor_readonly( ): boolean
 		all_pages_info( ): readonly(any)[]
 		Editor( ): $bog_wysiwyg
 		main_content( ): readonly(any)[]
@@ -23454,19 +23593,49 @@ declare namespace $ {
 		Graph_panel( ): $mol_view
 		Profile( ): $bog_wysiwyg_profile
 		Profile_panel( ): $mol_view
+		Permissions_title( ): $mol_paragraph
+		permissions_role_label( ): string
+		Permissions_role( ): $mol_paragraph
+		Permissions_head( ): $mol_view
+		permissions_member_rows( ): readonly(any)[]
+		Permissions_members( ): $mol_list
+		permissions_add_link( next?: string ): string
+		Permissions_add_input( ): $mol_string
+		permissions_add_role_value( next?: string ): string
+		permissions_add_role_options( ): ({ 
+			'editor': string,
+			'viewer': string,
+		}) 
+		Permissions_add_role( ): $mol_select
+		permissions_add_click( next?: any ): any
+		Permissions_add_button( ): $mol_button_minor
+		permissions_add_content( ): readonly(any)[]
+		Permissions_add( ): $mol_view
+		Permissions_panel( ): $mol_view
 		layout_content( ): readonly(any)[]
 		Layout( ): $mol_view
+		permissions_member_lord_title( id: any): string
+		Permissions_member_lord( id: any): $mol_paragraph
+		permissions_member_role_value( id: any, next?: string ): string
+		permissions_role_dict( ): ({ 
+			'rule': string,
+			'editor': string,
+			'viewer': string,
+		}) 
+		Permissions_member_role( id: any): $mol_select
 		registry_item_title( id: any): string
 		registry_item_click( id: any, next?: any ): any
 		registry_item_active( id: any): boolean
 		page_item_title( id: any): string
 		page_item_click( id: any, next?: any ): any
 		page_item_active( id: any): boolean
+		page_item_can_edit( id: any): boolean
 		page_item_rename( id: any, next?: any ): any
 		title( ): string
 		plugins( ): readonly(any)[]
 		tools( ): readonly(any)[]
 		sub( ): readonly(any)[]
+		Permissions_member( id: any): $mol_view
 		Registry_item( id: any): $bog_wysiwyg_app_registry
 		Page_item( id: any): $bog_wysiwyg_app_page
 	}
@@ -23538,6 +23707,7 @@ declare namespace $ {
 		confirm_rename( next?: any ): any
 		active( ): boolean
 		editing( next?: boolean ): boolean
+		can_edit( ): boolean
 		title( ): string
 		on_rename( next?: any ): any
 		edit_title( next?: string ): string
@@ -23572,6 +23742,21 @@ declare namespace $.$$ {
             blocks_html: string[];
         }[];
         registry_title_by_link(link: string): string;
+        my_lord(): $giper_baza_link;
+        current_page_land(): $giper_baza_land | null;
+        page_tier(): $giper_baza_rank_tier;
+        can_edit(): boolean;
+        is_owner(): boolean;
+        editor_readonly(): boolean;
+        permissions_role_label(): "You: Owner" | "You: Editor" | "You: Viewer" | "You: No access";
+        page_gift_lords(): string[];
+        permissions_member_rows(): $mol_view[];
+        permissions_member_lord_title(index: number): string;
+        permissions_member_role_value(index: number, next?: string): string;
+        permissions_add_click(event?: Event): Event | null;
+        permissions_add_content(): ($mol_button_minor | $.$mol_string | $.$mol_select)[];
+        sidebar_head_content(): any[];
+        page_item_can_edit(index: number): boolean;
         registry_rows(): $bog_wysiwyg_app_registry[];
         registry_item_title(index: number): string;
         registry_item_active(index: number): boolean;

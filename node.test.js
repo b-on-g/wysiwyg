@@ -12730,7 +12730,7 @@ var $;
         post(lead, head, self, vary, tag = 'term') {
             this.join();
             const lord_pass = this.auth().pass();
-            const encrypted = this.encrypted();
+            const encrypted = vary === null ? false : this.encrypted();
             let open = $giper_baza_link_base(this.link(), () => $giper_baza_vary.pack([vary]));
             const length = encrypted ? Math.ceil((open.byteLength + 1) / 16) * 16 : open.byteLength;
             const sand = $giper_baza_unit_sand.make(length, tag);
@@ -33168,6 +33168,13 @@ var $;
 			(obj.panel_open) = (next) => ((this.block_comment_open(id, next)));
 			return obj;
 		}
+		block_row_sub(id){
+			return [
+				(this.Drag_handle(id)), 
+				(this.Block(id)), 
+				(this.Block_comment(id))
+			];
+		}
 		editor_keydown(next){
 			if(next !== undefined) return next;
 			return null;
@@ -33272,6 +33279,9 @@ var $;
 		page_land_link(){
 			return "";
 		}
+		readonly(){
+			return false;
+		}
 		block_ids(next){
 			if(next !== undefined) return next;
 			return [];
@@ -33281,6 +33291,7 @@ var $;
 			(obj.html) = (next) => ((this.block_html(id, next)));
 			(obj.type) = (next) => ((this.block_type(id, next)));
 			(obj.level) = (next) => ((this.block_level(id, next)));
+			(obj.readonly) = () => ((this.readonly()));
 			(obj.menu_open) = () => ((this.menu_showed()));
 			(obj.ai_open) = () => ((this.ai_showed()));
 			(obj.on_enter) = (next) => ((this.block_enter(id, next)));
@@ -33305,11 +33316,7 @@ var $;
 				"drop": (next) => (this.row_drop(id, next)), 
 				"dragend": (next) => (this.row_dragend(id, next))
 			});
-			(obj.sub) = () => ([
-				(this.Drag_handle(id)), 
-				(this.Block(id)), 
-				(this.Block_comment(id))
-			]);
+			(obj.sub) = () => ((this.block_row_sub(id)));
 			return obj;
 		}
 		drag_source_id(next){
@@ -33422,6 +33429,16 @@ var $;
     var $$;
     (function ($$) {
         class $bog_wysiwyg extends $.$bog_wysiwyg {
+            block_row_sub(id) {
+                if (this.readonly()) {
+                    return [this.Block(id)];
+                }
+                return [
+                    this.Drag_handle(id),
+                    this.Block(id),
+                    this.Block_comment(id),
+                ];
+            }
             has_baza() {
                 return !!this.page_land_link();
             }
@@ -33535,6 +33552,8 @@ var $;
             block_enter(id, event) {
                 if (!event)
                     return null;
+                if (this.readonly())
+                    return null;
                 if (this.has_baza()) {
                     const data = this.page_data();
                     const blocks_list = data?.Blocks('auto');
@@ -33569,6 +33588,8 @@ var $;
             block_remove(id, event) {
                 if (!event)
                     return null;
+                if (this.readonly())
+                    return null;
                 const ids = [...this.block_ids()];
                 if (ids.length <= 1)
                     return null;
@@ -33588,6 +33609,8 @@ var $;
             }
             block_slash(id, event) {
                 if (!event)
+                    return null;
+                if (this.readonly())
                     return null;
                 this.active_block_id(id);
                 const block_node = this.Block(id).dom_node();
@@ -33731,6 +33754,8 @@ var $;
             }
             block_ai(id, event) {
                 if (!event)
+                    return null;
+                if (this.readonly())
                     return null;
                 this.active_block_id(id);
                 const block_node = this.Block(id).dom_node();
@@ -34269,6 +34294,28 @@ var $;
 	($.$mol_icon_graph_outline) = class $mol_icon_graph_outline extends ($.$mol_icon) {
 		path(){
 			return "M19.5 17C19.36 17 19.24 17 19.11 17.04L17.5 13.8C17.95 13.35 18.25 12.71 18.25 12C18.25 10.62 17.13 9.5 15.75 9.5C15.61 9.5 15.5 9.5 15.35 9.54L13.74 6.3C14.21 5.84 14.5 5.21 14.5 4.5C14.5 3.12 13.38 2 12 2S9.5 3.12 9.5 4.5C9.5 5.2 9.79 5.84 10.26 6.29L8.65 9.54C8.5 9.5 8.39 9.5 8.25 9.5C6.87 9.5 5.75 10.62 5.75 12C5.75 12.71 6.04 13.34 6.5 13.79L4.89 17.04C4.76 17 4.64 17 4.5 17C3.12 17 2 18.12 2 19.5C2 20.88 3.12 22 4.5 22S7 20.88 7 19.5C7 18.8 6.71 18.16 6.24 17.71L7.86 14.46C8 14.5 8.12 14.5 8.25 14.5C8.38 14.5 8.5 14.5 8.63 14.46L10.26 17.71C9.79 18.16 9.5 18.8 9.5 19.5C9.5 20.88 10.62 22 12 22S14.5 20.88 14.5 19.5C14.5 18.12 13.38 17 12 17C11.87 17 11.74 17 11.61 17.04L10 13.8C10.45 13.35 10.75 12.71 10.75 12C10.75 11.3 10.46 10.67 10 10.21L11.61 6.96C11.74 7 11.87 7 12 7C12.13 7 12.26 7 12.39 6.96L14 10.21C13.54 10.66 13.25 11.3 13.25 12C13.25 13.38 14.37 14.5 15.75 14.5C15.88 14.5 16 14.5 16.13 14.46L17.76 17.71C17.29 18.16 17 18.8 17 19.5C17 20.88 18.12 22 19.5 22S22 20.88 22 19.5C22 18.12 20.88 17 19.5 17M4.5 20.5C3.95 20.5 3.5 20.05 3.5 19.5S3.95 18.5 4.5 18.5 5.5 18.95 5.5 19.5 5.05 20.5 4.5 20.5M13 19.5C13 20.05 12.55 20.5 12 20.5S11 20.05 11 19.5 11.45 18.5 12 18.5 13 18.95 13 19.5M7.25 12C7.25 11.45 7.7 11 8.25 11S9.25 11.45 9.25 12 8.8 13 8.25 13 7.25 12.55 7.25 12M11 4.5C11 3.95 11.45 3.5 12 3.5S13 3.95 13 4.5 12.55 5.5 12 5.5 11 5.05 11 4.5M14.75 12C14.75 11.45 15.2 11 15.75 11S16.75 11.45 16.75 12 16.3 13 15.75 13 14.75 12.55 14.75 12M19.5 20.5C18.95 20.5 18.5 20.05 18.5 19.5S18.95 18.5 19.5 18.5 20.5 18.95 20.5 19.5 20.05 20.5 19.5 20.5Z";
+		}
+	};
+
+
+;
+"use strict";
+
+;
+	($.$mol_icon_shield) = class $mol_icon_shield extends ($.$mol_icon) {
+		path(){
+			return "M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z";
+		}
+	};
+
+
+;
+"use strict";
+
+;
+	($.$mol_icon_shield_lock) = class $mol_icon_shield_lock extends ($.$mol_icon) {
+		path(){
+			return "M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.1 14.8,9.5V11C15.4,11 16,11.6 16,12.3V15.8C16,16.4 15.4,17 14.7,17H9.2C8.6,17 8,16.4 8,15.7V12.2C8,11.6 8.6,11 9.2,11V9.5C9.2,8.1 10.6,7 12,7M12,8.2C11.2,8.2 10.5,8.7 10.5,9.5V11H13.5V9.5C13.5,8.7 12.8,8.2 12,8.2Z";
 		}
 	};
 
@@ -35016,6 +35063,21 @@ var $;
 			(obj.checked) = (next) => ((this.graph_showed(next)));
 			return obj;
 		}
+		Permissions_icon(){
+			const obj = new this.$.$mol_icon_shield_lock();
+			return obj;
+		}
+		permissions_showed(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		Permissions_toggle(){
+			const obj = new this.$.$mol_check_icon();
+			(obj.Icon) = () => ((this.Permissions_icon()));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Permissions_toggle_hint")));
+			(obj.checked) = (next) => ((this.permissions_showed(next)));
+			return obj;
+		}
 		Profile_icon(){
 			const obj = new this.$.$mol_icon_account();
 			return obj;
@@ -35086,9 +35148,12 @@ var $;
 			(obj.click) = (next) => ((this.page_create(next)));
 			return obj;
 		}
+		sidebar_head_content(){
+			return [(this.Sidebar_title()), (this.New_page())];
+		}
 		Sidebar_head(){
 			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ([(this.Sidebar_title()), (this.New_page())]);
+			(obj.sub) = () => ((this.sidebar_head_content()));
 			return obj;
 		}
 		Sidebar(){
@@ -35100,12 +35165,16 @@ var $;
 		page_land_link(){
 			return "";
 		}
+		editor_readonly(){
+			return false;
+		}
 		all_pages_info(){
 			return [];
 		}
 		Editor(){
 			const obj = new this.$.$bog_wysiwyg();
 			(obj.page_land_link) = () => ((this.page_land_link()));
+			(obj.readonly) = () => ((this.editor_readonly()));
 			(obj.all_pages) = () => ((this.all_pages_info()));
 			(obj.history_showed) = (next) => ((this.history_showed(next)));
 			return obj;
@@ -35146,18 +35215,124 @@ var $;
 			(obj.sub) = () => ([(this.Profile())]);
 			return obj;
 		}
+		Permissions_title(){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Permissions_title_title")));
+			return obj;
+		}
+		permissions_role_label(){
+			return "";
+		}
+		Permissions_role(){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.permissions_role_label()));
+			return obj;
+		}
+		Permissions_head(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Permissions_title()), (this.Permissions_role())]);
+			return obj;
+		}
+		permissions_member_rows(){
+			return [];
+		}
+		Permissions_members(){
+			const obj = new this.$.$mol_list();
+			(obj.rows) = () => ((this.permissions_member_rows()));
+			return obj;
+		}
+		permissions_add_link(next){
+			if(next !== undefined) return next;
+			return "";
+		}
+		Permissions_add_input(){
+			const obj = new this.$.$mol_string();
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Permissions_add_input_hint")));
+			(obj.value) = (next) => ((this.permissions_add_link(next)));
+			return obj;
+		}
+		permissions_add_role_value(next){
+			if(next !== undefined) return next;
+			return "editor";
+		}
+		permissions_add_role_options(){
+			return {"editor": (this.$.$mol_locale.text("$bog_wysiwyg_app_permissions_add_role_options_editor")), "viewer": (this.$.$mol_locale.text("$bog_wysiwyg_app_permissions_add_role_options_viewer"))};
+		}
+		Permissions_add_role(){
+			const obj = new this.$.$mol_select();
+			(obj.value) = (next) => ((this.permissions_add_role_value(next)));
+			(obj.dictionary) = () => ((this.permissions_add_role_options()));
+			return obj;
+		}
+		permissions_add_click(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		Permissions_add_button(){
+			const obj = new this.$.$mol_button_minor();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Permissions_add_button_title")));
+			(obj.click) = (next) => ((this.permissions_add_click(next)));
+			return obj;
+		}
+		permissions_add_content(){
+			return [
+				(this.Permissions_add_input()), 
+				(this.Permissions_add_role()), 
+				(this.Permissions_add_button())
+			];
+		}
+		Permissions_add(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ((this.permissions_add_content()));
+			return obj;
+		}
+		Permissions_panel(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([
+				(this.Permissions_head()), 
+				(this.Permissions_members()), 
+				(this.Permissions_add())
+			]);
+			return obj;
+		}
 		layout_content(){
 			return [
 				(this.Registry_panel()), 
 				(this.Sidebar()), 
 				(this.Main()), 
 				(this.Graph_panel()), 
-				(this.Profile_panel())
+				(this.Profile_panel()), 
+				(this.Permissions_panel())
 			];
 		}
 		Layout(){
 			const obj = new this.$.$mol_view();
 			(obj.sub) = () => ((this.layout_content()));
+			return obj;
+		}
+		permissions_member_lord_title(id){
+			return "";
+		}
+		Permissions_member_lord(id){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.permissions_member_lord_title(id)));
+			return obj;
+		}
+		permissions_member_role_value(id, next){
+			if(next !== undefined) return next;
+			return "";
+		}
+		permissions_role_dict(){
+			return {
+				"rule": (this.$.$mol_locale.text("$bog_wysiwyg_app_permissions_role_dict_rule")), 
+				"editor": (this.$.$mol_locale.text("$bog_wysiwyg_app_permissions_role_dict_editor")), 
+				"viewer": (this.$.$mol_locale.text("$bog_wysiwyg_app_permissions_role_dict_viewer"))
+			};
+		}
+		Permissions_member_role(id){
+			const obj = new this.$.$mol_select();
+			(obj.value) = (next) => ((this.permissions_member_role_value(id, next)));
+			(obj.dictionary) = () => ((this.permissions_role_dict()));
 			return obj;
 		}
 		registry_item_title(id){
@@ -35180,6 +35355,9 @@ var $;
 		page_item_active(id){
 			return false;
 		}
+		page_item_can_edit(id){
+			return true;
+		}
 		page_item_rename(id, next){
 			if(next !== undefined) return next;
 			return null;
@@ -35195,12 +35373,18 @@ var $;
 				(this.Registry_toggle()), 
 				(this.History_toggle()), 
 				(this.Graph_toggle()), 
+				(this.Permissions_toggle()), 
 				(this.Profile_toggle()), 
 				(this.Lights())
 			];
 		}
 		sub(){
 			return [(this.Head()), (this.Layout())];
+		}
+		Permissions_member(id){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([(this.Permissions_member_lord(id)), (this.Permissions_member_role(id))]);
+			return obj;
 		}
 		Registry_item(id){
 			const obj = new this.$.$bog_wysiwyg_app_registry();
@@ -35214,6 +35398,7 @@ var $;
 			(obj.title) = () => ((this.page_item_title(id)));
 			(obj.click) = (next) => ((this.page_item_click(id, next)));
 			(obj.active) = () => ((this.page_item_active(id)));
+			(obj.can_edit) = () => ((this.page_item_can_edit(id)));
 			(obj.on_rename) = (next) => ((this.page_item_rename(id, next)));
 			return obj;
 		}
@@ -35229,6 +35414,9 @@ var $;
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_icon"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "graph_showed"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_toggle"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_icon"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "permissions_showed"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_toggle"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Profile_icon"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "profile_showed"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Profile_toggle"));
@@ -35251,10 +35439,26 @@ var $;
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Graph_panel"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Profile"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Profile_panel"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_title"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_role"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_head"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_members"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "permissions_add_link"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_add_input"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "permissions_add_role_value"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_add_role"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "permissions_add_click"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_add_button"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_add"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Permissions_panel"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Layout"));
+	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Permissions_member_lord"));
+	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "permissions_member_role_value"));
+	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Permissions_member_role"));
 	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "registry_item_click"));
 	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "page_item_click"));
 	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "page_item_rename"));
+	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Permissions_member"));
 	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Registry_item"));
 	($mol_mem_key(($.$bog_wysiwyg_app.prototype), "Page_item"));
 	($.$bog_wysiwyg_app_registry) = class $bog_wysiwyg_app_registry extends ($.$mol_view) {
@@ -35325,6 +35529,9 @@ var $;
 		editing(next){
 			if(next !== undefined) return next;
 			return false;
+		}
+		can_edit(){
+			return true;
 		}
 		title(){
 			return "";
@@ -35400,6 +35607,9 @@ var $;
 
 ;
 	($.$bog_wysiwyg_block) = class $bog_wysiwyg_block extends ($.$mol_view) {
+		content_editable(){
+			return "true";
+		}
 		is_empty(){
 			return false;
 		}
@@ -35451,6 +35661,9 @@ var $;
 		level(next){
 			if(next !== undefined) return next;
 			return 1;
+		}
+		readonly(){
+			return false;
 		}
 		menu_open(){
 			return false;
@@ -35516,7 +35729,7 @@ var $;
 		attr(){
 			return {
 				...(super.attr()), 
-				"contenteditable": "true", 
+				"contenteditable": (this.content_editable()), 
 				"bog_wysiwyg_block_type": (this.type()), 
 				"bog_wysiwyg_block_level": (this.level()), 
 				"bog_wysiwyg_block_empty": (this.is_empty()), 
@@ -35669,6 +35882,11 @@ var $;
             minimal_height() {
                 return 40;
             }
+            content_editable() {
+                if (this.readonly())
+                    return 'false';
+                return 'true';
+            }
             is_empty() {
                 const html = this.html();
                 if (this.type() === 'image' && html?.includes('<img'))
@@ -35696,6 +35914,7 @@ var $;
             auto() {
                 const node = this.dom_node();
                 const doc = this.$.$mol_dom_context.document;
+                const readonly = this.readonly();
                 const plugin = $bog_wysiwyg_plugin_registry.get(this.type());
                 if (plugin?.render) {
                     node.contentEditable = 'false';
@@ -35724,7 +35943,7 @@ var $;
                     }
                     return;
                 }
-                if (this.is_static()) {
+                if (readonly || this.is_static()) {
                     node.contentEditable = 'false';
                     const html = this.html();
                     if (node.innerHTML !== html) {
@@ -35743,6 +35962,8 @@ var $;
             input_event(event) {
                 if (!event)
                     return null;
+                if (this.readonly())
+                    return event;
                 const node = event.target;
                 this.try_markdown(node);
                 this.html(node.innerHTML);
@@ -35866,6 +36087,10 @@ var $;
             paste_event(event) {
                 if (!event)
                     return null;
+                if (this.readonly()) {
+                    event.preventDefault();
+                    return event;
+                }
                 const items = event.clipboardData?.items;
                 if (!items)
                     return event;
@@ -35892,6 +36117,10 @@ var $;
             drop_event(event) {
                 if (!event)
                     return null;
+                if (this.readonly()) {
+                    event.preventDefault();
+                    return event;
+                }
                 const files = event.dataTransfer?.files;
                 if (!files)
                     return event;
@@ -35921,6 +36150,8 @@ var $;
             keydown_event(event) {
                 if (!event)
                     return null;
+                if (this.readonly())
+                    return event;
                 const node = event.target;
                 if (this.is_image() || $bog_wysiwyg_plugin_registry.get(this.type())?.render) {
                     if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -36359,6 +36590,139 @@ var $;
                 const data = land.Data($bog_wysiwyg_model_registry);
                 return data.Title()?.val() ?? '';
             }
+            my_lord() {
+                return this.$.$giper_baza_auth.current().pass().lord();
+            }
+            current_page_land() {
+                const link = this.page_land_link();
+                if (!link)
+                    return null;
+                return this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
+            }
+            page_tier() {
+                const land = this.current_page_land();
+                if (!land)
+                    return $giper_baza_rank_tier.deny;
+                const auth = this.$.$giper_baza_auth.current();
+                return $giper_baza_rank_tier_of(land.pass_rank(auth.pass()));
+            }
+            can_edit() {
+                return this.page_tier() >= $giper_baza_rank_tier.post;
+            }
+            is_owner() {
+                return this.page_tier() >= $giper_baza_rank_tier.rule;
+            }
+            editor_readonly() {
+                return !this.can_edit();
+            }
+            permissions_role_label() {
+                const tier = this.page_tier();
+                if (tier >= $giper_baza_rank_tier.rule)
+                    return 'You: Owner';
+                if (tier >= $giper_baza_rank_tier.post)
+                    return 'You: Editor';
+                if (tier >= $giper_baza_rank_tier.read)
+                    return 'You: Viewer';
+                return 'You: No access';
+            }
+            page_gift_lords() {
+                const land = this.current_page_land();
+                if (!land)
+                    return [];
+                const lords = [];
+                for (const [key] of land._gift) {
+                    if (key)
+                        lords.push(key);
+                }
+                return lords;
+            }
+            permissions_member_rows() {
+                if (!this.is_owner())
+                    return [];
+                return this.page_gift_lords().map((_, i) => this.Permissions_member(i));
+            }
+            permissions_member_lord_title(index) {
+                const lords = this.page_gift_lords();
+                const lord = lords[index];
+                if (!lord)
+                    return '';
+                const my = this.my_lord();
+                if (lord === my.str)
+                    return lord + ' (you)';
+                return lord;
+            }
+            permissions_member_role_value(index, next) {
+                const lords = this.page_gift_lords();
+                const lord_str = lords[index];
+                if (!lord_str)
+                    return 'viewer';
+                if (next !== undefined) {
+                    const land = this.current_page_land();
+                    if (!land)
+                        return next;
+                    const lord = new $giper_baza_link(lord_str);
+                    const pass = land.lord_pass(lord);
+                    if (!pass)
+                        return next;
+                    const rank = next === 'rule'
+                        ? $giper_baza_rank_make('rule', 'just')
+                        : next === 'editor'
+                            ? $giper_baza_rank_post('just')
+                            : $giper_baza_rank_make('read', 'late');
+                    land.pass_rank(pass, rank);
+                    return next;
+                }
+                const land = this.current_page_land();
+                if (!land)
+                    return 'viewer';
+                const lord = new $giper_baza_link(lord_str);
+                const tier = land.lord_tier(lord);
+                if (tier >= $giper_baza_rank_tier.rule)
+                    return 'rule';
+                if (tier >= $giper_baza_rank_tier.post)
+                    return 'editor';
+                return 'viewer';
+            }
+            permissions_add_click(event) {
+                if (!event)
+                    return null;
+                const land = this.current_page_land();
+                if (!land)
+                    return null;
+                const lord_str = this.permissions_add_link().trim();
+                if (!lord_str)
+                    return null;
+                const role = this.permissions_add_role_value();
+                const rank = role === 'editor'
+                    ? $giper_baza_rank_post('just')
+                    : $giper_baza_rank_make('read', 'late');
+                const lord = new $giper_baza_link(lord_str);
+                const pass = land.lord_pass(lord);
+                if (pass) {
+                    land.pass_rank(pass, rank);
+                }
+                this.permissions_add_link('');
+                return event;
+            }
+            permissions_add_content() {
+                if (!this.is_owner())
+                    return [];
+                return [
+                    this.Permissions_add_input(),
+                    this.Permissions_add_role(),
+                    this.Permissions_add_button(),
+                ];
+            }
+            sidebar_head_content() {
+                const parts = [this.Sidebar_title()];
+                if (this.can_edit()) {
+                    parts.push(this.New_page());
+                }
+                return parts;
+            }
+            page_item_can_edit(index) {
+                return this.can_edit();
+            }
             registry_rows() {
                 return this.user_registry_links().map((_, i) => this.Registry_item(i));
             }
@@ -36486,6 +36850,9 @@ var $;
                 if (this.profile_showed()) {
                     parts.push(this.Profile_panel());
                 }
+                else if (this.permissions_showed()) {
+                    parts.push(this.Permissions_panel());
+                }
                 else if (this.graph_showed()) {
                     if (this.page_links().length === 0) {
                         this.page_create(new Event('auto'));
@@ -36530,6 +36897,39 @@ var $;
         ], $bog_wysiwyg_app.prototype, "all_pages_info", null);
         __decorate([
             $mol_mem
+        ], $bog_wysiwyg_app.prototype, "page_tier", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "can_edit", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "is_owner", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "editor_readonly", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "permissions_role_label", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "page_gift_lords", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "permissions_member_rows", null);
+        __decorate([
+            $mol_mem_key
+        ], $bog_wysiwyg_app.prototype, "permissions_member_role_value", null);
+        __decorate([
+            $mol_action
+        ], $bog_wysiwyg_app.prototype, "permissions_add_click", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "permissions_add_content", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "sidebar_head_content", null);
+        __decorate([
+            $mol_mem
         ], $bog_wysiwyg_app.prototype, "registry_rows", null);
         __decorate([
             $mol_action
@@ -36555,10 +36955,15 @@ var $;
                 if (this.editing()) {
                     return [this.Title_input(), this.Rename_confirm()];
                 }
+                if (!this.can_edit()) {
+                    return [this.Title_nav()];
+                }
                 return [this.Title_nav(), this.Rename_trigger()];
             }
             start_rename(event) {
                 if (!event)
+                    return null;
+                if (!this.can_edit())
                     return null;
                 this.edit_title(this.title());
                 this.editing(true);
@@ -36659,6 +37064,100 @@ var $;
             },
             minWidth: 0,
             overflow: 'hidden',
+        },
+        Permissions_panel: {
+            flex: {
+                direction: 'column',
+                shrink: 0,
+            },
+            padding: {
+                top: '1rem',
+                bottom: '1rem',
+                left: '1rem',
+                right: '1rem',
+            },
+            minWidth: '16rem',
+            maxWidth: '24rem',
+            overflow: {
+                y: 'auto',
+            },
+        },
+        Permissions_head: {
+            flex: {
+                direction: 'row',
+            },
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            margin: {
+                bottom: '0.5rem',
+            },
+        },
+        Permissions_title: {
+            font: {
+                weight: 'bold',
+            },
+        },
+        Permissions_role: {
+            color: $mol_theme.shade,
+            font: {
+                size: '0.85rem',
+            },
+        },
+        Permissions_member: {
+            flex: {
+                direction: 'row',
+            },
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: {
+                top: '0.25rem',
+                bottom: '0.25rem',
+                left: 0,
+                right: 0,
+            },
+        },
+        Permissions_member_lord: {
+            flex: {
+                shrink: 1,
+            },
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            font: {
+                size: '0.8rem',
+                family: 'monospace',
+            },
+        },
+        Permissions_add: {
+            flex: {
+                direction: 'row',
+                wrap: 'wrap',
+            },
+            gap: '0.5rem',
+            alignItems: 'center',
+            margin: {
+                top: '1rem',
+            },
+            padding: {
+                top: '0.5rem',
+                bottom: 0,
+                left: 0,
+                right: 0,
+            },
+            border: {
+                top: {
+                    width: '1px',
+                    style: 'solid',
+                    color: $mol_theme.line,
+                },
+            },
+        },
+        Permissions_add_input: {
+            flex: {
+                grow: 1,
+            },
+            minWidth: '8rem',
         },
     });
     $mol_style_define($bog_wysiwyg_app_registry, {
@@ -42262,11 +42761,13 @@ var $;
             $mol_assert_equal(await land.encrypted(), false);
             await land.encrypted(true);
             $mol_assert_equal(await land.encrypted(), true);
-            const sand = await land.post($giper_baza_link.hole, $giper_baza_link.hole, null, new Uint8Array([1, 2, 3]));
-            $mol_assert_equal((await land.sand_encode(sand)).data().length, 16);
-            $mol_assert_equal(await land.sand_decode(sand), new Uint8Array([1, 2, 3]));
+            const material = await land.post($giper_baza_link.hole, $giper_baza_link.hole, null, new Uint8Array([1, 2, 3]));
+            $mol_assert_equal((await land.sand_encode(material)).data().length, 16);
+            $mol_assert_equal(await land.sand_decode(material), new Uint8Array([1, 2, 3]));
             $mol_assert_equal((await land.sand_ordered({ head: $giper_baza_link.hole, peer: $giper_baza_link.hole })).length, 1);
-            await land.post($giper_baza_link.hole, $giper_baza_link.hole, sand.self(), null);
+            const tombstone = await land.post($giper_baza_link.hole, $giper_baza_link.hole, material.self(), null);
+            $mol_assert_equal((await land.sand_encode(tombstone)).data().length, 1);
+            $mol_assert_equal(await land.sand_decode(tombstone), null);
             $mol_assert_equal((await land.sand_ordered({ head: $giper_baza_link.hole, peer: $giper_baza_link.hole })).length, 1);
         },
         'Land fork & merge': $mol_wire_async(($) => {
