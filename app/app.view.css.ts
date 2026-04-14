@@ -134,8 +134,8 @@ namespace $ {
 			padding: {
 				top: '0.25rem',
 				bottom: '0.25rem',
-				left: '0',
-				right: '0',
+				left: 0,
+				right: 0,
 			},
 		},
 
