@@ -12,9 +12,9 @@
 	"$bog_wysiwyg_app_Permissions_title_title": "Права доступа",
 	"$bog_wysiwyg_app_Permissions_add_input_hint": "Вставьте lord link пользователя",
 	"$bog_wysiwyg_app_Permissions_add_button_title": "+ Добавить",
-	"$bog_wysiwyg_app_Permissions_add_role_dictionary_editor": "Редактор",
-	"$bog_wysiwyg_app_Permissions_add_role_dictionary_viewer": "Читатель",
-	"$bog_wysiwyg_app_Permissions_member_role_dictionary_rule": "Владелец",
-	"$bog_wysiwyg_app_Permissions_member_role_dictionary_editor": "Редактор",
-	"$bog_wysiwyg_app_Permissions_member_role_dictionary_viewer": "Читатель"
+	"$bog_wysiwyg_app_permissions_role_dict_rule": "Владелец",
+	"$bog_wysiwyg_app_permissions_role_dict_editor": "Редактор",
+	"$bog_wysiwyg_app_permissions_role_dict_viewer": "Читатель",
+	"$bog_wysiwyg_app_permissions_add_role_options_editor": "Редактор",
+	"$bog_wysiwyg_app_permissions_add_role_options_viewer": "Читатель"
 }
