@@ -23,6 +23,18 @@ namespace $.$$ {
 
 	export class $bog_wysiwyg extends $.$bog_wysiwyg {
 
+		/** Block row content: hide drag handle and comments when readonly */
+		block_row_sub( id: string ) {
+			if( this.readonly() ) {
+				return [ this.Block( id ) ]
+			}
+			return [
+				this.Drag_handle( id ),
+				this.Block( id ),
+				this.Block_comment( id ),
+			]
+		}
+
 		// === Giper Baza integration ===
 
 		/** Whether this editor is connected to a Giper Baza page */
@@ -165,6 +177,7 @@ namespace $.$$ {
 
 		block_enter( id: string, event?: Event ) {
 			if( !event ) return null
+			if( this.readonly() ) return null
 
 			if( this.has_baza() ) {
 				const data = this.page_data()
@@ -202,6 +215,7 @@ namespace $.$$ {
 
 		block_remove( id: string, event?: Event ) {
 			if( !event ) return null
+			if( this.readonly() ) return null
 
 			const ids = [ ...this.block_ids() ]
 			if( ids.length <= 1 ) return null
@@ -226,6 +240,7 @@ namespace $.$$ {
 
 		block_slash( id: string, event?: Event ) {
 			if( !event ) return null
+			if( this.readonly() ) return null
 			this.active_block_id( id )
 
 			const block_node = this.Block( id ).dom_node() as HTMLElement
@@ -392,6 +407,7 @@ namespace $.$$ {
 
 		block_ai( id: string, event?: Event ) {
 			if( !event ) return null
+			if( this.readonly() ) return null
 			this.active_block_id( id )
 
 			const block_node = this.Block( id ).dom_node() as HTMLElement

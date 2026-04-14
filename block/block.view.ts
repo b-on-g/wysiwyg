@@ -114,6 +114,11 @@ namespace $.$$ {
 			return 40
 		}
 
+		content_editable() {
+			if( this.readonly() ) return 'false'
+			return 'true'
+		}
+
 		@ $mol_mem
 		is_empty() {
 			const html = this.html()
@@ -143,6 +148,7 @@ namespace $.$$ {
 		override auto() {
 			const node = this.dom_node() as HTMLElement
 			const doc = this.$.$mol_dom_context.document
+			const readonly = this.readonly()
 
 			// Plugin with custom render
 			const plugin = $bog_wysiwyg_plugin_registry.get( this.type() )
@@ -170,7 +176,7 @@ namespace $.$$ {
 				return
 			}
 
-			if( this.is_static() ) {
+			if( readonly || this.is_static() ) {
 				node.contentEditable = 'false'
 				const html = this.html()
 				if( node.innerHTML !== html ) {
@@ -191,6 +197,7 @@ namespace $.$$ {
 
 		input_event( event?: Event ) {
 			if( !event ) return null
+			if( this.readonly() ) return event
 			const node = event.target as HTMLElement
 			this.try_markdown( node )
 			this.html( node.innerHTML )
@@ -326,6 +333,7 @@ namespace $.$$ {
 
 		paste_event( event?: ClipboardEvent ) {
 			if( !event ) return null
+			if( this.readonly() ) { event.preventDefault(); return event }
 
 			const items = event.clipboardData?.items
 			if( !items ) return event
@@ -354,6 +362,7 @@ namespace $.$$ {
 
 		drop_event( event?: DragEvent ) {
 			if( !event ) return null
+			if( this.readonly() ) { event.preventDefault(); return event }
 
 			const files = event.dataTransfer?.files
 			if( !files ) return event
@@ -386,6 +395,7 @@ namespace $.$$ {
 
 		keydown_event( event?: KeyboardEvent ) {
 			if( !event ) return null
+			if( this.readonly() ) return event
 
 			const node = event.target as HTMLElement
 

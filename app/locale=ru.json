@@ -7,5 +7,14 @@
 	"$bog_wysiwyg_app_New_page_title": "+ Новая",
 	"$bog_wysiwyg_app_History_toggle_hint": "История версий",
 	"$bog_wysiwyg_app_Graph_toggle_hint": "Граф страниц",
-	"$bog_wysiwyg_app_Profile_toggle_hint": "Профиль"
+	"$bog_wysiwyg_app_Profile_toggle_hint": "Профиль",
+	"$bog_wysiwyg_app_Permissions_toggle_hint": "Права доступа",
+	"$bog_wysiwyg_app_Permissions_title_title": "Права доступа",
+	"$bog_wysiwyg_app_Permissions_add_input_hint": "Вставьте lord link пользователя",
+	"$bog_wysiwyg_app_Permissions_add_button_title": "+ Добавить",
+	"$bog_wysiwyg_app_Permissions_add_role_dictionary_editor": "Редактор",
+	"$bog_wysiwyg_app_Permissions_add_role_dictionary_viewer": "Читатель",
+	"$bog_wysiwyg_app_Permissions_member_role_dictionary_rule": "Владелец",
+	"$bog_wysiwyg_app_Permissions_member_role_dictionary_editor": "Редактор",
+	"$bog_wysiwyg_app_Permissions_member_role_dictionary_viewer": "Читатель"
 }

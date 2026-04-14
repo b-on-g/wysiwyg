@@ -134,6 +134,170 @@ namespace $.$$ {
 			return data.Title()?.val() ?? ''
 		}
 
+		// === Permissions ===
+
+		/** Current user's lord link. Do NOT put @$mol_mem. */
+		my_lord() {
+			return this.$.$giper_baza_auth.current().pass().lord()
+		}
+
+		/** Get the Giper Baza land for the current page. Do NOT put @$mol_mem. */
+		current_page_land() {
+			const link = this.page_land_link()
+			if( !link ) return null
+			return this.$.$giper_baza_glob.Land( new $giper_baza_link( link ) )
+		}
+
+		/** Current user's tier on the current page land */
+		@ $mol_mem
+		page_tier(): $giper_baza_rank_tier {
+			const land = this.current_page_land()
+			if( !land ) return $giper_baza_rank_tier.deny
+			const auth = this.$.$giper_baza_auth.current()
+			return $giper_baza_rank_tier_of( land.pass_rank( auth.pass() ) )
+		}
+
+		/** Whether current user can edit the current page */
+		@ $mol_mem
+		can_edit() {
+			return this.page_tier() >= $giper_baza_rank_tier.post
+		}
+
+		/** Whether current user is owner (rule) of the current page */
+		@ $mol_mem
+		is_owner() {
+			return this.page_tier() >= $giper_baza_rank_tier.rule
+		}
+
+		/** Editor is readonly when user cannot edit */
+		@ $mol_mem
+		editor_readonly() {
+			return !this.can_edit()
+		}
+
+		/** Label showing current user's role */
+		@ $mol_mem
+		permissions_role_label() {
+			const tier = this.page_tier()
+			if( tier >= $giper_baza_rank_tier.rule ) return 'You: Owner'
+			if( tier >= $giper_baza_rank_tier.post ) return 'You: Editor'
+			if( tier >= $giper_baza_rank_tier.read ) return 'You: Viewer'
+			return 'You: No access'
+		}
+
+		/** List known lords (gift recipients) in current page land */
+		@ $mol_mem
+		page_gift_lords(): string[] {
+			const land = this.current_page_land()
+			if( !land ) return []
+			const lords: string[] = []
+			for( const [ key ] of land._gift ) {
+				if( key ) lords.push( key )
+			}
+			return lords
+		}
+
+		/** Permissions member rows */
+		@ $mol_mem
+		override permissions_member_rows() {
+			if( !this.is_owner() ) return []
+			return this.page_gift_lords().map( ( _, i ) => this.Permissions_member( i ) )
+		}
+
+		/** Lord title for member row */
+		permissions_member_lord_title( index: number ) {
+			const lords = this.page_gift_lords()
+			const lord = lords[ index ]
+			if( !lord ) return ''
+			const my = this.my_lord()
+			if( lord === my.str ) return lord + ' (you)'
+			return lord
+		}
+
+		/** Role value for member row */
+		@ $mol_mem_key
+		permissions_member_role_value( index: number, next?: string ): string {
+			const lords = this.page_gift_lords()
+			const lord_str = lords[ index ]
+			if( !lord_str ) return 'viewer'
+
+			if( next !== undefined ) {
+				const land = this.current_page_land()
+				if( !land ) return next
+				const lord = new $giper_baza_link( lord_str )
+				const pass = land.lord_pass( lord )
+				if( !pass ) return next
+				const rank = next === 'rule'
+					? $giper_baza_rank_make( 'rule', 'just' )
+					: next === 'editor'
+					? $giper_baza_rank_post( 'just' )
+					: $giper_baza_rank_make( 'read', 'late' )
+				land.pass_rank( pass, rank )
+				return next
+			}
+
+			const land = this.current_page_land()
+			if( !land ) return 'viewer'
+			const lord = new $giper_baza_link( lord_str )
+			const tier = land.lord_tier( lord )
+			if( tier >= $giper_baza_rank_tier.rule ) return 'rule'
+			if( tier >= $giper_baza_rank_tier.post ) return 'editor'
+			return 'viewer'
+		}
+
+		/** Add a user to the current page land */
+		@ $mol_action
+		permissions_add_click( event?: Event ) {
+			if( !event ) return null
+			const land = this.current_page_land()
+			if( !land ) return null
+
+			const lord_str = this.permissions_add_link().trim()
+			if( !lord_str ) return null
+
+			const role = this.permissions_add_role_value()
+			const rank = role === 'editor'
+				? $giper_baza_rank_post( 'just' )
+				: $giper_baza_rank_make( 'read', 'late' )
+
+			const lord = new $giper_baza_link( lord_str )
+			const pass = land.lord_pass( lord )
+			if( pass ) {
+				land.pass_rank( pass, rank )
+			}
+
+			this.permissions_add_link( '' )
+			return event
+		}
+
+		/** Hide add-member controls for non-owners */
+		@ $mol_mem
+		override permissions_add_content() {
+			if( !this.is_owner() ) return []
+			return [
+				this.Permissions_add_input(),
+				this.Permissions_add_role(),
+				this.Permissions_add_button(),
+			]
+		}
+
+		// === Sidebar: hide New page button for viewers ===
+
+		@ $mol_mem
+		override sidebar_head_content() {
+			const parts: any[] = [ this.Sidebar_title() ]
+			if( this.can_edit() ) {
+				parts.push( this.New_page() )
+			}
+			return parts
+		}
+
+		// === Page item: hide rename for viewers ===
+
+		page_item_can_edit( index: number ) {
+			return this.can_edit()
+		}
+
 		/** Registry rows for panel */
 		@ $mol_mem
 		override registry_rows() {
@@ -314,6 +478,8 @@ namespace $.$$ {
 
 			if( this.profile_showed() ) {
 				parts.push( this.Profile_panel() )
+			} else if( this.permissions_showed() ) {
+				parts.push( this.Permissions_panel() )
 			} else if( this.graph_showed() ) {
 				if( this.page_links().length === 0 ) {
 					this.page_create( new Event( 'auto' ) )
@@ -347,12 +513,16 @@ namespace $.$$ {
 			if( this.editing() ) {
 				return [ this.Title_input(), this.Rename_confirm() ]
 			}
+			if( !this.can_edit() ) {
+				return [ this.Title_nav() ]
+			}
 			return [ this.Title_nav(), this.Rename_trigger() ]
 		}
 
 		@ $mol_action
 		override start_rename( event?: Event ) {
 			if( !event ) return null
+			if( !this.can_edit() ) return null
 			this.edit_title( this.title() )
 			this.editing( true )
 			return event

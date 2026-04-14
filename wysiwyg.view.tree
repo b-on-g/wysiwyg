@@ -1,10 +1,12 @@
 $bog_wysiwyg $mol_view
 	page_land_link \
+	readonly false
 	block_ids? /
 	Block* $bog_wysiwyg_block
 		html? <=> block_html*? \
 		type? <=> block_type*? \paragraph
 		level? <=> block_level*? 1
+		readonly <= readonly
 		menu_open <= menu_showed? false
 		ai_open <= ai_showed? false
 		on_enter?event <=> block_enter*?event null
@@ -24,7 +26,7 @@ $bog_wysiwyg $mol_view
 			dragover?event <=> row_dragover*?event null
 			drop?event <=> row_drop*?event null
 			dragend?event <=> row_dragend*?event null
-		sub /
+		sub <= block_row_sub* /
 			<= Drag_handle* $mol_view
 				attr *
 					draggable \true

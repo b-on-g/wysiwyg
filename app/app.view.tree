@@ -16,6 +16,10 @@ $bog_wysiwyg_app $mol_page
 			Icon <= Graph_icon $mol_icon_graph_outline
 			hint @ \Page graph
 			checked? <=> graph_showed? false
+		<= Permissions_toggle $mol_check_icon
+			Icon <= Permissions_icon $mol_icon_shield_lock
+			hint @ \Permissions
+			checked? <=> permissions_showed? false
 		<= Profile_toggle $mol_check_icon
 			Icon <= Profile_icon $mol_icon_account
 			hint @ \Profile
@@ -39,7 +43,7 @@ $bog_wysiwyg_app $mol_page
 				<= Sidebar $bog_ui_sidebar
 					items <= page_rows /
 					Header <= Sidebar_head $mol_view
-						sub /
+						sub <= sidebar_head_content /
 							<= Sidebar_title $mol_paragraph
 								title @ \Pages
 							<= New_page $mol_button_minor
@@ -49,6 +53,7 @@ $bog_wysiwyg_app $mol_page
 					sub <= main_content /
 						<= Editor $bog_wysiwyg
 							page_land_link <= page_land_link \
+							readonly <= editor_readonly false
 							all_pages <= all_pages_info /
 							history_showed? <=> history_showed? false
 				<= Graph_panel $mol_view
@@ -60,6 +65,39 @@ $bog_wysiwyg_app $mol_page
 				<= Profile_panel $mol_view
 					sub /
 						<= Profile $bog_wysiwyg_profile
+				<= Permissions_panel $mol_view
+					sub /
+						<= Permissions_head $mol_view
+							sub /
+								<= Permissions_title $mol_paragraph
+									title @ \Permissions
+								<= Permissions_role $mol_paragraph
+									title <= permissions_role_label \
+						<= Permissions_members $mol_list
+							rows <= permissions_member_rows /
+						<= Permissions_add $mol_view
+							sub <= permissions_add_content /
+								<= Permissions_add_input $mol_string
+									hint @ \Paste user lord link
+									value? <=> permissions_add_link? \
+								<= Permissions_add_role $mol_select
+									value? <=> permissions_add_role_value? \editor
+									dictionary <= permissions_add_role_options *
+										editor @ \Editor
+										viewer @ \Viewer
+								<= Permissions_add_button $mol_button_minor
+									title @ \+ Add
+									click?event <=> permissions_add_click?event null
+	Permissions_member* $mol_view
+		sub /
+			<= Permissions_member_lord* $mol_paragraph
+				title <= permissions_member_lord_title* \
+			<= Permissions_member_role* $mol_select
+				value? <=> permissions_member_role_value*? \
+				dictionary <= permissions_role_dict *
+					rule @ \Owner
+					editor @ \Editor
+					viewer @ \Viewer
 	Registry_item* $bog_wysiwyg_app_registry
 		title <= registry_item_title* \
 		click?event <=> registry_item_click*?event null
@@ -68,6 +106,7 @@ $bog_wysiwyg_app $mol_page
 		title <= page_item_title* \
 		click?event <=> page_item_click*?event null
 		active <= page_item_active* false
+		can_edit <= page_item_can_edit* true
 		on_rename?val <=> page_item_rename*?val null
 
 $bog_wysiwyg_app_registry $mol_view
@@ -84,6 +123,7 @@ $bog_wysiwyg_app_registry $mol_view
 $bog_wysiwyg_app_page $mol_view
 	active false
 	editing? false
+	can_edit true
 	title \
 	click?event null
 	on_rename?val null

@@ -2,6 +2,7 @@ $bog_wysiwyg_block $mol_view
 	html? \
 	type? \paragraph
 	level? 1
+	readonly false
 	menu_open false
 	placeholder \
 	on_enter?event null
@@ -20,7 +21,7 @@ $bog_wysiwyg_block $mol_view
 	link_exec?event null
 	attr *
 		^
-		contenteditable \true
+		contenteditable <= content_editable \true
 		bog_wysiwyg_block_type <= type?
 		bog_wysiwyg_block_level <= level?
 		bog_wysiwyg_block_empty <= is_empty false
