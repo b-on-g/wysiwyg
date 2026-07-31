@@ -4,7 +4,10 @@ namespace $ {
 		flex: {
 			direction: 'column',
 			grow: 1,
+			shrink: 1,
 		},
+		minWidth: 0,
+		minHeight: 0,
 		gap: '0.5rem',
 		padding: {
 			top: '0.5rem',
@@ -17,15 +20,23 @@ namespace $ {
 			flex: {
 				direction: 'column',
 				grow: 1,
+				shrink: 1,
 			},
+			minWidth: 0,
+			minHeight: 0,
 			gap: '0.5rem',
-			overflow: 'auto',
+			overflow: {
+				x: 'hidden',
+				y: 'auto',
+			},
 		},
 
 		Comment_row: {
 			flex: {
 				direction: 'column',
+				shrink: 0,
 			},
+			minWidth: 0,
 			padding: {
 				top: '0.375rem',
 				bottom: '0.375rem',
@@ -46,6 +57,7 @@ namespace $ {
 				direction: 'row',
 			},
 			alignItems: 'center',
+			minWidth: 0,
 			gap: '0.375rem',
 		},
 
@@ -64,18 +76,27 @@ namespace $ {
 				weight: 600,
 			},
 			color: $mol_theme.shade,
+			minWidth: 0,
+			overflow: 'hidden',
+			textOverflow: 'ellipsis',
+			whiteSpace: 'nowrap',
 		},
 
 		Comment_text: {
 			font: {
 				size: '0.875rem',
 			},
+			minWidth: 0,
+			maxWidth: '100%',
+			overflowWrap: 'anywhere',
 		},
 
 		Input_row: {
 			flex: {
 				direction: 'row',
+				shrink: 0,
 			},
+			minWidth: 0,
 			gap: '0.25rem',
 			alignItems: 'flex-end',
 		},
@@ -83,7 +104,9 @@ namespace $ {
 		Input: {
 			flex: {
 				grow: 1,
+				shrink: 1,
 			},
+			minWidth: 0,
 		},
 
 		Send: {
@@ -91,6 +114,32 @@ namespace $ {
 				shrink: 0,
 			},
 		},
+
+		'@media': {
+			'(max-width: 640px)': {
+
+				/** Composer stacks so the Send button keeps a full-size tap target */
+				Input_row: {
+					flex: {
+						direction: 'column',
+					},
+					alignItems: 'stretch',
+					gap: '0.375rem',
+				},
+
+				Send: {
+					justifyContent: 'center',
+					padding: {
+						top: '0.5rem',
+						bottom: '0.5rem',
+						left: '0.75rem',
+						right: '0.75rem',
+					},
+				},
+
+			},
+		},
+
 	} )
 
 }
