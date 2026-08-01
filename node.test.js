@@ -35496,11 +35496,14 @@ var $;
                         last.content += tail;
                     }
                 }
+                // Read the order before minting: with Baza connected `make_block_id` already appends
+                // the fresh pawns to the page list, so an order read afterwards would name them twice.
+                const ids = [...this.block_ids()];
+                const at = ids.indexOf(id);
                 const slot_ids = [id];
                 while (slot_ids.length < slots.length)
                     slot_ids.push(this.make_block_id());
-                const ids = [...this.block_ids()];
-                ids.splice(ids.indexOf(id) + 1, 0, ...slot_ids.slice(1));
+                ids.splice(at + 1, 0, ...slot_ids.slice(1));
                 this.block_ids(ids);
                 for (let i = 0; i < slots.length; i++) {
                     this.block_type(slot_ids[i], slots[i].type);
@@ -35645,18 +35648,30 @@ var $;
                 return 500;
             }
             history_snapshot() {
-                const blocks = this.block_ids().map(id => ({
+                return { blocks: this.history_blocks(), caret: this.caret_state() };
+            }
+            /** The part of a snapshot two undo steps are told apart by */
+            history_blocks() {
+                return this.block_ids().map(id => ({
                     id,
                     type: this.block_type(id),
                     level: this.block_level(id),
                     content: this.block_html(id),
                 }));
-                return { blocks, caret: this.caret_state() };
             }
             /** Block and text offset the caret is currently at */
             caret_state() {
                 for (const id of this.block_ids()) {
-                    const offset = this.block_view(id).caret_offset();
+                    // Only a block with a live DOM node can be holding the caret, and a node built
+                    // right here would be detached anyway. Probing keeps the walk from bringing a
+                    // view and a node into being for every block of the document — $mol_list keeps
+                    // a couple of dozen of them around, not one per block.
+                    const view = $mol_wire_probe(() => this.block_view(id));
+                    if (!view)
+                        continue;
+                    if (!$mol_wire_probe(() => view.dom_node()))
+                        continue;
+                    const offset = view.caret_offset();
                     if (offset >= 0)
                         return { id, offset };
                 }
@@ -35688,12 +35703,14 @@ var $;
                 if (this.history_locked)
                     return;
                 this.history_cancel();
-                const next = this.history_snapshot();
+                // Only the blocks decide whether this is a new step, so the caret is read after that
+                // is settled: most calls land on an unchanged document and return right here.
+                const blocks = this.history_blocks();
                 const prev = this.history_states[this.history_pos];
-                if (prev && $mol_compare_deep(prev.blocks, next.blocks))
+                if (prev && $mol_compare_deep(prev.blocks, blocks))
                     return;
                 this.history_states.length = this.history_pos + 1;
-                this.history_states.push(next);
+                this.history_states.push({ blocks, caret: this.caret_state() });
                 if (this.history_states.length > this.history_limit())
                     this.history_states.shift();
                 this.history_pos = this.history_states.length - 1;
@@ -52196,6 +52213,63 @@ var $;
                     $mol_assert_equal(editor.block_paste_blocks('a', { drafts: [] }), null);
                     $mol_assert_equal(editor.block_paste_blocks('a'), null);
                     $mol_assert_equal(editor.block_ids().length, 1);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_paste_blocks seats every draft exactly once'() {
+                const { editor, drop } = make_editor(Array.from({ length: 6 }, (_, i) => ({ id: 'b' + i, html: 'was ' + i })));
+                try {
+                    const drafts = Array.from({ length: 20 }, (_, i) => ({
+                        type: 'paragraph',
+                        content: 'new ' + i,
+                    }));
+                    editor.block_paste_blocks('b3', { drafts, head: 'was 3', tail: '' });
+                    const ids = editor.block_ids();
+                    // The block pasted into keeps its seat and swallows the first draft
+                    $mol_assert_equal(ids.length, 6 + 20 - 1);
+                    $mol_assert_equal(new Set(ids).size, ids.length);
+                    $mol_assert_equal(ids.slice(0, 4), ['b0', 'b1', 'b2', 'b3']);
+                    $mol_assert_equal(ids.slice(-2), ['b4', 'b5']);
+                    $mol_assert_equal(editor.block_html('b3'), 'was 3new 0');
+                    $mol_assert_equal(ids.slice(4, -2).map(id => editor.block_html(id)), drafts.slice(1).map(draft => draft.content));
+                }
+                finally {
+                    drop();
+                }
+            },
+            /*
+             * With Giper Baza behind the page, `make_block_id` mints a pawn through
+             * `$giper_baza_list_link_to.make`, and that appends it to the block list on the spot — so
+             * a `block_ids()` read taken afterwards already names everything just minted. The paste
+             * has to seat the fresh ids itself instead of trusting an order read back after minting.
+             * This editor reproduces the side effect without a Land.
+             */
+            'block_paste_blocks seats minted ids once even when minting appends them'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'first' },
+                    { id: 'b', html: '' },
+                    { id: 'c', html: 'last' },
+                ]);
+                try {
+                    let minted = 0;
+                    editor.make_block_id = () => {
+                        const id = 'made' + (++minted);
+                        editor.block_ids([...editor.block_ids(), id]);
+                        return id;
+                    };
+                    editor.block_paste_blocks('b', { drafts: [
+                            { type: 'paragraph', content: 'one' },
+                            { type: 'paragraph', content: 'two' },
+                            { type: 'paragraph', content: 'three' },
+                        ] });
+                    const ids = editor.block_ids();
+                    $mol_assert_equal(new Set(ids).size, ids.length);
+                    $mol_assert_equal(ids, ['a', 'b', 'made1', 'made2', 'c']);
+                    $mol_assert_equal(editor.block_html('b'), 'one');
+                    $mol_assert_equal(editor.block_html('made1'), 'two');
+                    $mol_assert_equal(editor.block_html('made2'), 'three');
                 }
                 finally {
                     drop();
