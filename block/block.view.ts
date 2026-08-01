@@ -569,10 +569,10 @@ namespace $.$$ {
 			if( !event ) return null
 			if( this.readonly() ) { event.preventDefault(); return event }
 
-			const items = event.clipboardData?.items
-			if( !items ) return event
+			const data = event.clipboardData
+			if( !data ) return event
 
-			for( const item of items ) {
+			for( const item of data.items ) {
 				if( item.type.startsWith( 'image/' ) ) {
 					event.preventDefault()
 					const file = item.getAsFile()
@@ -581,17 +581,72 @@ namespace $.$$ {
 				}
 			}
 
-			const text = event.clipboardData?.getData( 'text/plain' ) ?? ''
-			if( text.includes( '\n' ) ) {
-				event.preventDefault()
-				const blocks = $bog_wysiwyg_parse_markdown( text )
-				if( blocks.length > 0 ) {
-					this.on_paste_blocks( blocks )
-				}
-				return event
-			}
+			// Nothing from the clipboard reaches the DOM as is: the editor rebuilds it from drafts
+			event.preventDefault()
+			this.paste_data( data )
 
 			return event
+		}
+
+		/**
+		 * Clipboard content to editor content. Split off `paste_event` so it can be
+		 * driven with a bare `getData` and without a DataTransfer.
+		 */
+		paste_data( data: $bog_wysiwyg_paste_data ) {
+
+			// A code block takes the clipboard as plain text, markup and all
+			if( this.type() === 'code' ) {
+				const text = data.getData( 'text/plain' ) ?? ''
+				if( !text ) return
+				this.paste_at_caret( [ { type: 'code', content: $bog_wysiwyg_escape_html( text ) } ], true )
+				return
+			}
+
+			const drafts = $bog_wysiwyg_paste.from_data( data )
+			if( !drafts.length ) return
+
+			// A single unbroken paragraph belongs in the current text, not in a block of its own
+			const inline = drafts.length === 1
+				&& drafts[ 0 ].type === 'paragraph'
+				&& !drafts[ 0 ].content.includes( '<br>' )
+
+			if( !inline ) {
+				this.paste_at_caret( drafts, false )
+				return
+			}
+
+			// Every draft comes trimmed, but a fragment copied mid sentence needs its spaces back
+			const text = data.getData( 'text/plain' ) ?? ''
+			const lead = /^\s/.test( text ) ? ' ' : ''
+			const trail = /\s$/.test( text ) ? ' ' : ''
+
+			this.paste_at_caret( [ { type: 'paragraph', content: lead + drafts[ 0 ].content + trail } ], true )
+		}
+
+		/** Hands the drafts to the page together with the two halves of the block around the caret */
+		paste_at_caret( drafts: readonly $bog_wysiwyg_paste_draft[], inline: boolean ) {
+
+			const node = this.node_el()
+			const caret = Math.max( 0, this.caret_offset() )
+			let from = caret
+			let to = caret
+
+			const sel = this.selection()
+			if( sel && !sel.isCollapsed && sel.rangeCount > 0 ) {
+				const range = sel.getRangeAt( 0 )
+				// A selection running into other blocks is none of this block's business
+				if( node.contains( range.startContainer ) && node.contains( range.endContainer ) ) {
+					from = $bog_wysiwyg_offset_of( node, range.startContainer, range.startOffset )
+					to = $bog_wysiwyg_offset_of( node, range.endContainer, range.endOffset )
+				}
+			}
+
+			this.on_paste_blocks({
+				drafts,
+				head: this.html_before( from ),
+				tail: this.html_after( to ),
+				inline,
+			})
 		}
 
 		drop_event( event?: DragEvent ) {

@@ -23,6 +23,14 @@ namespace $.$$ {
 			root.appendChild( node )
 			view.dom_node = ()=> node
 			view.html = ( next?: string )=> editor.block_html( id, next )
+			view.type = ( next?: string )=> editor.block_type( id, next )
+			view.level = ( next?: number )=> editor.block_level( id, next )
+			// The same wiring view.tree does for the keyed Block
+			view.on_paste_blocks = ( val?: unknown )=> editor.block_paste_blocks( id, val as never )
+			view.on_split = ( parts?: unknown )=> editor.block_split( id, parts as never )
+			view.on_merge_prev = ( event?: unknown )=> editor.block_merge_prev( id, event as never )
+			view.on_merge_next = ( event?: unknown )=> editor.block_merge_next( id, event as never )
+			view.on_nav = ( nav?: unknown )=> editor.block_nav( id, nav as never )
 			views.set( id, view )
 
 			return view
@@ -1564,61 +1572,229 @@ namespace $.$$ {
 
 		// === block_paste_blocks ===
 
-		'block_paste_blocks replaces current and inserts new blocks'() {
+		'block_paste_blocks fills an untouched block and adds the rest after it'() {
 
-			const editor = new $bog_wysiwyg()
-			editor.block_ids( [ 'a', 'b' ] )
-			editor.focus_block = () => {}
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: '' },
+				{ id: 'b', html: 'next' },
+			])
+			try {
+				editor.block_paste_blocks( 'a', { drafts: [
+					{ type: 'heading', content: 'Title', level: 1 },
+					{ type: 'paragraph', content: 'text' },
+					{ type: 'code', content: 'x = 1' },
+				] } )
 
-			editor.block_paste_blocks( 'a', [
-				{ type: 'heading', content: 'Title', level: 1 },
-				{ type: 'paragraph', content: 'text' },
-				{ type: 'code', content: 'x = 1' },
-			] )
-
-			const ids = editor.block_ids()
-			$mol_assert_equal( ids.length, 4 )
-			$mol_assert_equal( ids[ 0 ], 'a' )
-			$mol_assert_equal( ids[ 3 ], 'b' )
-			$mol_assert_equal( editor.block_type( 'a' ), 'heading' )
-			$mol_assert_equal( editor.block_html( 'a' ), 'Title' )
-			$mol_assert_equal( editor.block_level( 'a' ), 1 )
-			$mol_assert_equal( editor.block_type( ids[ 1 ] ), 'paragraph' )
-			$mol_assert_equal( editor.block_html( ids[ 1 ] ), 'text' )
-			$mol_assert_equal( editor.block_type( ids[ 2 ] ), 'code' )
-			$mol_assert_equal( editor.block_html( ids[ 2 ] ), 'x = 1' )
+				const ids = editor.block_ids()
+				$mol_assert_equal( ids.length, 4 )
+				$mol_assert_equal( ids[ 0 ], 'a' )
+				$mol_assert_equal( ids[ 3 ], 'b' )
+				$mol_assert_equal( editor.block_type( 'a' ), 'heading' )
+				$mol_assert_equal( editor.block_html( 'a' ), 'Title' )
+				$mol_assert_equal( editor.block_level( 'a' ), 1 )
+				$mol_assert_equal( editor.block_type( ids[ 1 ] ), 'paragraph' )
+				$mol_assert_equal( editor.block_html( ids[ 1 ] ), 'text' )
+				$mol_assert_equal( editor.block_type( ids[ 2 ] ), 'code' )
+				$mol_assert_equal( editor.block_html( ids[ 2 ] ), 'x = 1' )
+			} finally { drop() }
 		},
 
-		'block_paste_blocks with single block replaces current only'() {
+		'block_paste_blocks with a single draft keeps the block count'() {
 
-			const editor = new $bog_wysiwyg()
-			editor.block_ids( [ 'a', 'b' ] )
-			editor.focus_block = () => {}
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: '' },
+				{ id: 'b', html: 'next' },
+			])
+			try {
+				editor.block_paste_blocks( 'a', { drafts: [ { type: 'quote', content: 'quoted' } ] } )
 
-			editor.block_paste_blocks( 'a', [
-				{ type: 'quote', content: 'quoted' },
-			] )
-
-			$mol_assert_equal( editor.block_ids().length, 2 )
-			$mol_assert_equal( editor.block_type( 'a' ), 'quote' )
-			$mol_assert_equal( editor.block_html( 'a' ), 'quoted' )
+				$mol_assert_equal( editor.block_ids().length, 2 )
+				$mol_assert_equal( editor.block_type( 'a' ), 'quote' )
+				$mol_assert_equal( editor.block_html( 'a' ), 'quoted' )
+			} finally { drop() }
 		},
 
-		'block_paste_blocks with empty array returns null'() {
+		'block_paste_blocks splits the block around the caret'() {
 
-			const editor = new $bog_wysiwyg()
-			editor.block_ids( [ 'a' ] )
+			const { editor, focused, drop } = make_editor([ { id: 'a', html: 'headtail' } ])
+			try {
+				editor.block_paste_blocks( 'a', {
+					drafts: [
+						{ type: 'paragraph', content: 'one' },
+						{ type: 'paragraph', content: 'two' },
+					],
+					head: 'head',
+					tail: 'tail',
+				} )
 
-			$mol_assert_equal( editor.block_paste_blocks( 'a', [] ), null )
-			$mol_assert_equal( editor.block_ids().length, 1 )
+				const ids = editor.block_ids()
+				$mol_assert_equal( ids.length, 2 )
+				$mol_assert_equal( editor.block_html( 'a' ), 'headone' )
+				$mol_assert_equal( editor.block_html( ids[ 1 ] ), 'twotail' )
+				// caret lands after the pasted text, in front of the old tail
+				$mol_assert_equal( focused.at( -1 ), { id: ids[ 1 ], offset: 3 } )
+			} finally { drop() }
 		},
 
-		'block_paste_blocks without val returns null'() {
+		'block_paste_blocks keeps the kind of the block it was pasted into'() {
 
-			const editor = new $bog_wysiwyg()
-			editor.block_ids( [ 'a' ] )
+			const { editor, drop } = make_editor([ { id: 'a', html: 'ab', type: 'quote' } ])
+			try {
+				editor.block_paste_blocks( 'a', {
+					drafts: [ { type: 'heading', content: 'H', level: 1 } ],
+					head: 'a',
+					tail: 'b',
+				} )
 
-			$mol_assert_equal( editor.block_paste_blocks( 'a' ), null )
+				$mol_assert_equal( editor.block_type( 'a' ), 'quote' )
+				$mol_assert_equal( editor.block_html( 'a' ), 'aHb' )
+			} finally { drop() }
+		},
+
+		'block_paste_blocks gives the tail its own block after a picture'() {
+
+			const { editor, focused, drop } = make_editor([ { id: 'a', html: 'headtail' } ])
+			try {
+				editor.block_paste_blocks( 'a', {
+					drafts: [ { type: 'image', content: '<img src="x.png">' } ],
+					head: 'head',
+					tail: 'tail',
+				} )
+
+				const ids = editor.block_ids()
+				$mol_assert_equal( ids.length, 3 )
+				$mol_assert_equal( editor.block_html( 'a' ), 'head' )
+				$mol_assert_equal( editor.block_type( ids[ 1 ] ), 'image' )
+				$mol_assert_equal( editor.block_html( ids[ 2 ] ), 'tail' )
+				$mol_assert_equal( focused.at( -1 ), { id: ids[ 2 ], offset: 0 } )
+			} finally { drop() }
+		},
+
+		'block_paste_blocks inline puts the draft straight into the text'() {
+
+			const { editor, focused, drop } = make_editor([ { id: 'a', html: 'ab' } ])
+			try {
+				editor.block_paste_blocks( 'a', {
+					drafts: [ { type: 'paragraph', content: '<b>X</b>' } ],
+					head: 'a',
+					tail: 'b',
+					inline: true,
+				} )
+
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'a<b>X</b>b' )
+				$mol_assert_equal( focused.at( -1 ), { id: 'a', offset: 2 } )
+			} finally { drop() }
+		},
+
+		'a whole paste is undone in one step'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'headtail' } ])
+			try {
+				editor.block_paste_blocks( 'a', {
+					drafts: [
+						{ type: 'paragraph', content: 'one' },
+						{ type: 'paragraph', content: 'two' },
+						{ type: 'paragraph', content: 'three' },
+					],
+					head: 'head',
+					tail: 'tail',
+				} )
+				$mol_assert_equal( editor.block_ids().length, 3 )
+
+				$mol_assert_equal( editor.history_undo(), true )
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'headtail' )
+			} finally { drop() }
+		},
+
+		'block_paste_blocks with no drafts returns null'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'text' } ])
+			try {
+				$mol_assert_equal( editor.block_paste_blocks( 'a', { drafts: [] } ), null )
+				$mol_assert_equal( editor.block_paste_blocks( 'a' ), null )
+				$mol_assert_equal( editor.block_ids().length, 1 )
+			} finally { drop() }
+		},
+
+		// === Clipboard end to end ===
+
+		'pasting markdown in the middle of a block splits the article'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'началоконец' },
+				{ id: 'b', html: 'следом' },
+			])
+			try {
+				const { editor } = helper
+				const block = editor.block_view( 'a' )
+				select_across( helper.node( 'a' ), 6, helper.node( 'a' ), 6 )
+
+				block.paste_data( {
+					getData: ( type: string )=> type === 'text/html' ? '' : '## Тема\n\nАбзац\n\n- пункт',
+				} )
+
+				const ids = editor.block_ids()
+				$mol_assert_equal( ids.length, 4 )
+				$mol_assert_equal( ids[ 0 ], 'a' )
+				$mol_assert_equal( ids[ 3 ], 'b' )
+				// the head keeps the kind of the block it was pasted into, the tail rides the last draft
+				$mol_assert_equal( editor.block_html( 'a' ), 'началоТема' )
+				$mol_assert_equal( editor.block_type( 'a' ), 'paragraph' )
+				$mol_assert_equal( editor.block_html( ids[ 1 ] ), 'Абзац' )
+				$mol_assert_equal( editor.block_type( ids[ 2 ] ), 'list' )
+				$mol_assert_equal( editor.block_html( ids[ 2 ] ), 'пунктконец' )
+			} finally { helper.drop() }
+		},
+
+		'pasting a plain line does not add blocks'() {
+
+			const helper = make_editor([ { id: 'a', html: 'началоконец' } ])
+			try {
+				const { editor } = helper
+				select_across( helper.node( 'a' ), 6, helper.node( 'a' ), 6 )
+
+				editor.block_view( 'a' ).paste_data( {
+					getData: ( type: string )=> type === 'text/html' ? '' : 'вставка',
+				} )
+
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'началовставкаконец' )
+			} finally { helper.drop() }
+		},
+
+		'a pasted article is undone by a single step'() {
+
+			const helper = make_editor([ { id: 'a', html: '' } ])
+			try {
+				const { editor } = helper
+				select_across( helper.node( 'a' ), 0, helper.node( 'a' ), 0 )
+
+				editor.block_view( 'a' ).paste_data( {
+					getData: ( type: string )=> type === 'text/html' ? '' : '# Раз\n\nДва\n\nТри\n\nЧетыре',
+				} )
+				$mol_assert_equal( editor.block_ids().length, 4 )
+
+				$mol_assert_equal( editor.history_undo(), true )
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), '' )
+				$mol_assert_equal( editor.history_redo(), true )
+				$mol_assert_equal( editor.block_ids().length, 4 )
+			} finally { helper.drop() }
+		},
+
+		'block_paste_blocks is refused in readonly mode'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'text' } ])
+			try {
+				editor.readonly = ()=> true
+				$mol_assert_equal(
+					editor.block_paste_blocks( 'a', { drafts: [ { type: 'paragraph', content: 'x' } ] } ),
+					null,
+				)
+				$mol_assert_equal( editor.block_html( 'a' ), 'text' )
+			} finally { drop() }
 		},
 
 	})

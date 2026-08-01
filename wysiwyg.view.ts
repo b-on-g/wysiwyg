@@ -178,11 +178,14 @@ namespace $.$$ {
 			return this.Block( id ) as $bog_wysiwyg_block
 		}
 
-		/** Blocks that hold no editable text and can not be glued with neighbours */
-		block_is_static( id: string ) {
-			const type = this.block_type( id )
+		/** Kinds of block that hold no editable text and can not be glued with neighbours */
+		type_is_static( type: string ) {
 			if( type === 'image' || type === 'embed' || type === 'divider' ) return true
 			return !!$bog_wysiwyg_plugin_registry.get( type )?.render
+		}
+
+		block_is_static( id: string ) {
+			return this.type_is_static( this.block_type( id ) )
 		}
 
 		/** Allocate an id for a new block, creating the Baza pawn when connected */
@@ -484,61 +487,89 @@ namespace $.$$ {
 			this.focus_block( id )
 		}
 
-		block_paste_blocks( id: string, val?: { type: string, content: string, level?: number }[] ) {
-			if( !val || !val.length ) return null
+		/** Plain text length of an html fragment */
+		html_text_length( html: string ) {
+			return $bog_wysiwyg_html_text( this.$.$mol_dom_context.document, html ).length
+		}
+
+		/**
+		 * Clipboard drafts into the page around the caret. The whole paste is one
+		 * undo step: the head of the target block keeps the pasted content, the
+		 * tail moves behind everything that was pasted.
+		 */
+		block_paste_blocks( id: string, val?: {
+			drafts: readonly { type: string, content: string, level?: number }[],
+			head?: string,
+			tail?: string,
+			inline?: boolean,
+		} ) {
+			const drafts = val?.drafts ?? []
+			if( !drafts.length ) return null
+			if( this.readonly() ) return null
+
+			const head = val?.head ?? ''
+			const tail = val?.tail ?? ''
 
 			this.history_record()
 
-			// First block replaces the current one
-			this.block_type( id, val[ 0 ].type )
-			this.block_html( id, val[ 0 ].content )
-			if( val[ 0 ].level ) this.block_level( id, val[ 0 ].level )
-
-			// Remaining blocks are inserted after
-			const ids = [ ...this.block_ids() ]
-			const index = ids.indexOf( id )
-			let last_id = id
-
-			for( let i = 1; i < val.length; i++ ) {
-				const block = val[ i ]
-
-				let new_id: string
-				if( this.has_baza() ) {
-					const data = this.page_data()
-					const blocks_list = data?.Blocks( 'auto' )
-					if( blocks_list ) {
-						const pawn = blocks_list.make( null )
-						$bog_wysiwyg_pawn_text( pawn.Type( 'auto' ), block.type )
-						pawn.Content( 'auto' )?.val( block.content )
-						if( block.level ) pawn.Level( 'auto' )?.val( block.level )
-						new_id = pawn.link().str
-					} else {
-						new_id = this.generate_id()
-					}
-				} else {
-					new_id = this.generate_id()
-				}
-
-				const insert_at = ids.indexOf( last_id ) + 1
-				ids.splice( insert_at, 0, new_id )
-				last_id = new_id
+			if( val?.inline ) {
+				const content = head + drafts[ 0 ].content
+				this.block_html( id, content + tail )
+				this.focus_block( id, this.html_text_length( content ) )
+				this.history_record()
+				return val
 			}
 
+			const own_type = this.block_type( id )
+			const own_level = this.block_level( id )
+
+			const slots = [] as { type: string, level: number, content: string }[]
+			const first = drafts[ 0 ]
+
+			if( !head && !tail ) {
+				// An untouched block takes the kind of the first pasted one
+				slots.push( { type: first.type, level: first.level ?? own_level, content: first.content } )
+			} else if( this.type_is_static( first.type ) ) {
+				// A picture or a divider can not swallow the text before the caret
+				slots.push( { type: own_type, level: own_level, content: head } )
+				slots.push( { type: first.type, level: first.level ?? 1, content: first.content } )
+			} else {
+				slots.push( { type: own_type, level: own_level, content: head + first.content } )
+			}
+
+			for( const draft of drafts.slice( 1 ) ) {
+				slots.push( { type: draft.type, level: draft.level ?? 1, content: draft.content } )
+			}
+
+			// The caret ends up right after everything pasted, before the old tail
+			let caret_slot = slots.length - 1
+			let caret_offset = this.html_text_length( slots[ caret_slot ].content )
+
+			if( tail ) {
+				const last = slots[ slots.length - 1 ]
+				if( this.type_is_static( last.type ) ) {
+					slots.push( { type: own_type, level: own_level, content: tail } )
+					caret_slot = slots.length - 1
+					caret_offset = 0
+				} else {
+					last.content += tail
+				}
+			}
+
+			const slot_ids = [ id ]
+			while( slot_ids.length < slots.length ) slot_ids.push( this.make_block_id() )
+
+			const ids = [ ...this.block_ids() ]
+			ids.splice( ids.indexOf( id ) + 1, 0, ...slot_ids.slice( 1 ) )
 			this.block_ids( ids )
 
-			// Set data for non-baza blocks
-			if( !this.has_baza() ) {
-				let pos = index + 1
-				for( let i = 1; i < val.length; i++ ) {
-					const new_id = ids[ pos ]
-					this.block_type( new_id, val[ i ].type )
-					this.block_html( new_id, val[ i ].content )
-					if( val[ i ].level ) this.block_level( new_id, val[ i ].level )
-					pos++
-				}
+			for( let i = 0; i < slots.length; i++ ) {
+				this.block_type( slot_ids[ i ], slots[ i ].type )
+				this.block_level( slot_ids[ i ], slots[ i ].level )
+				this.block_html( slot_ids[ i ], slots[ i ].content )
 			}
 
-			this.focus_block( last_id )
+			this.focus_block( slot_ids[ caret_slot ], caret_offset )
 
 			this.history_record()
 			return val

@@ -70,7 +70,7 @@ namespace $.$$ {
 		block.html = ( next?: string )=> next ?? node.innerHTML
 
 		const calls = [] as { name: string, arg: unknown }[]
-		for( const name of [ 'on_enter', 'on_remove', 'on_split', 'on_merge_prev', 'on_merge_next', 'on_nav', 'on_input', 'on_slash' ] as const ) {
+		for( const name of [ 'on_enter', 'on_remove', 'on_split', 'on_merge_prev', 'on_merge_next', 'on_nav', 'on_input', 'on_slash', 'on_paste_blocks', 'on_image' ] as const ) {
 			block[ name ] = ( arg?: unknown )=> {
 				calls.push({ name, arg })
 				return arg ?? null
@@ -105,6 +105,13 @@ namespace $.$$ {
 
 	function key( name: string, mods: KeyboardEventInit = {} ) {
 		return new KeyboardEvent( 'keydown', { key: name, cancelable: true, ...mods } )
+	}
+
+	/** Bare clipboard: `paste_data` needs nothing but `getData` */
+	function clipboard( parts: { html?: string, text?: string } ): $bog_wysiwyg_paste_data {
+		return {
+			getData: ( type: string )=> ( type === 'text/html' ? parts.html : parts.text ) ?? '',
+		}
 	}
 
 	$mol_test({
@@ -458,6 +465,145 @@ namespace $.$$ {
 			} finally { drop() }
 		},
 
+		// === Clipboard ===
+
+		'a single unbroken line is pasted into the text, not into a block'() {
+			const { block, node, calls, drop } = make_block( 'hello world' )
+			try {
+				set_caret( node, 6 )
+				block.paste_data( clipboard( { text: 'dear' } ) )
+
+				const paste = calls[ 0 ]
+				$mol_assert_equal( paste.name, 'on_paste_blocks' )
+				$mol_assert_equal( paste.arg, {
+					drafts: [ { type: 'paragraph', content: 'dear' } ],
+					head: 'hello ',
+					tail: 'world',
+					inline: true,
+				} )
+			} finally { drop() }
+		},
+
+		'spaces around a fragment copied mid sentence survive'() {
+			const { block, node, calls, drop } = make_block( 'словоконец' )
+			try {
+				set_caret( node, 5 )
+				block.paste_data( clipboard( { text: ' и ещё ' } ) )
+
+				const arg = calls[ 0 ].arg as { drafts: { content: string }[] }
+				$mol_assert_equal( arg.drafts[ 0 ].content, ' и ещё ' )
+			} finally { drop() }
+		},
+
+		'inline markdown in a single line still goes inline'() {
+			const { block, node, calls, drop } = make_block( 'a' )
+			try {
+				set_caret( node, 1 )
+				block.paste_data( clipboard( { text: 'очень **важно**' } ) )
+
+				const arg = calls[ 0 ].arg as { drafts: { content: string }[], inline: boolean }
+				$mol_assert_equal( arg.inline, true )
+				$mol_assert_equal( arg.drafts[ 0 ].content, 'очень <b>важно</b>' )
+			} finally { drop() }
+		},
+
+		'several markdown paragraphs become several drafts'() {
+			const { block, node, calls, drop } = make_block( '' )
+			try {
+				set_caret( node, 0 )
+				block.paste_data( clipboard( { text: '# Заголовок\n\nАбзац\n\n- пункт' } ) )
+
+				const arg = calls[ 0 ].arg as { drafts: { type: string }[], inline: boolean }
+				$mol_assert_equal( arg.inline, false )
+				$mol_assert_equal( arg.drafts.map( draft => draft.type ), [ 'heading', 'paragraph', 'list' ] )
+			} finally { drop() }
+		},
+
+		'rich html wins over plain text'() {
+			const { block, node, calls, drop } = make_block( '' )
+			try {
+				set_caret( node, 0 )
+				block.paste_data( clipboard( {
+					html: '<h2>Тема</h2><p>Тело</p>',
+					text: 'Тема\nТело',
+				} ) )
+
+				const arg = calls[ 0 ].arg as { drafts: { type: string, level?: number, content: string }[] }
+				$mol_assert_equal( arg.drafts, [
+					{ type: 'heading', level: 2, content: 'Тема' },
+					{ type: 'paragraph', content: 'Тело' },
+				] )
+			} finally { drop() }
+		},
+
+		'a paste in the middle carries both halves of the block'() {
+			const { block, node, calls, drop } = make_block( 'ab<b>cd</b>ef' )
+			try {
+				set_caret( node, 3 )
+				block.paste_data( clipboard( { text: 'раз\n\nдва' } ) )
+
+				const arg = calls[ 0 ].arg as { head: string, tail: string, inline: boolean }
+				$mol_assert_equal( arg.inline, false )
+				$mol_assert_equal( arg.head, 'ab<b>c</b>' )
+				$mol_assert_equal( arg.tail, '<b>d</b>ef' )
+			} finally { drop() }
+		},
+
+		'a paste over a selection replaces exactly that range'() {
+			const { block, node, calls, drop } = make_block( 'hello world' )
+			try {
+				set_range( node, 6, 11 )
+				block.paste_data( clipboard( { text: 'there' } ) )
+
+				const arg = calls[ 0 ].arg as { head: string, tail: string }
+				$mol_assert_equal( arg.head, 'hello ' )
+				$mol_assert_equal( arg.tail, '' )
+			} finally { drop() }
+		},
+
+		'a code block takes the clipboard as plain text'() {
+			const { block, node, calls, drop } = make_block( '' )
+			try {
+				block.type = ()=> 'code'
+				set_caret( node, 0 )
+				block.paste_data( clipboard( { html: '<h1>x</h1>', text: '<div>\n\tif( a && b ) c\n</div>' } ) )
+
+				const arg = calls[ 0 ].arg as { drafts: { type: string, content: string }[], inline: boolean }
+				$mol_assert_equal( arg.inline, true )
+				$mol_assert_equal( arg.drafts, [
+					{ type: 'code', content: '&lt;div&gt;\n\tif( a &amp;&amp; b ) c\n&lt;/div&gt;' },
+				] )
+			} finally { drop() }
+		},
+
+		'an empty clipboard pastes nothing'() {
+			const { block, node, calls, drop } = make_block( 'text' )
+			try {
+				set_caret( node, 0 )
+				block.paste_data( clipboard( {} ) )
+				$mol_assert_equal( calls.length, 0 )
+			} finally { drop() }
+		},
+
+		'a clipboard of markup junk pastes nothing'() {
+			const { block, node, calls, drop } = make_block( 'text' )
+			try {
+				set_caret( node, 0 )
+				block.paste_data( clipboard( { html: '<meta charset="utf-8"><span style="color:red"></span>', text: '' } ) )
+				$mol_assert_equal( calls.length, 0 )
+			} finally { drop() }
+		},
+
+		'a readonly block refuses the clipboard'() {
+			const { block, drop } = make_block( 'text' )
+			try {
+				block.readonly = ()=> true
+				const event = new ClipboardEvent( 'paste', { cancelable: true } )
+				block.paste_event( event )
+				$mol_assert_equal( event.defaultPrevented, true )
+			} finally { drop() }
+		},
+
 		// === Input notification ===
 
 		'input_event notifies the page'() {
@@ -750,21 +896,25 @@ namespace $.$$ {
 			$mol_assert_ok( prevented )
 		},
 
-		'paste_event without image does not prevent default'() {
+		'paste_event takes over plain text too, so no editor junk lands in the DOM'() {
 			if( typeof document === 'undefined' ) return
-			const block = new $bog_wysiwyg_block()
+			const { block, node, calls, drop } = make_block( '' )
+			try {
+				set_caret( node, 0 )
 
-			const dt = new DataTransfer()
-			dt.items.add( 'hello', 'text/plain' )
+				const dt = new DataTransfer()
+				dt.items.add( 'hello', 'text/plain' )
 
-			const event = new ClipboardEvent( 'paste', { clipboardData: dt } )
-			let prevented = false
-			Object.defineProperty( event, 'preventDefault', { value: () => { prevented = true } } )
+				const event = new ClipboardEvent( 'paste', { clipboardData: dt } )
+				let prevented = false
+				Object.defineProperty( event, 'preventDefault', { value: () => { prevented = true } } )
 
-			const result = block.paste_event( event )
+				const result = block.paste_event( event )
 
-			$mol_assert_ok( result )
-			$mol_assert_equal( prevented, false )
+				$mol_assert_ok( result )
+				$mol_assert_equal( prevented, true )
+				$mol_assert_equal( calls[ 0 ].name, 'on_paste_blocks' )
+			} finally { drop() }
 		},
 
 		'drop_event without event returns null'() {
