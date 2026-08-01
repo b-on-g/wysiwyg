@@ -6932,6 +6932,493 @@ console.log( a &lt; 2 )</code></pre><figure><img src="https://notion.so/image/pi
 "use strict";
 var $;
 (function ($) {
+    function check(str, query) {
+        $mol_assert_like(str, $hyoo_harp_to_string(query));
+        $mol_assert_like(query, $hyoo_harp_from_string(str));
+    }
+    $mol_test({
+        'root'() {
+            check('', {});
+        },
+        'only field'() {
+            check('user%3D777', {
+                'user=777': {},
+            });
+        },
+        'primary key'() {
+            check('user=jin%2C777!=', {
+                user: {
+                    '=': [['jin,777!']],
+                },
+            });
+        },
+        'single fetch'() {
+            check('friend(age%24)', {
+                friend: {
+                    age$: {},
+                },
+            });
+        },
+        'fetch and primary key'() {
+            check('user=jin()=(friend)', {
+                'user': {
+                    '=': [['jin()']],
+                    friend: {},
+                },
+            });
+        },
+        'multiple fetch'() {
+            check('age;friend', {
+                age: {},
+                friend: {},
+            });
+        },
+        'common query string back compatible'() {
+            $mol_assert_like($hyoo_harp_from_string('user=jin&age=100500'), {
+                user: {
+                    '=': [['jin']],
+                },
+                age: {
+                    '=': [['100500']],
+                },
+            });
+        },
+        'common pathname back compatible'() {
+            $mol_assert_like($hyoo_harp_from_string('users/jin/comments'), {
+                users: {},
+                jin: {},
+                comments: {},
+            });
+        },
+        'deep fetch'() {
+            check('my(friend(age);name);stat', {
+                my: {
+                    friend: {
+                        age: {},
+                    },
+                    name: {},
+                },
+                stat: {},
+            });
+        },
+        'orders'() {
+            check('+age;-name', {
+                age: {
+                    '+': true
+                },
+                name: {
+                    '+': false
+                },
+            });
+        },
+        'filter types'() {
+            check('sex=female=;status!=married=', {
+                sex: {
+                    '=': [['female']],
+                },
+                status: {
+                    '!=': [['married']],
+                },
+            });
+        },
+        'filter ranges'() {
+            check('sex=female=;age=18@25=;weight=@50=;height=150@=;hobby=paint=singing=', {
+                sex: {
+                    '=': [['female']],
+                },
+                age: {
+                    '=': [['18', '25']],
+                },
+                weight: {
+                    '=': [['', '50']],
+                },
+                height: {
+                    '=': [['150', '']],
+                },
+                hobby: {
+                    '=': [['paint'], ['singing']],
+                },
+            });
+        },
+        'unescaped values'() {
+            $mol_assert_like($hyoo_harp_from_string('foo=jin=777=;bar=jin!=666='), {
+                foo: {
+                    '=': [['jin'], ['777']],
+                },
+                bar: {
+                    '=': [['jin!'], ['666']],
+                },
+            });
+        },
+        'slicing'() {
+            check('friend(_num=0@100=)', {
+                friend: {
+                    _num: { '=': [['0', '100']] },
+                },
+            });
+        },
+        'complex'() {
+            check('pullRequest(state=closed=merged=;+repository(name;private);-updateTime;_num=0@100=)', {
+                pullRequest: {
+                    state: {
+                        '=': [
+                            ['closed'],
+                            ['merged'],
+                        ]
+                    },
+                    repository: {
+                        '+': true,
+                        name: {},
+                        private: {},
+                    },
+                    updateTime: {
+                        '+': false,
+                    },
+                    _num: {
+                        '=': [['0', '100']],
+                    },
+                },
+            });
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Is string'() {
+            $mol_data_string('');
+        },
+        'Is not string'() {
+            $mol_assert_fail(() => {
+                $mol_data_string(0);
+            }, '0 is not a string');
+        },
+        'Is object string'() {
+            $mol_assert_fail(() => {
+                $mol_data_string(new String('x'));
+            }, 'x is not a string');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Is first'() {
+            $mol_data_variant($mol_data_number, $mol_data_string)(0);
+        },
+        'Is second'() {
+            $mol_data_variant($mol_data_number, $mol_data_string)('');
+        },
+        'Is false'() {
+            $mol_assert_fail(() => {
+                $mol_data_variant($mol_data_number, $mol_data_string)(false);
+            }, 'false is not any of variants');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    const Age = $mol_data_optional($mol_data_number);
+    const Age_or_zero = $mol_data_optional($mol_data_number, () => 0);
+    $mol_test({
+        'Is not present'() {
+            $mol_assert_equal(Age(undefined), undefined);
+        },
+        'Is present'() {
+            $mol_assert_equal(Age(0), 0);
+        },
+        'Fallbacked'() {
+            $mol_assert_equal(Age_or_zero(undefined), 0);
+        },
+        'Is null'() {
+            $mol_assert_fail(() => Age(null), 'null is not a number');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Fit to record'() {
+            const User = $mol_data_record({ age: $mol_data_number });
+            User({ age: 0 });
+        },
+        'Extends record'() {
+            const User = $mol_data_record({ age: $mol_data_number });
+            User({ age: 0, name: 'Jin' });
+        },
+        // 'Recursive record' () {
+        // 	const User = $mol_data_record({
+        // 		name : $mol_data_string ,
+        // 		get kids() { return $mol_data_array( User ) } ,
+        // 	})
+        // 	User({
+        // 		name : 'Jin' ,
+        // 		kids : [
+        // 			{
+        // 				name : 'John' ,
+        // 				kids : [] ,
+        // 			}
+        // 		] ,
+        // 	})
+        // } ,
+        'Shrinks record'() {
+            $mol_assert_fail(() => {
+                const User = $mol_data_record({ age: $mol_data_number, name: $mol_data_string });
+                User({ age: 0 });
+            }, '["name"] undefined is not a string');
+        },
+        'Shrinks deep record'() {
+            $mol_assert_fail(() => {
+                const User = $mol_data_record({ wife: $mol_data_record({ age: $mol_data_number }) });
+                User({ wife: {} });
+            }, '["wife"] ["age"] undefined is not a number');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Is empty array'() {
+            $mol_data_array($mol_data_number)([]);
+        },
+        'Is array'() {
+            $mol_data_array($mol_data_number)([1, 2]);
+        },
+        'Is not array'() {
+            $mol_assert_fail(() => {
+                $mol_data_array($mol_data_number)({ [0]: 1, length: 1, map: () => { } });
+            }, '[object Object] is not an array');
+        },
+        'Has wrong item'() {
+            $mol_assert_fail(() => {
+                $mol_data_array($mol_data_number)([1, '1']);
+            }, '[1] 1 is not a number');
+        },
+        'Has wrong deep item'() {
+            $mol_assert_fail(() => {
+                $mol_data_array($mol_data_array($mol_data_number))([[], [0, 0, false]]);
+            }, '[1] [2] false is not a number');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'Is boolean - true'() {
+            $mol_data_boolean(true);
+        },
+        'Is boolean - false'() {
+            $mol_data_boolean(false);
+        },
+        'Is not boolean'() {
+            $mol_assert_fail(() => {
+                $mol_data_boolean('x');
+            }, 'x is not a boolean');
+        },
+        'Is object boolean'() {
+            $mol_assert_fail(() => {
+                $mol_data_boolean(new Boolean(''));
+            }, 'false is not a boolean');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /**
+     * Checks for value of given enum and returns expected type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_enum_demo
+     */
+    function $mol_data_enum(name, dict) {
+        const index = {};
+        for (let key in dict) {
+            if (Number.isNaN(Number(key))) {
+                index[dict[key]] = key;
+            }
+        }
+        return $mol_data_setup((value) => {
+            if (typeof index[value] !== 'string') {
+                return $mol_fail(new $mol_data_error(`${value} is not value of ${name} enum`));
+            }
+            return value;
+        }, { name, dict });
+    }
+    $.$mol_data_enum = $mol_data_enum;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    let sex;
+    (function (sex) {
+        sex[sex["male"] = 0] = "male";
+        sex[sex["female"] = 1] = "female";
+    })(sex || (sex = {}));
+    let gender;
+    (function (gender) {
+        gender["bisexual"] = "bisexual";
+        gender["trans"] = "transgender";
+    })(gender || (gender = {}));
+    // Test disabled due https://github.com/microsoft/TypeScript/issues/46112
+    // const Sex = $mol_data_enum( 'sex' , sex )
+    // type sex_value =  $mol_type_assert< typeof Sex.Value , sex >
+    $mol_test({
+        'config of enum'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_like(Sex.config, {
+                name: 'sex',
+                dict: sex,
+            });
+        },
+        'name of enum'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_equal(Sex.config.name, 'sex');
+        },
+        'Is right value of enum'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_equal(Sex(0), sex.male);
+        },
+        'Is wrong value of enum'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_fail(() => Sex(2), `2 is not value of sex enum`);
+        },
+        'Is name instead of value'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_fail(() => Sex('male'), `male is not value of sex enum`);
+        },
+        'Is common object field'() {
+            const Sex = $mol_data_enum('sex', sex);
+            $mol_assert_fail(() => Sex('__proto__'), `__proto__ is not value of sex enum`);
+        },
+    });
+    // Test disabled due https://github.com/microsoft/TypeScript/issues/46112
+    // type gender_value =  $mol_type_assert< typeof Gender.Value , gender >
+    $mol_test({
+        'config of enum'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_like(Gender.config, {
+                name: 'gender',
+                dict: gender,
+            });
+        },
+        'Is right value of enum'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_equal(Gender('transgender'), gender.trans);
+        },
+        'Is wrong value of enum'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_fail(() => Gender('xxx'), `xxx is not value of gender enum`);
+        },
+        'Is name instead of value'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_fail(() => Gender('trans'), `trans is not value of gender enum`);
+        },
+        'Is common object field'() {
+            const Gender = $mol_data_enum('gender', gender);
+            $mol_assert_fail(() => Gender('__proto__'), `__proto__ is not value of gender enum`);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'type safe build & parse'() {
+            let States;
+            (function (States) {
+                States["opened"] = "opened";
+                States["closed"] = "closed";
+            })(States || (States = {}));
+            const State = $hyoo_harp_scheme({}, $mol_data_enum('States', States));
+            const Str = $hyoo_harp_scheme({}, $mol_data_string);
+            const Bool = $hyoo_harp_scheme({}, $mol_data_boolean);
+            const Repository = $hyoo_harp_scheme({
+                name: $mol_data_optional(Str),
+                isPrivate: $mol_data_optional(Bool),
+                // pullRequests: PullRequest,
+            });
+            const PullRequest = $hyoo_harp_scheme({
+                state: $mol_data_optional(State),
+                updated_at: $mol_data_optional(Str),
+                repository: $mol_data_optional(Repository),
+            });
+            const Request = $hyoo_harp_scheme({
+                pullRequest: $mol_data_optional(PullRequest),
+            });
+            const uri = 'pullRequest(state=closed=;-updated_at;repository(name;isPrivate);_num=0@100=)';
+            let query = Request({
+                pullRequest: {
+                    state: { '=': [[States.closed]] }, // filter
+                    updated_at: { '+': false }, // order
+                    repository: {
+                        name: {},
+                        isPrivate: {},
+                    },
+                    _num: { '=': [[0, 100]] }, // slice
+                }
+            });
+            $mol_assert_like(uri, Request.build(query));
+            $mol_assert_like(query, Request.parse(uri));
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test({
+        'save and load buffers'($) {
+            const land = $giper_baza_land.make({ $ });
+            const file = land.Data($giper_baza_file);
+            const source = new Uint8Array(2 ** 15 + 1);
+            source[2 ** 15] = 255;
+            file.buffer(source);
+            $mol_assert_equal(file.chunks().length, 2);
+            $mol_assert_equal(file.buffer(), source);
+        },
+        async 'save and load blobs'($) {
+            const land = $giper_baza_land.make({ $ });
+            const file = land.Data($giper_baza_file);
+            const source = new Uint8Array(2 ** 16 + 1);
+            source[2 ** 16 + 1] = 255;
+            await $mol_wire_async(file).blob(new $mol_blob([source], { type: 'test/test' }));
+            $mol_assert_equal('test/test', file.blob().type);
+            $mol_assert_equal(source, new Uint8Array(await file.blob().arrayBuffer()));
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
     var $$;
     (function ($$) {
         /** Helper: create a contenteditable div with text, place cursor at end, run try_markdown */
@@ -7700,48 +8187,48 @@ var $;
                 const block = new $bog_wysiwyg_block();
                 $mol_assert_equal(block.link_exec(), null);
             },
-            'link_exec with cancelled prompt does nothing'() {
+            'link_exec asks the editor and touches nothing yet'() {
                 if (typeof document === 'undefined')
                     return;
                 const div = make_block_with_selection('hello world end', 'world');
                 try {
-                    const original_prompt = globalThis.prompt;
-                    globalThis.prompt = () => null;
                     const block = new $bog_wysiwyg_block();
                     block.dom_node = () => div;
                     block.html = (val) => val ?? div.innerHTML;
+                    let asked = 0;
+                    block.on_link = (event) => { ++asked; return event; };
                     const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
                     const result = block.link_exec(event);
                     $mol_assert_ok(result);
+                    $mol_assert_equal(asked, 1);
+                    // The panel has the floor now, so the text is untouched until it answers
                     $mol_assert_equal(div.innerHTML, 'hello world end');
-                    globalThis.prompt = original_prompt;
+                    $mol_assert_ok(!!block.link_range);
                 }
                 finally {
                     div.remove();
                 }
             },
-            'link_exec creates link from selected text'() {
+            'link_apply wraps the selection remembered by link_exec'() {
                 if (typeof document === 'undefined')
                     return;
                 const div = make_block_with_selection('click here now', 'here');
                 try {
-                    const original_prompt = globalThis.prompt;
-                    globalThis.prompt = () => 'https://example.com';
                     const block = new $bog_wysiwyg_block();
                     block.dom_node = () => div;
                     block.html = (val) => val ?? div.innerHTML;
-                    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
-                    block.link_exec(event);
+                    block.on_link = (event) => event;
+                    block.link_exec(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+                    block.link_apply('https://example.com');
                     $mol_assert_ok(div.innerHTML.includes('<a '));
                     $mol_assert_ok(div.innerHTML.includes('https://example.com'));
                     $mol_assert_ok(div.innerHTML.includes('here'));
-                    globalThis.prompt = original_prompt;
                 }
                 finally {
                     div.remove();
                 }
             },
-            'link_exec inserts url as text when no selection'() {
+            'link_apply inserts the url as text when nothing is selected'() {
                 if (typeof document === 'undefined')
                     return;
                 const div = make_block_with_selection('hello world');
@@ -7754,22 +8241,67 @@ var $;
                     range.collapse(false);
                     sel.removeAllRanges();
                     sel.addRange(range);
-                    const original_prompt = globalThis.prompt;
-                    globalThis.prompt = () => 'https://example.com';
                     const block = new $bog_wysiwyg_block();
                     block.dom_node = () => div;
                     block.html = (val) => val ?? div.innerHTML;
-                    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
-                    block.link_exec(event);
+                    block.on_link = (event) => event;
+                    block.link_exec(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+                    block.link_apply('https://example.com');
                     $mol_assert_ok(div.innerHTML.includes('<a '));
                     $mol_assert_ok(div.innerHTML.includes('https://example.com'));
-                    globalThis.prompt = original_prompt;
                 }
                 finally {
                     div.remove();
                 }
             },
             // === Image block ===
+            /*
+             * One Sand holds 64 KB, so a picture that became a data uri on the way in was simply
+             * dropped past that size. The bytes go to the editor untouched now, and only an editor
+             * with nowhere to put them falls back to the reader.
+             */
+            'insert_image_file hands the file over whole'() {
+                if (typeof document === 'undefined')
+                    return;
+                const block = new $bog_wysiwyg_block();
+                const seen = [];
+                block.on_image_file = (file) => { if (file)
+                    seen.push(file); return file ?? null; };
+                block.on_image = () => $mol_fail(new Error('must not fall back to a data uri'));
+                const file = new File([new Uint8Array(8)], 'shot.png', { type: 'image/png' });
+                block.insert_image_file(file);
+                $mol_assert_equal(seen.length, 1);
+                $mol_assert_equal(seen[0].name, 'shot.png');
+            },
+            'insert_image_file falls back to a data uri with no Land behind the editor'() {
+                if (typeof document === 'undefined')
+                    return;
+                const block = new $bog_wysiwyg_block();
+                // What the editor answers when it has no Land to keep a file pawn in
+                block.on_image_file = () => null;
+                let reached = false;
+                block.on_image = () => { reached = true; return null; };
+                block.insert_image_file(new File([new Uint8Array(8)], 's.png', { type: 'image/png' }));
+                // FileReader answers on a later tick, so all this pins is that the fallback was armed
+                $mol_assert_equal(reached, false);
+            },
+            'html_shown leaves ordinary markup alone'() {
+                const block = new $bog_wysiwyg_block();
+                block.html = () => '<img src="https://x.dev/a.png" alt="A">';
+                $mol_assert_equal(block.html_shown(), '<img src="https://x.dev/a.png" alt="A">');
+            },
+            'html_shown swaps a file address for something the browser can fetch'() {
+                const block = new $bog_wysiwyg_block();
+                block.html = () => '<img src="?BAZA:file=a_b;name=pic.png" alt="Pic">';
+                block.file_uri = (link) => 'blob:fake/' + link;
+                $mol_assert_equal(block.html_shown(), '<img src="blob:fake/a_b" alt="Pic">');
+            },
+            'html_shown keeps the address while the file is still coming in'() {
+                const block = new $bog_wysiwyg_block();
+                block.html = () => '<img src="?BAZA:file=a_b;name=pic.png">';
+                block.file_uri = () => '';
+                $mol_assert_equal(block.html_shown(), '<img src="?BAZA:file=a_b;name=pic.png">');
+            },
             'paste_event without event returns null'() {
                 const block = new $bog_wysiwyg_block();
                 $mol_assert_equal(block.paste_event(), null);
@@ -8028,493 +8560,6 @@ var $;
             },
         });
     })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function check(str, query) {
-        $mol_assert_like(str, $hyoo_harp_to_string(query));
-        $mol_assert_like(query, $hyoo_harp_from_string(str));
-    }
-    $mol_test({
-        'root'() {
-            check('', {});
-        },
-        'only field'() {
-            check('user%3D777', {
-                'user=777': {},
-            });
-        },
-        'primary key'() {
-            check('user=jin%2C777!=', {
-                user: {
-                    '=': [['jin,777!']],
-                },
-            });
-        },
-        'single fetch'() {
-            check('friend(age%24)', {
-                friend: {
-                    age$: {},
-                },
-            });
-        },
-        'fetch and primary key'() {
-            check('user=jin()=(friend)', {
-                'user': {
-                    '=': [['jin()']],
-                    friend: {},
-                },
-            });
-        },
-        'multiple fetch'() {
-            check('age;friend', {
-                age: {},
-                friend: {},
-            });
-        },
-        'common query string back compatible'() {
-            $mol_assert_like($hyoo_harp_from_string('user=jin&age=100500'), {
-                user: {
-                    '=': [['jin']],
-                },
-                age: {
-                    '=': [['100500']],
-                },
-            });
-        },
-        'common pathname back compatible'() {
-            $mol_assert_like($hyoo_harp_from_string('users/jin/comments'), {
-                users: {},
-                jin: {},
-                comments: {},
-            });
-        },
-        'deep fetch'() {
-            check('my(friend(age);name);stat', {
-                my: {
-                    friend: {
-                        age: {},
-                    },
-                    name: {},
-                },
-                stat: {},
-            });
-        },
-        'orders'() {
-            check('+age;-name', {
-                age: {
-                    '+': true
-                },
-                name: {
-                    '+': false
-                },
-            });
-        },
-        'filter types'() {
-            check('sex=female=;status!=married=', {
-                sex: {
-                    '=': [['female']],
-                },
-                status: {
-                    '!=': [['married']],
-                },
-            });
-        },
-        'filter ranges'() {
-            check('sex=female=;age=18@25=;weight=@50=;height=150@=;hobby=paint=singing=', {
-                sex: {
-                    '=': [['female']],
-                },
-                age: {
-                    '=': [['18', '25']],
-                },
-                weight: {
-                    '=': [['', '50']],
-                },
-                height: {
-                    '=': [['150', '']],
-                },
-                hobby: {
-                    '=': [['paint'], ['singing']],
-                },
-            });
-        },
-        'unescaped values'() {
-            $mol_assert_like($hyoo_harp_from_string('foo=jin=777=;bar=jin!=666='), {
-                foo: {
-                    '=': [['jin'], ['777']],
-                },
-                bar: {
-                    '=': [['jin!'], ['666']],
-                },
-            });
-        },
-        'slicing'() {
-            check('friend(_num=0@100=)', {
-                friend: {
-                    _num: { '=': [['0', '100']] },
-                },
-            });
-        },
-        'complex'() {
-            check('pullRequest(state=closed=merged=;+repository(name;private);-updateTime;_num=0@100=)', {
-                pullRequest: {
-                    state: {
-                        '=': [
-                            ['closed'],
-                            ['merged'],
-                        ]
-                    },
-                    repository: {
-                        '+': true,
-                        name: {},
-                        private: {},
-                    },
-                    updateTime: {
-                        '+': false,
-                    },
-                    _num: {
-                        '=': [['0', '100']],
-                    },
-                },
-            });
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is string'() {
-            $mol_data_string('');
-        },
-        'Is not string'() {
-            $mol_assert_fail(() => {
-                $mol_data_string(0);
-            }, '0 is not a string');
-        },
-        'Is object string'() {
-            $mol_assert_fail(() => {
-                $mol_data_string(new String('x'));
-            }, 'x is not a string');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is first'() {
-            $mol_data_variant($mol_data_number, $mol_data_string)(0);
-        },
-        'Is second'() {
-            $mol_data_variant($mol_data_number, $mol_data_string)('');
-        },
-        'Is false'() {
-            $mol_assert_fail(() => {
-                $mol_data_variant($mol_data_number, $mol_data_string)(false);
-            }, 'false is not any of variants');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    const Age = $mol_data_optional($mol_data_number);
-    const Age_or_zero = $mol_data_optional($mol_data_number, () => 0);
-    $mol_test({
-        'Is not present'() {
-            $mol_assert_equal(Age(undefined), undefined);
-        },
-        'Is present'() {
-            $mol_assert_equal(Age(0), 0);
-        },
-        'Fallbacked'() {
-            $mol_assert_equal(Age_or_zero(undefined), 0);
-        },
-        'Is null'() {
-            $mol_assert_fail(() => Age(null), 'null is not a number');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Fit to record'() {
-            const User = $mol_data_record({ age: $mol_data_number });
-            User({ age: 0 });
-        },
-        'Extends record'() {
-            const User = $mol_data_record({ age: $mol_data_number });
-            User({ age: 0, name: 'Jin' });
-        },
-        // 'Recursive record' () {
-        // 	const User = $mol_data_record({
-        // 		name : $mol_data_string ,
-        // 		get kids() { return $mol_data_array( User ) } ,
-        // 	})
-        // 	User({
-        // 		name : 'Jin' ,
-        // 		kids : [
-        // 			{
-        // 				name : 'John' ,
-        // 				kids : [] ,
-        // 			}
-        // 		] ,
-        // 	})
-        // } ,
-        'Shrinks record'() {
-            $mol_assert_fail(() => {
-                const User = $mol_data_record({ age: $mol_data_number, name: $mol_data_string });
-                User({ age: 0 });
-            }, '["name"] undefined is not a string');
-        },
-        'Shrinks deep record'() {
-            $mol_assert_fail(() => {
-                const User = $mol_data_record({ wife: $mol_data_record({ age: $mol_data_number }) });
-                User({ wife: {} });
-            }, '["wife"] ["age"] undefined is not a number');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is empty array'() {
-            $mol_data_array($mol_data_number)([]);
-        },
-        'Is array'() {
-            $mol_data_array($mol_data_number)([1, 2]);
-        },
-        'Is not array'() {
-            $mol_assert_fail(() => {
-                $mol_data_array($mol_data_number)({ [0]: 1, length: 1, map: () => { } });
-            }, '[object Object] is not an array');
-        },
-        'Has wrong item'() {
-            $mol_assert_fail(() => {
-                $mol_data_array($mol_data_number)([1, '1']);
-            }, '[1] 1 is not a number');
-        },
-        'Has wrong deep item'() {
-            $mol_assert_fail(() => {
-                $mol_data_array($mol_data_array($mol_data_number))([[], [0, 0, false]]);
-            }, '[1] [2] false is not a number');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is boolean - true'() {
-            $mol_data_boolean(true);
-        },
-        'Is boolean - false'() {
-            $mol_data_boolean(false);
-        },
-        'Is not boolean'() {
-            $mol_assert_fail(() => {
-                $mol_data_boolean('x');
-            }, 'x is not a boolean');
-        },
-        'Is object boolean'() {
-            $mol_assert_fail(() => {
-                $mol_data_boolean(new Boolean(''));
-            }, 'false is not a boolean');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    /**
-     * Checks for value of given enum and returns expected type.
-     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_enum_demo
-     */
-    function $mol_data_enum(name, dict) {
-        const index = {};
-        for (let key in dict) {
-            if (Number.isNaN(Number(key))) {
-                index[dict[key]] = key;
-            }
-        }
-        return $mol_data_setup((value) => {
-            if (typeof index[value] !== 'string') {
-                return $mol_fail(new $mol_data_error(`${value} is not value of ${name} enum`));
-            }
-            return value;
-        }, { name, dict });
-    }
-    $.$mol_data_enum = $mol_data_enum;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    let sex;
-    (function (sex) {
-        sex[sex["male"] = 0] = "male";
-        sex[sex["female"] = 1] = "female";
-    })(sex || (sex = {}));
-    let gender;
-    (function (gender) {
-        gender["bisexual"] = "bisexual";
-        gender["trans"] = "transgender";
-    })(gender || (gender = {}));
-    // Test disabled due https://github.com/microsoft/TypeScript/issues/46112
-    // const Sex = $mol_data_enum( 'sex' , sex )
-    // type sex_value =  $mol_type_assert< typeof Sex.Value , sex >
-    $mol_test({
-        'config of enum'() {
-            const Sex = $mol_data_enum('sex', sex);
-            $mol_assert_like(Sex.config, {
-                name: 'sex',
-                dict: sex,
-            });
-        },
-        'name of enum'() {
-            const Sex = $mol_data_enum('sex', sex);
-            $mol_assert_equal(Sex.config.name, 'sex');
-        },
-        'Is right value of enum'() {
-            const Sex = $mol_data_enum('sex', sex);
-            $mol_assert_equal(Sex(0), sex.male);
-        },
-        'Is wrong value of enum'() {
-            const Sex = $mol_data_enum('sex', sex);
-            $mol_assert_fail(() => Sex(2), `2 is not value of sex enum`);
-        },
-        'Is name instead of value'() {
-            const Sex = $mol_data_enum('sex', sex);
-            $mol_assert_fail(() => Sex('male'), `male is not value of sex enum`);
-        },
-        'Is common object field'() {
-            const Sex = $mol_data_enum('sex', sex);
-            $mol_assert_fail(() => Sex('__proto__'), `__proto__ is not value of sex enum`);
-        },
-    });
-    // Test disabled due https://github.com/microsoft/TypeScript/issues/46112
-    // type gender_value =  $mol_type_assert< typeof Gender.Value , gender >
-    $mol_test({
-        'config of enum'() {
-            const Gender = $mol_data_enum('gender', gender);
-            $mol_assert_like(Gender.config, {
-                name: 'gender',
-                dict: gender,
-            });
-        },
-        'Is right value of enum'() {
-            const Gender = $mol_data_enum('gender', gender);
-            $mol_assert_equal(Gender('transgender'), gender.trans);
-        },
-        'Is wrong value of enum'() {
-            const Gender = $mol_data_enum('gender', gender);
-            $mol_assert_fail(() => Gender('xxx'), `xxx is not value of gender enum`);
-        },
-        'Is name instead of value'() {
-            const Gender = $mol_data_enum('gender', gender);
-            $mol_assert_fail(() => Gender('trans'), `trans is not value of gender enum`);
-        },
-        'Is common object field'() {
-            const Gender = $mol_data_enum('gender', gender);
-            $mol_assert_fail(() => Gender('__proto__'), `__proto__ is not value of gender enum`);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'type safe build & parse'() {
-            let States;
-            (function (States) {
-                States["opened"] = "opened";
-                States["closed"] = "closed";
-            })(States || (States = {}));
-            const State = $hyoo_harp_scheme({}, $mol_data_enum('States', States));
-            const Str = $hyoo_harp_scheme({}, $mol_data_string);
-            const Bool = $hyoo_harp_scheme({}, $mol_data_boolean);
-            const Repository = $hyoo_harp_scheme({
-                name: $mol_data_optional(Str),
-                isPrivate: $mol_data_optional(Bool),
-                // pullRequests: PullRequest,
-            });
-            const PullRequest = $hyoo_harp_scheme({
-                state: $mol_data_optional(State),
-                updated_at: $mol_data_optional(Str),
-                repository: $mol_data_optional(Repository),
-            });
-            const Request = $hyoo_harp_scheme({
-                pullRequest: $mol_data_optional(PullRequest),
-            });
-            const uri = 'pullRequest(state=closed=;-updated_at;repository(name;isPrivate);_num=0@100=)';
-            let query = Request({
-                pullRequest: {
-                    state: { '=': [[States.closed]] }, // filter
-                    updated_at: { '+': false }, // order
-                    repository: {
-                        name: {},
-                        isPrivate: {},
-                    },
-                    _num: { '=': [[0, 100]] }, // slice
-                }
-            });
-            $mol_assert_like(uri, Request.build(query));
-            $mol_assert_like(query, Request.parse(uri));
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    $mol_test({
-        'save and load buffers'($) {
-            const land = $giper_baza_land.make({ $ });
-            const file = land.Data($giper_baza_file);
-            const source = new Uint8Array(2 ** 15 + 1);
-            source[2 ** 15] = 255;
-            file.buffer(source);
-            $mol_assert_equal(file.chunks().length, 2);
-            $mol_assert_equal(file.buffer(), source);
-        },
-        async 'save and load blobs'($) {
-            const land = $giper_baza_land.make({ $ });
-            const file = land.Data($giper_baza_file);
-            const source = new Uint8Array(2 ** 16 + 1);
-            source[2 ** 16 + 1] = 255;
-            await $mol_wire_async(file).blob(new $mol_blob([source], { type: 'test/test' }));
-            $mol_assert_equal('test/test', file.blob().type);
-            $mol_assert_equal(source, new Uint8Array(await file.blob().arrayBuffer()));
-        },
-    });
 })($ || ($ = {}));
 
 ;
@@ -10416,34 +10461,68 @@ var $;
                 $mol_assert_equal(editor.block_image('b1'), null);
                 $mol_assert_equal(editor.block_type('b1'), 'paragraph');
             },
-            'menu_picked with image prompts for URL'() {
+            /*
+             * The picture command used to call a native `prompt()`. That freezes the renderer, so the
+             * tab stops answering the user and the debug protocol alike, and an address was the only
+             * thing it could ever ask for. It opens the editor's own panel now.
+             */
+            'menu_picked with image opens the picture panel'() {
                 const editor = new $bog_wysiwyg();
                 editor.active_block_id('b1');
                 editor.block_ids(['b1']);
                 editor.menu_showed(true);
                 editor.focus_block = () => { };
-                const ctx = editor.$.$mol_dom_context;
-                const original_prompt = ctx.prompt;
-                ctx.prompt = () => 'https://example.com/img.png';
                 editor.menu_picked('image');
+                $mol_assert_equal(editor.image_prompt_showed(), true);
+                $mol_assert_equal(editor.menu_showed(), false);
+                // Nothing is committed until the panel answers
+                $mol_assert_equal(editor.block_type('b1'), 'paragraph');
+            },
+            'an address typed into the picture panel makes the picture'() {
+                const editor = new $bog_wysiwyg();
+                editor.active_block_id('b1');
+                editor.block_ids(['b1']);
+                editor.focus_block = () => { };
+                editor.menu_picked('image');
+                editor.image_url('https://example.com/img.png');
+                editor.image_submit();
                 $mol_assert_equal(editor.block_type('b1'), 'image');
                 $mol_assert_ok(editor.block_html('b1').includes('https://example.com/img.png'));
-                $mol_assert_equal(editor.menu_showed(), false);
-                ctx.prompt = original_prompt;
+                $mol_assert_equal(editor.image_prompt_showed(), false);
             },
-            'menu_picked with image cancelled prompt keeps paragraph'() {
+            'an empty picture panel leaves the block alone'() {
                 const editor = new $bog_wysiwyg();
                 editor.active_block_id('b1');
                 editor.block_ids(['b1']);
-                editor.menu_showed(true);
                 editor.focus_block = () => { };
-                const ctx = editor.$.$mol_dom_context;
-                const original_prompt = ctx.prompt;
-                ctx.prompt = () => null;
                 editor.menu_picked('image');
+                editor.image_submit();
                 $mol_assert_equal(editor.block_type('b1'), 'paragraph');
-                $mol_assert_equal(editor.menu_showed(), false);
-                ctx.prompt = original_prompt;
+                $mol_assert_equal(editor.image_prompt_showed(), false);
+            },
+            'the link panel wraps the selection through the block'() {
+                const editor = new $bog_wysiwyg();
+                editor.block_ids(['b1']);
+                editor.focus_block = () => { };
+                const applied = [];
+                editor.block_view = () => ({ link_apply: (url) => { applied.push(url); } });
+                editor.block_link('b1', new $mol_dom_context.Event('keydown'));
+                $mol_assert_equal(editor.link_prompt_showed(), true);
+                editor.link_url('https://example.com');
+                editor.link_submit();
+                $mol_assert_equal(applied, ['https://example.com']);
+                $mol_assert_equal(editor.link_prompt_showed(), false);
+            },
+            'the link panel makes an embed block when the plugin asked'() {
+                const editor = new $bog_wysiwyg();
+                editor.block_ids(['b1']);
+                editor.focus_block = () => { };
+                editor.link_prompt_open('b1', 'embed');
+                editor.link_url('https://example.com/page');
+                editor.link_submit();
+                $mol_assert_equal(editor.block_type('b1'), 'embed');
+                $mol_assert_ok(editor.block_html('b1').includes('https://example.com/page'));
+                $mol_assert_equal(editor.link_prompt_showed(), false);
             },
             // === Drag & Drop ===
             'move_block moves block down (after)'() {

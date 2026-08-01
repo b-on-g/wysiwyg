@@ -2176,8 +2176,52 @@ $bog_wysiwyg_history_version $mol_button_minor
 		^
 		bog_wysiwyg_history_version_active <= active
 
+- A small panel asking for an address, and optionally for a file.
+- Replaces the native `prompt()`: a browser modal freezes the renderer, and a
+- frozen renderer answers neither the user nor the debug protocol.
+$bog_wysiwyg_prompt $mol_view
+	showed false
+	pos_y 0
+	pos_x 0
+	label @ \Address
+	hint \
+	file_shown false
+	value?val \
+	files? /File
+	submit? null
+	sub <= content /
+	Label $mol_paragraph
+		title <= label
+	Field $mol_string
+		hint <= hint
+		value?val <=> value?val
+		submit? <=> submit?
+	Submit $mol_button_minor
+		title @ \Insert
+		click? <=> submit?
+	Row $mol_view
+		sub /
+			<= Field
+			<= Submit
+	Open $mol_button_open
+		accept \image/*
+		multiple false
+		files? <=> files? /File
+		sub /
+			<= Open_icon $mol_icon_upload
+			<= Open_label $mol_paragraph
+				title @ \Choose a file
+	attr *
+		^
+		bog_wysiwyg_prompt_showed <= showed
+	style *
+		^
+		top <= pos_y_str \0px
+		left <= pos_x_str \0px
+
 $bog_wysiwyg $mol_view
 	page_land_link \
+	notice_too_long @ \That is more text than one block can hold, so it was not saved. Split it up.
 	readonly false
 	block_ids? /
 	Block* $bog_wysiwyg_block
@@ -2197,6 +2241,8 @@ $bog_wysiwyg $mol_view
 		on_slash?event <=> block_slash*?event null
 		on_menu_key?event <=> block_menu_key*?event null
 		on_image?src <=> block_image*?src null
+		on_image_file?file <=> block_image_file*?file null
+		on_link?event <=> block_link*?event null
 		on_ai?event <=> block_ai*?event null
 		on_ai_key?event <=> block_ai_key*?event null
 		on_paste_blocks?val <=> block_paste_blocks*?val null
@@ -2254,6 +2300,30 @@ $bog_wysiwyg $mol_view
 		<= History $bog_wysiwyg_history
 			page_land_link <= page_land_link
 			showed? <=> history_showed? false
+		<= Image_prompt $bog_wysiwyg_prompt
+			showed <= image_prompt_showed? false
+			pos_y <= prompt_pos_y? 0
+			pos_x <= prompt_pos_x? 0
+			file_shown true
+			label @ \Picture: choose a file or paste an address
+			hint \https://example.com/picture.png
+			value?val <=> image_url?val \
+			files? <=> image_files? /File
+			submit? <=> image_submit? null
+		<= Link_prompt $bog_wysiwyg_prompt
+			showed <= link_prompt_showed? false
+			pos_y <= prompt_pos_y?
+			pos_x <= prompt_pos_x?
+			label @ \Link address
+			hint \https://example.com
+			value?val <=> link_url?val \
+			submit? <=> link_submit? null
+		<= Notice $mol_button_minor
+			title <= notice? \
+			click? <=> notice_dismiss? null
+			attr *
+				^
+				bog_wysiwyg_notice_showed <= notice_showed false
 
 $mol_icon_notebook $mol_icon path \M3,7V5H5V4C5,2.89 5.9,2 7,2H13V9L15.5,7.5L18,9V2H19C20.05,2 21,2.95 21,4V20C21,21.05 20.05,22 19,22H7C5.95,22 5,21.05 5,20V19H3V17H5V13H3V11H5V7H3M7,11H5V13H7V11M7,7V5H5V7H7M7,19V17H5V19H7Z
 
@@ -2550,6 +2620,8 @@ $bog_wysiwyg_block $mol_view
 	on_slash?event null
 	on_menu_key?event null
 	on_image?src null
+	on_image_file?file null
+	on_link?event null
 	ai_open false
 	on_ai?event null
 	on_ai_key?event null
