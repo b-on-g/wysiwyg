@@ -11,6 +11,11 @@ $bog_wysiwyg $mol_view
 		ai_open <= ai_showed? false
 		on_enter?event <=> block_enter*?event null
 		on_remove?event <=> block_remove*?event null
+		on_split?parts <=> block_split*?parts null
+		on_merge_prev?event <=> block_merge_prev*?event null
+		on_merge_next?event <=> block_merge_next*?event null
+		on_nav?nav <=> block_nav*?nav null
+		on_input?event <=> block_input*?event null
 		on_slash?event <=> block_slash*?event null
 		on_menu_key?event <=> block_menu_key*?event null
 		on_image?src <=> block_image*?src null

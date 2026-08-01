@@ -17,6 +17,20 @@ namespace $ {
 		return text
 	}
 
+	/**
+	 * Read or write a text field of a Baza model.
+	 * An atomic register exposes `val`, a mergeable text pawn exposes `text`.
+	 */
+	export function $bog_wysiwyg_pawn_text(
+		pawn: { val?( next?: string ): string | null, text?( next?: string ): string } | null | undefined,
+		next?: string,
+	): string {
+		if( !pawn ) return next ?? ''
+		if( pawn.text ) return pawn.text( next ) ?? ''
+		if( pawn.val ) return pawn.val( next ) ?? ''
+		return next ?? ''
+	}
+
 }
 
 namespace $.$$ {
@@ -104,7 +118,7 @@ namespace $.$$ {
 			if( !blocks.length ) {
 				// Auto-create first empty block
 				const block = blocks_list.make( null )
-				block.Type( 'auto' )?.val( 'paragraph' )
+				$bog_wysiwyg_pawn_text( block.Type( 'auto' ), 'paragraph' )
 				return [ block.link().str ]
 			}
 
@@ -127,10 +141,10 @@ namespace $.$$ {
 			if( !this.has_baza() ) return super.block_type( id, next )
 			const block = this.baza_block( id )
 			if( next !== undefined ) {
-				block.Type( 'auto' )?.val( next )
+				$bog_wysiwyg_pawn_text( block.Type( 'auto' ), next )
 				return next
 			}
-			return block.Type()?.val() ?? 'paragraph'
+			return $bog_wysiwyg_pawn_text( block.Type() ) || 'paragraph'
 		}
 
 		/** Override block_level to sync with Baza when connected */
@@ -159,12 +173,53 @@ namespace $.$$ {
 			return next ?? ''
 		}
 
-		focus_block( id: string ) {
+		/** Block view with its caret API */
+		block_view( id: string ) {
+			return this.Block( id ) as $bog_wysiwyg_block
+		}
+
+		/** Blocks that hold no editable text and can not be glued with neighbours */
+		block_is_static( id: string ) {
+			const type = this.block_type( id )
+			if( type === 'image' || type === 'embed' || type === 'divider' ) return true
+			return !!$bog_wysiwyg_plugin_registry.get( type )?.render
+		}
+
+		/** Allocate an id for a new block, creating the Baza pawn when connected */
+		make_block_id() {
+			if( this.has_baza() ) {
+				const blocks_list = this.page_data()?.Blocks( 'auto' )
+				if( blocks_list ) {
+					const pawn = blocks_list.make( null )
+					$bog_wysiwyg_pawn_text( pawn.Type( 'auto' ), 'paragraph' )
+					return pawn.link().str
+				}
+			}
+			return this.generate_id()
+		}
+
+		/** Drop blocks from the page and from Baza. Callers keep at least one alive. */
+		drop_blocks( drop: readonly string[] ) {
+			const ids = this.block_ids().filter( id => !drop.includes( id ) )
+			this.block_ids( ids )
+
+			if( !this.has_baza() ) return
+			const blocks_list = this.page_data()?.Blocks( 'auto' )
+			if( !blocks_list ) return
+			for( const id of drop ) blocks_list.cut( new $giper_baza_link( id ) )
+		}
+
+		focus_block( id: string, offset?: number ) {
 			setTimeout( () => {
 				try {
-					const node = this.Block( id ).dom_node() as HTMLElement
+					const block = this.block_view( id )
+					const node = block.dom_node() as HTMLElement
 					node.focus()
-					const sel = window.getSelection()
+					if( offset !== undefined ) {
+						block.focus_at( offset )
+						return
+					}
+					const sel = node.ownerDocument.defaultView?.getSelection()
 					if( sel ) {
 						sel.selectAllChildren( node )
 						sel.collapseToEnd()
@@ -179,36 +234,20 @@ namespace $.$$ {
 			if( !event ) return null
 			if( this.readonly() ) return null
 
-			if( this.has_baza() ) {
-				const data = this.page_data()
-				const blocks_list = data?.Blocks( 'auto' )
-				if( blocks_list ) {
-					const block = blocks_list.make( null )
-					block.Type( 'auto' )?.val( 'paragraph' )
-					const new_id = block.link().str
-					const ids = [ ...this.block_ids() ]
-					const index = ids.indexOf( id )
-					ids.splice( index + 1, 0, new_id )
-					this.block_ids( ids )
-					this.focus_block( new_id )
-					return event
-				}
-			}
+			this.history_record()
+			const done = this.block_enter_apply( id, event )
+			this.history_record()
+			return done
+		}
+
+		block_enter_apply( id: string, event: Event ) {
 
 			const ids = [ ...this.block_ids() ]
 			const index = ids.indexOf( id )
-			const new_id = this.generate_id()
+			const new_id = this.make_block_id()
 			ids.splice( index + 1, 0, new_id )
 			this.block_ids( ids )
-
-			setTimeout( () => {
-				try {
-					const node = this.Block( new_id ).dom_node() as HTMLElement
-					node.focus()
-				} catch( e ) {
-					$mol_fail_log( e )
-				}
-			}, 0 )
+			this.focus_block( new_id, 0 )
 
 			return event
 		}
@@ -220,21 +259,129 @@ namespace $.$$ {
 			const ids = [ ...this.block_ids() ]
 			if( ids.length <= 1 ) return null
 
+			this.history_record()
+
 			const index = ids.indexOf( id )
-			ids.splice( index, 1 )
-			this.block_ids( ids )
+			this.drop_blocks( [ id ] )
 
-			if( this.has_baza() ) {
-				const data = this.page_data()
-				const blocks_list = data?.Blocks( 'auto' )
-				if( blocks_list ) {
-					blocks_list.cut( new $giper_baza_link( id ) )
-				}
-			}
-
-			const prev_id = ids[ Math.max( 0, index - 1 ) ]
+			const rest = this.block_ids()
+			const prev_id = rest[ Math.max( 0, index - 1 ) ]
 			this.focus_block( prev_id )
 
+			this.history_record()
+			return event
+		}
+
+		// === Block boundaries ===
+
+		/** Enter in the middle: the tail moves into a fresh block of the same kind */
+		block_split( id: string, parts?: { head: string, tail: string } ) {
+			if( !parts ) return null
+			if( this.readonly() ) return null
+
+			this.history_record()
+
+			const type = this.block_type( id )
+			const level = this.block_level( id )
+
+			const ids = [ ...this.block_ids() ]
+			const index = ids.indexOf( id )
+			const new_id = this.make_block_id()
+			ids.splice( index + 1, 0, new_id )
+
+			this.block_html( id, parts.head )
+			this.block_ids( ids )
+			this.block_type( new_id, type )
+			this.block_level( new_id, level )
+			this.block_html( new_id, parts.tail )
+
+			this.focus_block( new_id, 0 )
+
+			this.history_record()
+			return parts
+		}
+
+		/** Backspace at the start: glue the block into the previous one */
+		block_merge_prev( id: string, event?: Event ) {
+			if( !event ) return null
+			if( this.readonly() ) return null
+
+			const ids = this.block_ids()
+			const index = ids.indexOf( id )
+			if( index <= 0 ) return event
+			const prev_id = ids[ index - 1 ]
+
+			this.history_record()
+
+			if( this.block_is_static( prev_id ) ) {
+				// Nothing to glue text into: the neighbour just goes away
+				this.drop_blocks( [ prev_id ] )
+				this.focus_block( id, 0 )
+				this.history_record()
+				return event
+			}
+
+			const prev_html = this.block_html( prev_id )
+			const caret = $bog_wysiwyg_html_text( this.$.$mol_dom_context.document, prev_html ).length
+
+			this.block_html( prev_id, prev_html + this.block_html( id ) )
+			this.drop_blocks( [ id ] )
+			this.focus_block( prev_id, caret )
+
+			this.history_record()
+			return event
+		}
+
+		/** Delete at the end: pull the next block into this one */
+		block_merge_next( id: string, event?: Event ) {
+			if( !event ) return null
+			if( this.readonly() ) return null
+
+			const ids = this.block_ids()
+			const index = ids.indexOf( id )
+			if( index < 0 || index >= ids.length - 1 ) return event
+			const next_id = ids[ index + 1 ]
+
+			this.history_record()
+
+			const own_html = this.block_html( id )
+			const caret = $bog_wysiwyg_html_text( this.$.$mol_dom_context.document, own_html ).length
+
+			if( !this.block_is_static( next_id ) ) {
+				this.block_html( id, own_html + this.block_html( next_id ) )
+			}
+			this.drop_blocks( [ next_id ] )
+			this.focus_block( id, caret )
+
+			this.history_record()
+			return event
+		}
+
+		/** Desired horizontal caret position kept while walking with arrows */
+		nav_column = null as { x: number, offset: number } | null
+
+		/** ArrowUp / ArrowDown on the edge line: move the caret to the neighbour block */
+		block_nav( id: string, nav?: { dir: 'up' | 'down', x: number, offset: number } ) {
+			if( !nav ) return null
+
+			const ids = this.block_ids()
+			const index = ids.indexOf( id )
+			const target = nav.dir === 'up' ? ids[ index - 1 ] : ids[ index + 1 ]
+			if( !target ) return nav
+
+			const column = this.nav_column ?? { x: nav.x, offset: nav.offset }
+			this.nav_column = column
+
+			this.block_view( target ).focus_column( column.x, column.offset, nav.dir === 'down' )
+
+			return nav
+		}
+
+		/** Text of a block changed from the keyboard */
+		block_input( id: string, event?: Event ) {
+			if( !event ) return null
+			this.nav_column = null
+			this.history_schedule()
 			return event
 		}
 
@@ -293,6 +440,13 @@ namespace $.$$ {
 			const id = this.active_block_id()
 			if( !id ) return
 
+			this.history_record()
+			this.apply_menu_command_run( cmd, id )
+			this.history_record()
+		}
+
+		apply_menu_command_run( cmd: string, id: string ) {
+
 			const plugin = $bog_wysiwyg_plugin_registry.get( cmd )
 			if( plugin ) {
 				if( plugin.on_select ) {
@@ -333,6 +487,8 @@ namespace $.$$ {
 		block_paste_blocks( id: string, val?: { type: string, content: string, level?: number }[] ) {
 			if( !val || !val.length ) return null
 
+			this.history_record()
+
 			// First block replaces the current one
 			this.block_type( id, val[ 0 ].type )
 			this.block_html( id, val[ 0 ].content )
@@ -352,7 +508,7 @@ namespace $.$$ {
 					const blocks_list = data?.Blocks( 'auto' )
 					if( blocks_list ) {
 						const pawn = blocks_list.make( null )
-						pawn.Type( 'auto' )?.val( block.type )
+						$bog_wysiwyg_pawn_text( pawn.Type( 'auto' ), block.type )
 						pawn.Content( 'auto' )?.val( block.content )
 						if( block.level ) pawn.Level( 'auto' )?.val( block.level )
 						new_id = pawn.link().str
@@ -383,13 +539,17 @@ namespace $.$$ {
 			}
 
 			this.focus_block( last_id )
+
+			this.history_record()
 			return val
 		}
 
 		block_image( id: string, src?: string ) {
 			if( !src ) return null
+			this.history_record()
 			this.block_type( id, 'image' )
 			this.block_html( id, '<img src="' + src.replace( /"/g, '&quot;' ) + '">' )
+			this.history_record()
 			return src
 		}
 
@@ -521,15 +681,166 @@ namespace $.$$ {
 			if( atom ) atom.val( land.link().str )
 		}
 
+		// === Undo / redo ===
+		//
+		// The browser history is useless here: auto() rewrites innerHTML behind its back.
+		// So the page keeps its own snapshot stack, in memory only, never in Baza.
+
+		history_states = [] as {
+			blocks: { id: string, type: string, level: number, content: string }[],
+			caret: { id: string, offset: number },
+		}[]
+
+		history_pos = -1
+
+		history_timer = null as $mol_after_timeout | null
+
+		/** Snapshots are not taken while an older one is being applied */
+		history_locked = false
+
+		history_limit() {
+			return 100
+		}
+
+		history_delay() {
+			return 500
+		}
+
+		history_snapshot() {
+			const blocks = this.block_ids().map( id => ({
+				id,
+				type: this.block_type( id ),
+				level: this.block_level( id ),
+				content: this.block_html( id ),
+			}) )
+			return { blocks, caret: this.caret_state() }
+		}
+
+		/** Block and text offset the caret is currently at */
+		caret_state() {
+			for( const id of this.block_ids() ) {
+				const offset = this.block_view( id ).caret_offset()
+				if( offset >= 0 ) return { id, offset }
+			}
+			return { id: '', offset: 0 }
+		}
+
+		/** Remember the state before the first edit of a fresh page */
+		history_ensure() {
+			if( this.history_states.length ) return
+			this.history_states.push( this.history_snapshot() )
+			this.history_pos = 0
+		}
+
+		history_cancel() {
+			this.history_timer?.destructor()
+			this.history_timer = null
+		}
+
+		/** Group a burst of keystrokes into a single undo step */
+		history_schedule() {
+			if( this.history_locked ) return
+			this.history_cancel()
+			this.history_timer = new this.$.$mol_after_timeout( this.history_delay(), () => {
+				this.history_timer = null
+				this.history_record()
+			} )
+		}
+
+		/** Put the current state on the stack unless it is already there */
+		history_record() {
+			if( this.history_locked ) return
+			this.history_cancel()
+
+			const next = this.history_snapshot()
+			const prev = this.history_states[ this.history_pos ]
+			if( prev && $mol_compare_deep( prev.blocks, next.blocks ) ) return
+
+			this.history_states.length = this.history_pos + 1
+			this.history_states.push( next )
+			if( this.history_states.length > this.history_limit() ) this.history_states.shift()
+			this.history_pos = this.history_states.length - 1
+		}
+
+		history_undo() {
+			this.history_record()
+			if( this.history_pos <= 0 ) return false
+			this.history_pos -= 1
+			this.history_apply( this.history_states[ this.history_pos ] )
+			return true
+		}
+
+		history_redo() {
+			// Text typed after an undo must not be thrown away by a redo
+			this.history_record()
+			if( this.history_pos < 0 ) return false
+			if( this.history_pos >= this.history_states.length - 1 ) return false
+			this.history_pos += 1
+			this.history_apply( this.history_states[ this.history_pos ] )
+			return true
+		}
+
+		history_apply( state: { blocks: readonly { id: string, type: string, level: number, content: string }[], caret: { id: string, offset: number } } ) {
+			this.history_locked = true
+			try {
+				this.block_ids( state.blocks.map( block => block.id ) )
+				for( const block of state.blocks ) {
+					this.block_type( block.id, block.type )
+					this.block_level( block.id, block.level )
+					this.block_html( block.id, block.content )
+				}
+			} finally {
+				this.history_locked = false
+			}
+
+			this.nav_column = null
+			if( state.caret.id ) this.focus_block( state.caret.id, state.caret.offset )
+		}
+
 		// === Select All & Copy as Markdown ===
 
 		editor_keydown( event?: KeyboardEvent ) {
 			if( !event ) return null
-			if( ( event.ctrlKey || event.metaKey ) && event.key === 'a' ) {
+
+			const cmd = event.ctrlKey || event.metaKey
+			const editable = !this.readonly()
+
+			if( cmd && editable && ( event.key === 'z' || event.key === 'Z' ) ) {
+				event.preventDefault()
+				if( event.shiftKey ) this.history_redo()
+				else this.history_undo()
+				return event
+			}
+
+			if( cmd && editable && ( event.key === 'y' || event.key === 'Y' ) ) {
+				event.preventDefault()
+				this.history_redo()
+				return event
+			}
+
+			// Any key but a vertical step drops the remembered column
+			if( event.key !== 'ArrowUp' && event.key !== 'ArrowDown' ) this.nav_column = null
+
+			if( cmd && event.key === 'a' ) {
 				event.preventDefault()
 				this.select_all_blocks()
 				return event
 			}
+
+			if( !editable ) return event
+
+			this.history_ensure()
+
+			const printable = event.key.length === 1 && !cmd && !event.altKey
+
+			if( event.key === 'Backspace' || event.key === 'Delete' || printable ) {
+				if( this.selection_spans_blocks() ) {
+					event.preventDefault()
+					this.delete_selection( printable ? event.key : '' )
+					return event
+				}
+			}
+
 			if( event.key === 'Backspace' || event.key === 'Delete' ) {
 				const selected = this.selected_block_ids()
 				if( selected.length > 1 ) {
@@ -538,7 +849,77 @@ namespace $.$$ {
 					return event
 				}
 			}
+
 			return event
+		}
+
+		/** Block owning a DOM node, empty string when the node is outside the editor */
+		block_of_node( node: Node | null ) {
+			if( !node ) return ''
+			for( const id of this.block_ids() ) {
+				const el = this.Block( id ).dom_node()
+				if( el === node || el.contains( node ) ) return id
+			}
+			return ''
+		}
+
+		/** Whether the current selection crosses a block border */
+		selection_spans_blocks() {
+			const doc = this.$.$mol_dom_context.document
+			const sel = doc.defaultView?.getSelection()
+			if( !sel || sel.isCollapsed || sel.rangeCount === 0 ) return false
+
+			const range = sel.getRangeAt( 0 )
+			const from = this.block_of_node( range.startContainer )
+			const to = this.block_of_node( range.endContainer )
+
+			return !!from && !!to && from !== to
+		}
+
+		/**
+		 * Wipe a selection spanning several blocks: the head of the first block
+		 * and the tail of the last one survive glued together, optionally with
+		 * the typed character between them.
+		 */
+		delete_selection( insert = '' ) {
+			if( this.readonly() ) return false
+
+			const doc = this.$.$mol_dom_context.document
+			const sel = doc.defaultView?.getSelection()
+			if( !sel || sel.isCollapsed || sel.rangeCount === 0 ) return false
+
+			const range = sel.getRangeAt( 0 )
+			const start_id = this.block_of_node( range.startContainer )
+			const end_id = this.block_of_node( range.endContainer )
+			if( !start_id || !end_id || start_id === end_id ) return false
+
+			const ids = this.block_ids()
+			const from = ids.indexOf( start_id )
+			const to = ids.indexOf( end_id )
+			if( from < 0 || to <= from ) return false
+
+			const start_block = this.block_view( start_id )
+			const end_block = this.block_view( end_id )
+
+			const start_offset = $bog_wysiwyg_offset_of( start_block.dom_node(), range.startContainer, range.startOffset )
+			const end_offset = $bog_wysiwyg_offset_of( end_block.dom_node(), range.endContainer, range.endOffset )
+			if( start_offset < 0 || end_offset < 0 ) return false
+
+			const head = start_block.html_before( start_offset )
+			const tail = end_block.html_after( end_offset )
+
+			this.history_record()
+
+			sel.removeAllRanges()
+
+			this.block_html( start_id, head + $bog_wysiwyg_escape_html( insert ) + tail )
+			this.drop_blocks( ids.slice( from + 1, to + 1 ) )
+
+			this.nav_column = null
+			this.focus_block( start_id, start_offset + insert.length )
+
+			this.history_record()
+			return true
 		}
 
 		selected_block_ids() {
@@ -553,6 +934,8 @@ namespace $.$$ {
 		}
 
 		delete_blocks( selected: string[] ) {
+			this.history_record()
+
 			const ids = [ ...this.block_ids() ]
 
 			for( const id of selected ) {
@@ -575,7 +958,7 @@ namespace $.$$ {
 					const blocks_list = data?.Blocks( 'auto' )
 					if( blocks_list ) {
 						const block = blocks_list.make( null )
-						block.Type( 'auto' )?.val( 'paragraph' )
+						$bog_wysiwyg_pawn_text( block.Type( 'auto' ), 'paragraph' )
 						ids.push( block.link().str )
 					}
 				} else {
@@ -585,6 +968,8 @@ namespace $.$$ {
 
 			this.block_ids( ids )
 			this.focus_block( ids[ 0 ] )
+
+			this.history_record()
 		}
 
 		select_all_blocks() {
@@ -739,9 +1124,13 @@ namespace $.$$ {
 			const to = ids.indexOf( to_id )
 			if( to < 0 ) return
 
+			this.history_record()
+
 			const insert = position === 'before' ? to : to + 1
 			ids.splice( insert, 0, from_id )
 			this.block_ids( ids )
+
+			this.history_record()
 		}
 
 	}

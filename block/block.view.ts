@@ -77,6 +77,72 @@ namespace $ {
 		return text.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' )
 	}
 
+	/** Escape plain text to be safely embedded into HTML */
+	export function $bog_wysiwyg_escape_html( text: string ): string {
+		return md_escape_html( text )
+	}
+
+	/** DOM position (node + offset) for a plain text offset inside a root node */
+	export function $bog_wysiwyg_point_at( root: Node, offset: number ): { node: Node, offset: number } {
+
+		const doc = root.ownerDocument ?? ( root as Document )
+		const walker = doc.createTreeWalker( root, 4 /* NodeFilter.SHOW_TEXT */ )
+
+		let rest = Math.max( 0, offset )
+		let last: Text | null = null
+		let node = walker.nextNode() as Text | null
+
+		while( node ) {
+			const len = node.data.length
+			if( rest <= len ) return { node, offset: rest }
+			rest -= len
+			last = node
+			node = walker.nextNode() as Text | null
+		}
+
+		if( last ) return { node: last, offset: last.data.length }
+		return { node: root, offset: 0 }
+	}
+
+	/** Plain text offset of a DOM position inside a root node. -1 when the position is outside. */
+	export function $bog_wysiwyg_offset_of( root: Node, node: Node, offset: number ): number {
+
+		if( root !== node && !root.contains( node ) ) return -1
+
+		const doc = root.ownerDocument ?? ( root as Document )
+		const range = doc.createRange()
+		range.selectNodeContents( root )
+		range.setEnd( node, offset )
+
+		return range.toString().length
+	}
+
+	/** Plain text of an HTML fragment */
+	export function $bog_wysiwyg_html_text( doc: Document, html: string ): string {
+		const box = doc.createElement( 'div' )
+		box.innerHTML = html
+		return box.textContent ?? ''
+	}
+
+	/** Collapsed Range under a viewport point, when the engine is able to tell */
+	export function $bog_wysiwyg_caret_from_point( doc: Document, x: number, y: number ): Range | null {
+
+		const legacy = Reflect.get( doc, 'caretRangeFromPoint' )
+		if( typeof legacy === 'function' ) return legacy.call( doc, x, y ) ?? null
+
+		const modern = Reflect.get( doc, 'caretPositionFromPoint' )
+		if( typeof modern === 'function' ) {
+			const pos = modern.call( doc, x, y )
+			if( !pos ) return null
+			const range = doc.createRange()
+			range.setStart( pos.offsetNode, pos.offset )
+			range.collapse( true )
+			return range
+		}
+
+		return null
+	}
+
 }
 
 namespace $.$$ {
@@ -143,6 +209,172 @@ namespace $.$$ {
 			return !!plugin?.render
 		}
 
+		// === Caret ===
+
+		/** Editable root of this block */
+		node_el() {
+			return this.dom_node() as HTMLElement
+		}
+
+		/** Plain text of the block as it is rendered right now */
+		text_content() {
+			return this.node_el().textContent ?? ''
+		}
+
+		selection() {
+			return this.node_el().ownerDocument.defaultView?.getSelection() ?? null
+		}
+
+		selection_collapsed() {
+			const sel = this.selection()
+			return !sel || sel.isCollapsed
+		}
+
+		/** Text offset of the caret inside this block. -1 when the caret is elsewhere. */
+		caret_offset(): number {
+			const sel = this.selection()
+			if( !sel || sel.rangeCount === 0 ) return -1
+			const focus = sel.focusNode
+			if( !focus ) return -1
+			return $bog_wysiwyg_offset_of( this.node_el(), focus, sel.focusOffset )
+		}
+
+		/** Put a collapsed caret at a plain text offset. Survives innerHTML rewrites. */
+		caret_place( offset: number ) {
+			const node = this.node_el()
+			const sel = this.selection()
+			if( !sel ) return
+			const point = $bog_wysiwyg_point_at( node, offset )
+			const range = node.ownerDocument.createRange()
+			range.setStart( point.node, point.offset )
+			range.collapse( true )
+			sel.removeAllRanges()
+			sel.addRange( range )
+		}
+
+		/** Focus the block and place the caret at a text offset (end of text by default) */
+		focus_at( offset?: number ) {
+			const node = this.node_el()
+			node.focus()
+			const len = ( node.textContent ?? '' ).length
+			this.caret_place( offset === undefined ? len : Math.max( 0, Math.min( offset, len ) ) )
+		}
+
+		/** HTML of the content before a text offset */
+		html_before( offset: number ) {
+			const node = this.node_el()
+			const doc = node.ownerDocument
+			const point = $bog_wysiwyg_point_at( node, offset )
+			const range = doc.createRange()
+			range.selectNodeContents( node )
+			range.setEnd( point.node, point.offset )
+			const box = doc.createElement( 'div' )
+			box.appendChild( range.cloneContents() )
+			return box.innerHTML
+		}
+
+		/** HTML of the content after a text offset */
+		html_after( offset: number ) {
+			const node = this.node_el()
+			const doc = node.ownerDocument
+			const point = $bog_wysiwyg_point_at( node, offset )
+			const range = doc.createRange()
+			range.selectNodeContents( node )
+			range.setStart( point.node, point.offset )
+			const box = doc.createElement( 'div' )
+			box.appendChild( range.cloneContents() )
+			return box.innerHTML
+		}
+
+		/** Drop the selected content when the whole selection lies inside this block */
+		delete_range() {
+			const node = this.node_el()
+			const sel = this.selection()
+			if( !sel || sel.isCollapsed || sel.rangeCount === 0 ) return false
+
+			const range = sel.getRangeAt( 0 )
+			if( !node.contains( range.startContainer ) || !node.contains( range.endContainer ) ) return false
+
+			const offset = $bog_wysiwyg_offset_of( node, range.startContainer, range.startOffset )
+			range.deleteContents()
+			this.html( node.innerHTML )
+			this.caret_place( offset )
+
+			return true
+		}
+
+		/** Bounding box of a text range. Null when the engine gives no layout. */
+		range_rect( from: number, to: number ): DOMRect | null {
+			const node = this.node_el()
+			const doc = node.ownerDocument
+			const start = $bog_wysiwyg_point_at( node, from )
+			const end = $bog_wysiwyg_point_at( node, to )
+			const range = doc.createRange()
+			range.setStart( start.node, start.offset )
+			range.setEnd( end.node, end.offset )
+			if( typeof range.getBoundingClientRect !== 'function' ) return null
+			return range.getBoundingClientRect()
+		}
+
+		/** Box of the character the caret sticks to */
+		caret_rect(): DOMRect | null {
+			const len = this.text_content().length
+			const offset = this.caret_offset()
+			if( offset < 0 || len === 0 ) return null
+			return offset < len ? this.range_rect( offset, offset + 1 ) : this.range_rect( offset - 1, offset )
+		}
+
+		/** Whether the caret sits on the first / last visual line of the block */
+		caret_lines() {
+			const len = this.text_content().length
+			const offset = this.caret_offset()
+			if( offset < 0 || len === 0 ) return { first: true, last: true }
+
+			const cur = this.caret_rect()
+			const head = this.range_rect( 0, 1 )
+			const tail = this.range_rect( len - 1, len )
+			// No layout engine (server side render, tests): the block is a single line
+			if( !cur || !head || !tail || !cur.height ) return { first: true, last: true }
+
+			return {
+				first: cur.top <= head.top + 1,
+				last: cur.bottom >= tail.bottom - 1,
+			}
+		}
+
+		/** Horizontal position of the caret in viewport pixels. 0 when unknown. */
+		caret_x() {
+			const rect = this.caret_rect()
+			if( !rect ) return 0
+			const len = this.text_content().length
+			return this.caret_offset() < len ? rect.left : rect.right
+		}
+
+		/** Enter the block from a neighbour keeping the horizontal position */
+		focus_column( x: number, offset: number, from_top: boolean ) {
+			const node = this.node_el()
+			node.focus()
+
+			const box = typeof node.getBoundingClientRect === 'function' ? node.getBoundingClientRect() : null
+
+			if( x > 0 && box && box.height > 0 ) {
+				const doc = node.ownerDocument
+				const y = from_top ? box.top + 2 : box.bottom - 2
+				const range = $bog_wysiwyg_caret_from_point( doc, x, y )
+				if( range && node.contains( range.startContainer ) ) {
+					const sel = this.selection()
+					if( sel ) {
+						range.collapse( true )
+						sel.removeAllRanges()
+						sel.addRange( range )
+						return
+					}
+				}
+			}
+
+			this.focus_at( offset )
+		}
+
 		static render_cache = new WeakMap< $bog_wysiwyg_block, $mol_view >()
 
 		override auto() {
@@ -187,11 +419,12 @@ namespace $.$$ {
 
 			node.contentEditable = 'true'
 
-			if( node !== doc.activeElement ) {
-				const html = this.html()
-				if( node.innerHTML !== html ) {
-					node.innerHTML = html
-				}
+			const html = this.html()
+			if( node.innerHTML !== html ) {
+				// Nodes are recreated wholesale, so the caret is remembered by text offset
+				const offset = node === doc.activeElement ? this.caret_offset() : -1
+				node.innerHTML = html
+				if( offset >= 0 ) this.caret_place( offset )
 			}
 		}
 
@@ -201,6 +434,7 @@ namespace $.$$ {
 			const node = event.target as HTMLElement
 			this.try_markdown( node )
 			this.html( node.innerHTML )
+			this.on_input( event )
 			return event
 		}
 
@@ -397,7 +631,7 @@ namespace $.$$ {
 			if( !event ) return null
 			if( this.readonly() ) return event
 
-			const node = event.target as HTMLElement
+			const node = this.node_el()
 
 			// Static rendered blocks (image, plugin render): only Backspace/Enter
 			if( this.is_image() || $bog_wysiwyg_plugin_registry.get( this.type() )?.render ) {
@@ -441,22 +675,64 @@ namespace $.$$ {
 				}
 			}
 
-			// Enter: create new block
+			const collapsed = this.selection_collapsed()
+			const text = node.textContent ?? ''
+
+			// ArrowUp / ArrowDown on the edge line: step into the neighbour block
+			if( collapsed && !event.shiftKey && ( event.key === 'ArrowUp' || event.key === 'ArrowDown' ) ) {
+				const up = event.key === 'ArrowUp'
+				const lines = this.caret_lines()
+				if( up ? lines.first : lines.last ) {
+					event.preventDefault()
+					this.on_nav({
+						dir: up ? 'up' : 'down',
+						x: this.caret_x(),
+						offset: Math.max( 0, this.caret_offset() ),
+					})
+					return event
+				}
+			}
+
+			// Enter: split the block at the caret, or append an empty one at the tail
 			if( event.key === 'Enter' && !event.shiftKey ) {
 				event.preventDefault()
+				// A selection inside this block goes away first
+				const wiped = collapsed ? false : this.delete_range()
+				const offset = this.caret_offset()
+				if( ( collapsed || wiped ) && offset >= 0 && offset < this.text_content().length ) {
+					this.on_split({
+						head: this.html_before( offset ),
+						tail: this.html_after( offset ),
+					})
+					return event
+				}
 				this.on_enter( event )
 				return event
 			}
 
 			// Backspace on empty: remove block
-			if( event.key === 'Backspace' && !node.textContent?.trim() ) {
+			if( event.key === 'Backspace' && collapsed && !text.trim() ) {
 				event.preventDefault()
 				this.on_remove( event )
 				return event
 			}
 
+			// Backspace at the very start: glue with the previous block
+			if( event.key === 'Backspace' && collapsed && this.caret_offset() === 0 ) {
+				event.preventDefault()
+				this.on_merge_prev( event )
+				return event
+			}
+
+			// Delete at the very end: pull the next block in
+			if( event.key === 'Delete' && collapsed && this.caret_offset() === text.length ) {
+				event.preventDefault()
+				this.on_merge_next( event )
+				return event
+			}
+
 			// Slash on empty: open slash menu
-			if( event.key === '/' && !node.textContent?.trim() ) {
+			if( event.key === '/' && !text.trim() ) {
 				event.preventDefault()
 				this.on_slash( event )
 				return event

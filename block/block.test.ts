@@ -55,7 +55,420 @@ namespace $.$$ {
 		return div
 	}
 
+	/** Editable node plus a block view bound to it */
+	function make_block( html: string ) {
+		const doc = $mol_dom_context.document
+		const node = doc.createElement( 'div' )
+		node.contentEditable = 'true'
+		// jsdom only tracks activeElement for focusable areas
+		node.tabIndex = 0
+		node.innerHTML = html
+		doc.body.appendChild( node )
+
+		const block = new $bog_wysiwyg_block()
+		block.dom_node = ()=> node
+		block.html = ( next?: string )=> next ?? node.innerHTML
+
+		const calls = [] as { name: string, arg: unknown }[]
+		for( const name of [ 'on_enter', 'on_remove', 'on_split', 'on_merge_prev', 'on_merge_next', 'on_nav', 'on_input', 'on_slash' ] as const ) {
+			block[ name ] = ( arg?: unknown )=> {
+				calls.push({ name, arg })
+				return arg ?? null
+			}
+		}
+
+		return { block, node, calls, drop: ()=> node.remove() }
+	}
+
+	function set_caret( node: HTMLElement, offset: number ) {
+		const doc = $mol_dom_context.document
+		const point = $bog_wysiwyg_point_at( node, offset )
+		const range = doc.createRange()
+		range.setStart( point.node, point.offset )
+		range.collapse( true )
+		const sel = doc.defaultView!.getSelection()!
+		sel.removeAllRanges()
+		sel.addRange( range )
+	}
+
+	function set_range( node: HTMLElement, from: number, to: number ) {
+		const doc = $mol_dom_context.document
+		const start = $bog_wysiwyg_point_at( node, from )
+		const end = $bog_wysiwyg_point_at( node, to )
+		const range = doc.createRange()
+		range.setStart( start.node, start.offset )
+		range.setEnd( end.node, end.offset )
+		const sel = doc.defaultView!.getSelection()!
+		sel.removeAllRanges()
+		sel.addRange( range )
+	}
+
+	function key( name: string, mods: KeyboardEventInit = {} ) {
+		return new KeyboardEvent( 'keydown', { key: name, cancelable: true, ...mods } )
+	}
+
 	$mol_test({
+
+		// === Text offsets ===
+
+		'point_at walks through nested inline tags'() {
+			const { node, drop } = make_block( 'ab<b>cd</b>ef' )
+			try {
+				$mol_assert_equal( $bog_wysiwyg_point_at( node, 0 ).offset, 0 )
+				$mol_assert_equal( ( $bog_wysiwyg_point_at( node, 3 ).node as Text ).data, 'cd' )
+				$mol_assert_equal( $bog_wysiwyg_point_at( node, 3 ).offset, 1 )
+				$mol_assert_equal( ( $bog_wysiwyg_point_at( node, 6 ).node as Text ).data, 'ef' )
+				$mol_assert_equal( $bog_wysiwyg_point_at( node, 6 ).offset, 2 )
+			} finally { drop() }
+		},
+
+		'point_at clamps beyond the end'() {
+			const { node, drop } = make_block( 'abc' )
+			try {
+				$mol_assert_equal( $bog_wysiwyg_point_at( node, 100 ).offset, 3 )
+			} finally { drop() }
+		},
+
+		'offset_of is inverse of point_at'() {
+			const { node, drop } = make_block( 'ab<b>cd</b>ef' )
+			try {
+				for( let i = 0; i <= 6; i++ ) {
+					const point = $bog_wysiwyg_point_at( node, i )
+					$mol_assert_equal( $bog_wysiwyg_offset_of( node, point.node, point.offset ), i )
+				}
+			} finally { drop() }
+		},
+
+		'offset_of rejects a node outside the block'() {
+			const { node, drop } = make_block( 'abc' )
+			const other = $mol_dom_context.document.createElement( 'div' )
+			try {
+				$mol_assert_equal( $bog_wysiwyg_offset_of( node, other, 0 ), -1 )
+			} finally { drop() }
+		},
+
+		'html_text strips markup'() {
+			$mol_assert_equal(
+				$bog_wysiwyg_html_text( $mol_dom_context.document, 'a<b>b</b><i>c</i>' ),
+				'abc',
+			)
+		},
+
+		'escape_html protects angle brackets'() {
+			$mol_assert_equal( $bog_wysiwyg_escape_html( '<&>' ), '&lt;&amp;&gt;' )
+		},
+
+		// === Caret ===
+
+		'caret_offset counts through inline tags'() {
+			const { block, node, drop } = make_block( 'ab<b>cd</b>ef' )
+			try {
+				set_caret( node, 5 )
+				$mol_assert_equal( block.caret_offset(), 5 )
+			} finally { drop() }
+		},
+
+		'caret_offset is -1 when the caret is in another block'() {
+			const one = make_block( 'first' )
+			const two = make_block( 'second' )
+			try {
+				set_caret( two.node, 2 )
+				$mol_assert_equal( one.block.caret_offset(), -1 )
+			} finally { one.drop(); two.drop() }
+		},
+
+		'caret survives an innerHTML rewrite'() {
+			const { block, node, drop } = make_block( 'hello world' )
+			try {
+				set_caret( node, 5 )
+				const offset = block.caret_offset()
+				// Nodes are recreated, the old Range would be lost
+				node.innerHTML = 'hello <b>world</b>'
+				block.caret_place( offset )
+				$mol_assert_equal( block.caret_offset(), 5 )
+			} finally { drop() }
+		},
+
+		'auto keeps the caret when the focused block is resynced'() {
+			const { block, node, drop } = make_block( 'hello world' )
+			try {
+				node.focus()
+				set_caret( node, 5 )
+				block.html = ( next?: string )=> next ?? 'hello <b>world</b>'
+				block.auto()
+				$mol_assert_equal( node.innerHTML, 'hello <b>world</b>' )
+				$mol_assert_equal( block.caret_offset(), 5 )
+			} finally { drop() }
+		},
+
+		'auto rewrites an unfocused block without touching the selection'() {
+			const { block, node, drop } = make_block( 'old' )
+			const other = make_block( 'elsewhere' )
+			try {
+				set_caret( other.node, 3 )
+				block.html = ( next?: string )=> next ?? 'new'
+				block.auto()
+				$mol_assert_equal( node.innerHTML, 'new' )
+				$mol_assert_equal( other.block.caret_offset(), 3 )
+			} finally { drop(); other.drop() }
+		},
+
+		'focus_at clamps the offset to the text length'() {
+			const { block, node, drop } = make_block( 'abc' )
+			try {
+				block.focus_at( 100 )
+				$mol_assert_equal( block.caret_offset(), 3 )
+			} finally { drop() }
+		},
+
+		// === Splitting content ===
+
+		'html_before and html_after keep markup'() {
+			const { block, drop } = make_block( 'ab<b>cdef</b>gh' )
+			try {
+				$mol_assert_equal( block.html_before( 4 ), 'ab<b>cd</b>' )
+				$mol_assert_equal( block.html_after( 4 ), '<b>ef</b>gh' )
+			} finally { drop() }
+		},
+
+		'html_before at zero is empty and html_after at zero is everything'() {
+			const { block, drop } = make_block( 'a<i>b</i>' )
+			try {
+				$mol_assert_equal( block.html_before( 0 ), '' )
+				$mol_assert_equal( block.html_after( 0 ), 'a<i>b</i>' )
+			} finally { drop() }
+		},
+
+		'Enter in the middle asks the page to split the block'() {
+			const { block, node, calls, drop } = make_block( 'hello world' )
+			try {
+				set_caret( node, 5 )
+				block.keydown_event( key( 'Enter' ) )
+				$mol_assert_equal( calls.length, 1 )
+				$mol_assert_equal( calls[ 0 ].name, 'on_split' )
+				$mol_assert_equal( calls[ 0 ].arg, { head: 'hello', tail: ' world' } )
+			} finally { drop() }
+		},
+
+		'Enter at the end appends a fresh block'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 5 )
+				block.keydown_event( key( 'Enter' ) )
+				$mol_assert_equal( calls.length, 1 )
+				$mol_assert_equal( calls[ 0 ].name, 'on_enter' )
+			} finally { drop() }
+		},
+
+		'Enter at the start pushes the whole text into a new block'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 0 )
+				block.keydown_event( key( 'Enter' ) )
+				$mol_assert_equal( calls[ 0 ].name, 'on_split' )
+				$mol_assert_equal( calls[ 0 ].arg, { head: '', tail: 'hello' } )
+			} finally { drop() }
+		},
+
+		'Enter on an empty block appends a fresh block'() {
+			const { block, node, calls, drop } = make_block( '' )
+			try {
+				set_caret( node, 0 )
+				block.keydown_event( key( 'Enter' ) )
+				$mol_assert_equal( calls[ 0 ].name, 'on_enter' )
+			} finally { drop() }
+		},
+
+		'Enter over a selection inside the block wipes it and splits there'() {
+			const { block, node, calls, drop } = make_block( 'hello world' )
+			try {
+				set_range( node, 5, 8 )
+				block.keydown_event( key( 'Enter' ) )
+				$mol_assert_equal( calls[ 0 ].name, 'on_split' )
+				$mol_assert_equal( calls[ 0 ].arg, { head: 'hello', tail: 'rld' } )
+			} finally { drop() }
+		},
+
+		'delete_range drops the selected content and keeps the caret'() {
+			const { block, node, drop } = make_block( 'hello world' )
+			try {
+				set_range( node, 5, 8 )
+				$mol_assert_equal( block.delete_range(), true )
+				$mol_assert_equal( node.textContent, 'hellorld' )
+				$mol_assert_equal( block.caret_offset(), 5 )
+			} finally { drop() }
+		},
+
+		'delete_range refuses a selection reaching outside the block'() {
+			const one = make_block( 'first' )
+			const two = make_block( 'second' )
+			try {
+				const doc = $mol_dom_context.document
+				const range = doc.createRange()
+				range.setStart( one.node.firstChild!, 1 )
+				range.setEnd( two.node.firstChild!, 1 )
+				const sel = doc.defaultView!.getSelection()!
+				sel.removeAllRanges()
+				sel.addRange( range )
+
+				$mol_assert_equal( one.block.delete_range(), false )
+				$mol_assert_equal( one.node.textContent, 'first' )
+			} finally { one.drop(); two.drop() }
+		},
+
+		'Shift+Enter is left to the browser'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 2 )
+				const event = key( 'Enter', { shiftKey: true } )
+				block.keydown_event( event )
+				$mol_assert_equal( calls.length, 0 )
+				$mol_assert_equal( event.defaultPrevented, false )
+			} finally { drop() }
+		},
+
+		// === Block boundaries ===
+
+		'Backspace at the start of a filled block asks to merge with the previous'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 0 )
+				const event = key( 'Backspace' )
+				block.keydown_event( event )
+				$mol_assert_equal( calls[ 0 ].name, 'on_merge_prev' )
+				$mol_assert_equal( event.defaultPrevented, true )
+			} finally { drop() }
+		},
+
+		'Backspace in the middle is left to the browser'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 3 )
+				const event = key( 'Backspace' )
+				block.keydown_event( event )
+				$mol_assert_equal( calls.length, 0 )
+				$mol_assert_equal( event.defaultPrevented, false )
+			} finally { drop() }
+		},
+
+		'Backspace on an empty block still removes it'() {
+			const { block, node, calls, drop } = make_block( '' )
+			try {
+				set_caret( node, 0 )
+				block.keydown_event( key( 'Backspace' ) )
+				$mol_assert_equal( calls[ 0 ].name, 'on_remove' )
+			} finally { drop() }
+		},
+
+		'Backspace over a selection is left to the browser'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_range( node, 0, 3 )
+				block.keydown_event( key( 'Backspace' ) )
+				$mol_assert_equal( calls.length, 0 )
+			} finally { drop() }
+		},
+
+		'Delete at the end asks to pull the next block in'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 5 )
+				const event = key( 'Delete' )
+				block.keydown_event( event )
+				$mol_assert_equal( calls[ 0 ].name, 'on_merge_next' )
+				$mol_assert_equal( event.defaultPrevented, true )
+			} finally { drop() }
+		},
+
+		'Delete in the middle is left to the browser'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 2 )
+				const event = key( 'Delete' )
+				block.keydown_event( event )
+				$mol_assert_equal( calls.length, 0 )
+				$mol_assert_equal( event.defaultPrevented, false )
+			} finally { drop() }
+		},
+
+		// === Vertical navigation ===
+
+		'caret_lines reports both edges without a layout engine'() {
+			const { block, node, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 2 )
+				const lines = block.caret_lines()
+				$mol_assert_equal( lines.first, true )
+				$mol_assert_equal( lines.last, true )
+			} finally { drop() }
+		},
+
+		'caret_lines reports both edges for an empty block'() {
+			const { block, node, drop } = make_block( '' )
+			try {
+				set_caret( node, 0 )
+				$mol_assert_equal( block.caret_lines(), { first: true, last: true } )
+			} finally { drop() }
+		},
+
+		'ArrowUp on the first line asks to step up'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 3 )
+				const event = key( 'ArrowUp' )
+				block.keydown_event( event )
+				$mol_assert_equal( calls[ 0 ].name, 'on_nav' )
+				$mol_assert_equal( calls[ 0 ].arg, { dir: 'up', x: 0, offset: 3 } )
+				$mol_assert_equal( event.defaultPrevented, true )
+			} finally { drop() }
+		},
+
+		'ArrowDown on the last line asks to step down'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 1 )
+				block.keydown_event( key( 'ArrowDown' ) )
+				$mol_assert_equal( calls[ 0 ].name, 'on_nav' )
+				$mol_assert_equal( calls[ 0 ].arg, { dir: 'down', x: 0, offset: 1 } )
+			} finally { drop() }
+		},
+
+		'Shift+ArrowUp extends the selection instead of stepping'() {
+			const { block, node, calls, drop } = make_block( 'hello' )
+			try {
+				set_caret( node, 3 )
+				block.keydown_event( key( 'ArrowUp', { shiftKey: true } ) )
+				$mol_assert_equal( calls.length, 0 )
+			} finally { drop() }
+		},
+
+		'focus_column falls back to the text offset without a layout engine'() {
+			const { block, node, drop } = make_block( 'hello world' )
+			try {
+				block.focus_column( 0, 4, true )
+				$mol_assert_equal( block.caret_offset(), 4 )
+			} finally { drop() }
+		},
+
+		'focus_column clamps the offset to a shorter block'() {
+			const { block, node, drop } = make_block( 'ab' )
+			try {
+				block.focus_column( 0, 9, false )
+				$mol_assert_equal( block.caret_offset(), 2 )
+			} finally { drop() }
+		},
+
+		// === Input notification ===
+
+		'input_event notifies the page'() {
+			const { block, node, calls, drop } = make_block( 'hi' )
+			try {
+				const event = new Event( 'input' )
+				Object.defineProperty( event, 'target', { value: node } )
+				block.input_event( event )
+				$mol_assert_equal( calls.some( call => call.name === 'on_input' ), true )
+			} finally { drop() }
+		},
 
 		'bold markdown converts to HTML'() {
 			$mol_assert_equal(

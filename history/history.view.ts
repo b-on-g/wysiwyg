@@ -23,9 +23,7 @@ namespace $.$$ {
 			if( !data ) return []
 			const versions = data.Versions()
 			if( !versions ) return []
-			const items = versions.items_vary() ?? []
-			return items
-				.map( v => $giper_baza_vary_cast_link( v ) )
+			return ( versions.items() ?? [] )
 				.filter( $mol_guard_defined )
 				.map( link => link.str )
 		}
@@ -56,10 +54,10 @@ namespace $.$$ {
 				if( snap_blocks ) {
 					for( const block of blocks ) {
 						const snap_block = snap_blocks.make( null )
-						const type_val = block.Type()?.val() ?? ''
+						const type_val = $bog_wysiwyg_pawn_text( block.Type() )
 						const level_val = block.Level()?.val() ?? 0
 						const content_val = block.Content()?.val() ?? ''
-						snap_block.Type( 'auto' )?.val( type_val )
+						$bog_wysiwyg_pawn_text( snap_block.Type( 'auto' ), type_val )
 						snap_block.Level( 'auto' )?.val( level_val )
 						snap_block.Content( 'auto' )?.val( content_val )
 					}
@@ -139,10 +137,10 @@ namespace $.$$ {
 				// Copy snapshot blocks into current land
 				for( const block of src_list ) {
 					const new_block = dst_blocks.make( null )
-					const type_val = block.Type()?.val() ?? ''
+					const type_val = $bog_wysiwyg_pawn_text( block.Type() )
 					const level_val = block.Level()?.val() ?? 0
 					const content_val = block.Content()?.val() ?? ''
-					new_block.Type( 'auto' )?.val( type_val )
+					$bog_wysiwyg_pawn_text( new_block.Type( 'auto' ), type_val )
 					new_block.Level( 'auto' )?.val( level_val )
 					new_block.Content( 'auto' )?.val( content_val )
 				}

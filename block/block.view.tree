@@ -7,6 +7,11 @@ $bog_wysiwyg_block $mol_view
 	placeholder \
 	on_enter?event null
 	on_remove?event null
+	on_split?parts null
+	on_merge_prev?event null
+	on_merge_next?event null
+	on_nav?nav null
+	on_input?event null
 	on_slash?event null
 	on_menu_key?event null
 	on_image?src null

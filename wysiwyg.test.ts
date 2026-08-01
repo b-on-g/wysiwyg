@@ -1,6 +1,724 @@
 namespace $.$$ {
 
+	/** Editor with real DOM behind every block and no Giper Baza at all */
+	function make_editor( blocks: { id: string, html?: string, type?: string, level?: number }[] ) {
+
+		const doc = $mol_dom_context.document
+		const root = doc.createElement( 'div' )
+		doc.body.appendChild( root )
+
+		const editor = new $bog_wysiwyg()
+		const views = new Map< string, $bog_wysiwyg_block >()
+		const focused = [] as { id: string, offset?: number }[]
+
+		editor.Block = ( id: string )=> {
+			let view = views.get( id )
+			if( view ) return view
+
+			view = new $bog_wysiwyg_block()
+			const node = doc.createElement( 'div' )
+			node.contentEditable = 'true'
+			node.tabIndex = 0
+			node.innerHTML = editor.block_html( id )
+			root.appendChild( node )
+			view.dom_node = ()=> node
+			view.html = ( next?: string )=> editor.block_html( id, next )
+			views.set( id, view )
+
+			return view
+		}
+
+		editor.focus_block = ( id: string, offset?: number )=> { focused.push({ id, offset }) }
+
+		editor.block_ids( blocks.map( block => block.id ) )
+		for( const block of blocks ) {
+			if( block.html !== undefined ) editor.block_html( block.id, block.html )
+			if( block.type ) editor.block_type( block.id, block.type )
+			if( block.level ) editor.block_level( block.id, block.level )
+		}
+		// Materialize the DOM so selections can reach into the blocks
+		for( const block of blocks ) editor.Block( block.id )
+
+		return {
+			editor,
+			focused,
+			node: ( id: string )=> editor.Block( id ).dom_node() as HTMLElement,
+			drop: ()=> root.remove(),
+		}
+	}
+
+	function select_across( from: HTMLElement, from_offset: number, to: HTMLElement, to_offset: number ) {
+		const doc = $mol_dom_context.document
+		const start = $bog_wysiwyg_point_at( from, from_offset )
+		const end = $bog_wysiwyg_point_at( to, to_offset )
+		const range = doc.createRange()
+		range.setStart( start.node, start.offset )
+		range.setEnd( end.node, end.offset )
+		const sel = doc.defaultView!.getSelection()!
+		sel.removeAllRanges()
+		sel.addRange( range )
+	}
+
+	function editor_key( name: string, mods: KeyboardEventInit = {} ) {
+		return new KeyboardEvent( 'keydown', { key: name, cancelable: true, ...mods } )
+	}
+
 	$mol_test({
+
+		// === Splitting ===
+
+		'block_split moves the tail into a new block'() {
+
+			const { editor, focused, drop } = make_editor([
+				{ id: 'a', html: 'hello world' },
+				{ id: 'b', html: 'next' },
+			])
+			try {
+				editor.block_split( 'a', { head: 'hello', tail: ' world' } )
+
+				const ids = editor.block_ids()
+				$mol_assert_equal( ids.length, 3 )
+				$mol_assert_equal( ids[ 0 ], 'a' )
+				$mol_assert_equal( ids[ 2 ], 'b' )
+				$mol_assert_equal( editor.block_html( 'a' ), 'hello' )
+				$mol_assert_equal( editor.block_html( ids[ 1 ] ), ' world' )
+				$mol_assert_equal( focused.at( -1 ), { id: ids[ 1 ], offset: 0 } )
+			} finally { drop() }
+		},
+
+		'block_split keeps the type and level of the source block'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'Title text', type: 'heading', level: 2 },
+			])
+			try {
+				editor.block_split( 'a', { head: 'Title', tail: ' text' } )
+
+				const tail_id = editor.block_ids()[ 1 ]
+				$mol_assert_equal( editor.block_type( tail_id ), 'heading' )
+				$mol_assert_equal( editor.block_level( tail_id ), 2 )
+			} finally { drop() }
+		},
+
+		'block_split without parts does nothing'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'text' } ])
+			try {
+				$mol_assert_equal( editor.block_split( 'a' ), null )
+				$mol_assert_equal( editor.block_ids().length, 1 )
+			} finally { drop() }
+		},
+
+		'block_split is refused in readonly mode'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'text' } ])
+			try {
+				editor.readonly = ()=> true
+				$mol_assert_equal( editor.block_split( 'a', { head: 'te', tail: 'xt' } ), null )
+				$mol_assert_equal( editor.block_ids().length, 1 )
+			} finally { drop() }
+		},
+
+		// === Merging ===
+
+		'block_merge_prev glues the block into the previous one'() {
+
+			const { editor, focused, drop } = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				editor.block_merge_prev( 'b', new Event( 'keydown' ) )
+
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'onetwo' )
+				$mol_assert_equal( focused.at( -1 ), { id: 'a', offset: 3 } )
+			} finally { drop() }
+		},
+
+		'block_merge_prev counts the joint offset over markup'() {
+
+			const { editor, focused, drop } = make_editor([
+				{ id: 'a', html: '<b>one</b>' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				editor.block_merge_prev( 'b', new Event( 'keydown' ) )
+
+				$mol_assert_equal( editor.block_html( 'a' ), '<b>one</b>two' )
+				$mol_assert_equal( focused.at( -1 ), { id: 'a', offset: 3 } )
+			} finally { drop() }
+		},
+
+		'block_merge_prev on the first block changes nothing'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				editor.block_merge_prev( 'a', new Event( 'keydown' ) )
+
+				$mol_assert_equal( editor.block_ids(), [ 'a', 'b' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one' )
+			} finally { drop() }
+		},
+
+		'block_merge_prev drops a previous block that holds no text'() {
+
+			const { editor, focused, drop } = make_editor([
+				{ id: 'a', html: '<img src="x.png">', type: 'image' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				editor.block_merge_prev( 'b', new Event( 'keydown' ) )
+
+				$mol_assert_equal( editor.block_ids(), [ 'b' ] )
+				$mol_assert_equal( editor.block_html( 'b' ), 'two' )
+				$mol_assert_equal( focused.at( -1 ), { id: 'b', offset: 0 } )
+			} finally { drop() }
+		},
+
+		'block_merge_next pulls the next block in'() {
+
+			const { editor, focused, drop } = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				editor.block_merge_next( 'a', new Event( 'keydown' ) )
+
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'onetwo' )
+				$mol_assert_equal( focused.at( -1 ), { id: 'a', offset: 3 } )
+			} finally { drop() }
+		},
+
+		'block_merge_next on the last block changes nothing'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				editor.block_merge_next( 'b', new Event( 'keydown' ) )
+				$mol_assert_equal( editor.block_ids(), [ 'a', 'b' ] )
+			} finally { drop() }
+		},
+
+		'block_merge_next drops a next block that holds no text'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: '', type: 'divider' },
+			])
+			try {
+				editor.block_merge_next( 'a', new Event( 'keydown' ) )
+
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one' )
+			} finally { drop() }
+		},
+
+		'merges are refused in readonly mode'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				editor.readonly = ()=> true
+				$mol_assert_equal( editor.block_merge_prev( 'b', new Event( 'keydown' ) ), null )
+				$mol_assert_equal( editor.block_merge_next( 'a', new Event( 'keydown' ) ), null )
+				$mol_assert_equal( editor.block_ids().length, 2 )
+			} finally { drop() }
+		},
+
+		// === Vertical navigation ===
+
+		'block_nav moves the caret into the next block'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'hello' },
+				{ id: 'b', html: 'world wide' },
+			])
+			try {
+				editor.block_nav( 'a', { dir: 'down', x: 0, offset: 3 } )
+				$mol_assert_equal( editor.block_view( 'b' ).caret_offset(), 3 )
+			} finally { drop() }
+		},
+
+		'block_nav keeps the desired column across several steps'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'first line' },
+				{ id: 'b', html: 'ab' },
+				{ id: 'c', html: 'third line' },
+			])
+			try {
+				// Down through a short block: the caret clamps to its end
+				editor.block_nav( 'a', { dir: 'down', x: 0, offset: 7 } )
+				$mol_assert_equal( editor.block_view( 'b' ).caret_offset(), 2 )
+
+				// but the wanted column is remembered and restored in the next block
+				editor.block_nav( 'b', { dir: 'down', x: 0, offset: 2 } )
+				$mol_assert_equal( editor.block_view( 'c' ).caret_offset(), 7 )
+			} finally { drop() }
+		},
+
+		'the desired column is dropped by any other key'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'first line' },
+				{ id: 'b', html: 'ab' },
+				{ id: 'c', html: 'third line' },
+			])
+			try {
+				editor.block_nav( 'a', { dir: 'down', x: 0, offset: 7 } )
+				editor.editor_keydown( editor_key( 'x' ) )
+				$mol_assert_equal( editor.nav_column, null )
+
+				editor.block_nav( 'b', { dir: 'down', x: 0, offset: 2 } )
+				$mol_assert_equal( editor.block_view( 'c' ).caret_offset(), 2 )
+			} finally { drop() }
+		},
+
+		'block_nav at the top edge stays put'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'hello' },
+				{ id: 'b', html: 'world' },
+			])
+			try {
+				editor.block_view( 'a' ).focus_at( 2 )
+				editor.block_nav( 'a', { dir: 'up', x: 0, offset: 2 } )
+				$mol_assert_equal( editor.block_view( 'a' ).caret_offset(), 2 )
+			} finally { drop() }
+		},
+
+		'block_nav without a hint returns null'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'hello' } ])
+			try {
+				$mol_assert_equal( editor.block_nav( 'a' ), null )
+			} finally { drop() }
+		},
+
+		// === Undo / redo ===
+
+		'undo and redo walk over typed text'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				editor.block_html( 'a', 'one two' )
+				editor.history_record()
+
+				$mol_assert_equal( editor.history_states.length, 2 )
+
+				$mol_assert_equal( editor.history_undo(), true )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one' )
+
+				$mol_assert_equal( editor.history_redo(), true )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one two' )
+			} finally { drop() }
+		},
+
+		'undo restores a block split'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'hello world' } ])
+			try {
+				editor.block_split( 'a', { head: 'hello', tail: ' world' } )
+				$mol_assert_equal( editor.block_ids().length, 2 )
+
+				editor.history_undo()
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'hello world' )
+			} finally { drop() }
+		},
+
+		'undo restores a merge'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				editor.block_merge_prev( 'b', new Event( 'keydown' ) )
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+
+				editor.history_undo()
+				$mol_assert_equal( editor.block_ids(), [ 'a', 'b' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one' )
+				$mol_assert_equal( editor.block_html( 'b' ), 'two' )
+			} finally { drop() }
+		},
+
+		'undo restores the block type'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'text' } ])
+			try {
+				editor.history_ensure()
+				editor.block_type( 'a', 'quote' )
+				editor.history_record()
+
+				editor.history_undo()
+				$mol_assert_equal( editor.block_type( 'a' ), 'paragraph' )
+			} finally { drop() }
+		},
+
+		'undo at the bottom of the stack reports failure'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				$mol_assert_equal( editor.history_undo(), false )
+			} finally { drop() }
+		},
+
+		'redo at the top of the stack reports failure'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				$mol_assert_equal( editor.history_redo(), false )
+			} finally { drop() }
+		},
+
+		'a repeated state is not stacked twice'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_record()
+				editor.history_record()
+				editor.history_record()
+				$mol_assert_equal( editor.history_states.length, 1 )
+			} finally { drop() }
+		},
+
+		'a new edit after undo cuts the redo tail'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				editor.block_html( 'a', 'two' )
+				editor.history_record()
+				editor.history_undo()
+
+				editor.block_html( 'a', 'three' )
+				editor.history_record()
+
+				$mol_assert_equal( editor.history_states.length, 2 )
+				$mol_assert_equal( editor.history_redo(), false )
+			} finally { drop() }
+		},
+
+		'redo does not throw away text typed after an undo'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				editor.block_html( 'a', 'one two' )
+				editor.history_record()
+				editor.history_undo()
+
+				// typed, but the debounce has not fired yet
+				editor.block_html( 'a', 'one three' )
+
+				$mol_assert_equal( editor.history_redo(), false )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one three' )
+			} finally { drop() }
+		},
+
+		'the stack is trimmed to its limit'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: '0' } ])
+			try {
+				editor.history_limit = ()=> 3
+				for( let i = 1; i <= 6; i++ ) {
+					editor.block_html( 'a', String( i ) )
+					editor.history_record()
+				}
+				$mol_assert_equal( editor.history_states.length, 3 )
+				$mol_assert_equal( editor.history_states[ 0 ].blocks[ 0 ].content, '4' )
+			} finally { drop() }
+		},
+
+		'a snapshot carries id, type, level, content and the caret'() {
+
+			const { editor, drop } = make_editor([
+				{ id: 'a', html: 'Head', type: 'heading', level: 3 },
+			])
+			try {
+				editor.block_view( 'a' ).focus_at( 2 )
+				const snapshot = editor.history_snapshot()
+
+				$mol_assert_equal( snapshot.blocks, [
+					{ id: 'a', type: 'heading', level: 3, content: 'Head' },
+				] )
+				$mol_assert_equal( snapshot.caret, { id: 'a', offset: 2 } )
+			} finally { drop() }
+		},
+
+		'history stays in memory and never reaches Giper Baza'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				editor.block_html( 'a', 'two' )
+				editor.history_record()
+
+				$mol_assert_equal( editor.has_baza(), false )
+				$mol_assert_equal( editor.history_states.length, 2 )
+			} finally { drop() }
+		},
+
+		'the debounce timer is dropped when a snapshot is taken'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.block_input( 'a', new Event( 'input' ) )
+				$mol_assert_ok( editor.history_timer )
+
+				editor.history_record()
+				$mol_assert_equal( editor.history_timer, null )
+			} finally { drop() }
+		},
+
+		'Ctrl+Z undoes and Ctrl+Shift+Z redoes'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				editor.block_html( 'a', 'one two' )
+				editor.history_record()
+
+				editor.editor_keydown( editor_key( 'z', { ctrlKey: true } ) )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one' )
+
+				editor.editor_keydown( editor_key( 'z', { ctrlKey: true, shiftKey: true } ) )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one two' )
+			} finally { drop() }
+		},
+
+		'Ctrl+Y redoes as well'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				editor.block_html( 'a', 'one two' )
+				editor.history_record()
+				editor.history_undo()
+
+				editor.editor_keydown( editor_key( 'y', { ctrlKey: true } ) )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one two' )
+			} finally { drop() }
+		},
+
+		'undo is not offered in readonly mode'() {
+
+			const { editor, drop } = make_editor([ { id: 'a', html: 'one' } ])
+			try {
+				editor.history_ensure()
+				editor.block_html( 'a', 'one two' )
+				editor.history_record()
+				editor.readonly = ()=> true
+
+				const event = editor_key( 'z', { ctrlKey: true } )
+				editor.editor_keydown( event )
+
+				$mol_assert_equal( event.defaultPrevented, false )
+				$mol_assert_equal( editor.block_html( 'a' ), 'one two' )
+			} finally { drop() }
+		},
+
+		// === Selection across blocks ===
+
+		'block_of_node finds the owning block'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				const { editor } = helper
+				$mol_assert_equal( editor.block_of_node( helper.node( 'b' ).firstChild ), 'b' )
+				$mol_assert_equal( editor.block_of_node( helper.node( 'a' ) ), 'a' )
+				$mol_assert_equal( editor.block_of_node( null ), '' )
+			} finally { helper.drop() }
+		},
+
+		'selection_spans_blocks is false inside a single block'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				select_across( helper.node( 'a' ), 0, helper.node( 'a' ), 2 )
+				$mol_assert_equal( helper.editor.selection_spans_blocks(), false )
+			} finally { helper.drop() }
+		},
+
+		'selection_spans_blocks is true over a border'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'one' },
+				{ id: 'b', html: 'two' },
+			])
+			try {
+				select_across( helper.node( 'a' ), 1, helper.node( 'b' ), 1 )
+				$mol_assert_equal( helper.editor.selection_spans_blocks(), true )
+			} finally { helper.drop() }
+		},
+
+		'delete_selection keeps the head of the first and the tail of the last block'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'aaa' },
+				{ id: 'b', html: 'bbb' },
+				{ id: 'c', html: 'ccc' },
+			])
+			try {
+				const { editor, focused } = helper
+				select_across( helper.node( 'a' ), 1, helper.node( 'c' ), 2 )
+
+				$mol_assert_equal( editor.delete_selection(), true )
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'ac' )
+				$mol_assert_equal( focused.at( -1 ), { id: 'a', offset: 1 } )
+			} finally { helper.drop() }
+		},
+
+		'delete_selection keeps markup around the cut'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: '<b>keep</b>drop' },
+				{ id: 'b', html: 'drop<i>rest</i>' },
+			])
+			try {
+				select_across( helper.node( 'a' ), 4, helper.node( 'b' ), 4 )
+
+				$mol_assert_equal( helper.editor.delete_selection(), true )
+				$mol_assert_equal( helper.editor.block_html( 'a' ), '<b>keep</b><i>rest</i>' )
+			} finally { helper.drop() }
+		},
+
+		'delete_selection can put a typed character in place of the selection'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'aaa' },
+				{ id: 'b', html: 'bbb' },
+			])
+			try {
+				const { editor, focused } = helper
+				select_across( helper.node( 'a' ), 1, helper.node( 'b' ), 2 )
+
+				$mol_assert_equal( editor.delete_selection( 'X' ), true )
+				$mol_assert_equal( editor.block_html( 'a' ), 'aXb' )
+				$mol_assert_equal( focused.at( -1 ), { id: 'a', offset: 2 } )
+			} finally { helper.drop() }
+		},
+
+		'delete_selection escapes the typed character'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'aaa' },
+				{ id: 'b', html: 'bbb' },
+			])
+			try {
+				select_across( helper.node( 'a' ), 1, helper.node( 'b' ), 2 )
+				helper.editor.delete_selection( '<' )
+				$mol_assert_equal( helper.editor.block_html( 'a' ), 'a&lt;b' )
+			} finally { helper.drop() }
+		},
+
+		'delete_selection ignores a selection inside one block'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'aaa' },
+				{ id: 'b', html: 'bbb' },
+			])
+			try {
+				select_across( helper.node( 'a' ), 0, helper.node( 'a' ), 2 )
+				$mol_assert_equal( helper.editor.delete_selection(), false )
+				$mol_assert_equal( helper.editor.block_ids().length, 2 )
+			} finally { helper.drop() }
+		},
+
+		'Backspace over a cross block selection keeps the document sane'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'aaa' },
+				{ id: 'b', html: 'bbb' },
+				{ id: 'c', html: 'ccc' },
+			])
+			try {
+				const { editor } = helper
+				select_across( helper.node( 'a' ), 1, helper.node( 'c' ), 1 )
+
+				const event = editor_key( 'Backspace' )
+				editor.editor_keydown( event )
+
+				$mol_assert_equal( event.defaultPrevented, true )
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'acc' )
+			} finally { helper.drop() }
+		},
+
+		'typing over a cross block selection replaces it with the character'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'aaa' },
+				{ id: 'b', html: 'bbb' },
+			])
+			try {
+				const { editor } = helper
+				select_across( helper.node( 'a' ), 2, helper.node( 'b' ), 1 )
+
+				const event = editor_key( 'q' )
+				editor.editor_keydown( event )
+
+				$mol_assert_equal( event.defaultPrevented, true )
+				$mol_assert_equal( editor.block_ids(), [ 'a' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'aaqbb' )
+			} finally { helper.drop() }
+		},
+
+		'a cross block deletion can be undone'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'aaa' },
+				{ id: 'b', html: 'bbb' },
+				{ id: 'c', html: 'ccc' },
+			])
+			try {
+				const { editor } = helper
+				select_across( helper.node( 'a' ), 1, helper.node( 'c' ), 1 )
+				editor.delete_selection()
+
+				editor.history_undo()
+				$mol_assert_equal( editor.block_ids(), [ 'a', 'b', 'c' ] )
+				$mol_assert_equal( editor.block_html( 'a' ), 'aaa' )
+				$mol_assert_equal( editor.block_html( 'c' ), 'ccc' )
+			} finally { helper.drop() }
+		},
+
+		'a printable key with a plain caret is left to the browser'() {
+
+			const helper = make_editor([
+				{ id: 'a', html: 'aaa' },
+				{ id: 'b', html: 'bbb' },
+			])
+			try {
+				helper.editor.block_view( 'a' ).focus_at( 1 )
+				const event = editor_key( 'q' )
+				helper.editor.editor_keydown( event )
+
+				$mol_assert_equal( event.defaultPrevented, false )
+				$mol_assert_equal( helper.editor.block_html( 'a' ), 'aaa' )
+			} finally { helper.drop() }
+		},
 
 		'ArrowDown increments menu_index within bounds'() {
 
