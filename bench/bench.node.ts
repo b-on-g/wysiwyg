@@ -311,41 +311,13 @@ namespace $.$$ {
 				editor.block_paste_blocks( ids[ ids.length >> 1 ], { drafts, head: '', tail: '' } )
 			}, land )
 
-			/*
-			 * The same paste with the block order written by hand.
-			 *
-			 * `block_paste_blocks` re-reads `block_ids()` *after* minting the new pawns, and by then
-			 * the Baza list already holds them at its end, so the order it writes back names them
-			 * twice. `$mol_reconcile` then walks into its insert branch and never touches the tail,
-			 * which is why the row above stays flat while every other middle edit grows. The page
-			 * really does end up with the pasted blocks duplicated — verified separately: 50 blocks
-			 * plus a 20 block paste gives 88 blocks and 19 repeated links.
-			 *
-			 * This row does what the paste meant to do, so it shows what the operation costs once
-			 * the order is right.
-			 */
-			const fixed = this.build( size )
-			const list = fixed.editor.page_data()!.Blocks( 'auto' )!
-
-			this.measure( size, 'paste 20 blocks (fixed)', 5, ()=> {
-
-				const ids = fixed.editor.block_ids()
-				const at = ids.length >> 1
-
-				const fresh = [] as string[]
-				for( let i = 0; i < 20; ++ i ) {
-					const pawn = list.make( null )
-					$bog_wysiwyg_pawn_text( pawn.Type( 'auto' ), 'paragraph' )
-					fresh.push( pawn.link().str )
-				}
-
-				const next = [ ... ids ]
-				next.splice( at + 1, 0, ... fresh )
-				fixed.editor.block_ids( next )
-
-				for( let i = 0; i < 20; ++ i ) fixed.editor.block_html( fresh[ i ], this.text( i + 100 ) )
-
-			}, fixed.land )
+			// A paste that lands duplicates would read as flat units here, because reconciliation
+			// finds the fresh links already sitting in the tail and never rewrites it. So the row
+			// growing with the document is also the check that the order came out right.
+			const ids = editor.block_ids()
+			if( new Set( ids ).size !== ids.length ) {
+				$mol_fail( new Error( 'Paste left duplicated blocks in the page order' ) )
+			}
 
 		}
 
