@@ -24,6 +24,9 @@ $bog_wysiwyg_app $mol_page
 			Icon <= Profile_icon $mol_icon_account
 			hint @ \Profile
 			checked? <=> profile_showed? false
+		<= Export $bog_wysiwyg_export
+			blocks <= export_blocks /
+			page_title <= export_page_title \
 		<= Lights $mol_lights_toggle
 	sub /
 		<= Head

@@ -1,0 +1,17 @@
+{
+	"$bog_wysiwyg_export_hint": "Экспорт в Markdown",
+	"$bog_wysiwyg_export_label_image": "Картинка",
+	"$bog_wysiwyg_export_label_images": "Картинки",
+	"$bog_wysiwyg_export_note_length": "Длина",
+	"$bog_wysiwyg_export_note_parts": "Сообщений",
+	"$bog_wysiwyg_export_Dialect_hint": "Площадка",
+	"$bog_wysiwyg_export_dialect_options_common": "Markdown (GFM)",
+	"$bog_wysiwyg_export_dialect_options_habr": "Хабр",
+	"$bog_wysiwyg_export_dialect_options_devto": "dev.to",
+	"$bog_wysiwyg_export_dialect_options_telegram": "Телеграм",
+	"$bog_wysiwyg_export_Images_apart_title": "Картинки списком",
+	"$bog_wysiwyg_export_Images_apart_hint": "Вынести все картинки в список в конце",
+	"$bog_wysiwyg_export_Copy_title": "Скопировать",
+	"$bog_wysiwyg_export_Copy_hint": "Скопировать markdown в буфер обмена",
+	"$bog_wysiwyg_export_Parts_hint": "Сообщение"
+}

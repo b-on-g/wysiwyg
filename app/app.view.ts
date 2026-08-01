@@ -36,9 +36,7 @@ namespace $.$$ {
 			if( !data ) return []
 			const list = data.Registries()
 			if( !list ) return []
-			const items = list.items_vary() ?? []
-			return items
-				.map( v => $giper_baza_vary_cast_link( v ) )
+			return ( list.items() ?? [] )
 				.filter( $mol_guard_defined )
 				.map( link => link.str )
 		}
@@ -83,9 +81,7 @@ namespace $.$$ {
 			if( !data ) return []
 			const list = data.Pages()
 			if( !list ) return []
-			const items = list.items_vary() ?? []
-			return items
-				.map( v => $giper_baza_vary_cast_link( v ) )
+			return ( list.items() ?? [] )
 				.filter( $mol_guard_defined )
 				.map( link => link.str )
 		}
@@ -113,6 +109,31 @@ namespace $.$$ {
 				$bog_wysiwyg_model_block,
 			)
 			return block.Content()?.val() ?? ''
+		}
+
+		/**
+		 * Current page unwrapped into plain blocks for the markdown exporter.
+		 * Read through the editor, so the Baza schema stays in one place
+		 * and the serializer never sees a land, a pawn or an atom.
+		 */
+		@ $mol_mem
+		export_blocks(): readonly $bog_wysiwyg_export_block[] {
+
+			if( !this.page_land_link() ) return []
+
+			const editor = this.Editor()
+
+			return editor.block_ids().map( ( id: string ) => ( {
+				type: editor.block_type( id ),
+				level: editor.block_level( id ),
+				content: editor.block_html( id ),
+			} ) )
+		}
+
+		/** Page title for the dev.to front matter */
+		export_page_title() {
+			const link = this.page_land_link()
+			return link ? this.page_title_by_link( link ) : ''
 		}
 
 		/** All pages info for backlinks */
@@ -328,12 +349,8 @@ namespace $.$$ {
 				const data = land.Data( $bog_wysiwyg_model_registry )
 				const pages = data.Pages()
 				if( pages ) {
-					const items = pages.items_vary() ?? []
-					const first = items[0]
-					if( first ) {
-						const first_link = $giper_baza_vary_cast_link( first )
-						if( first_link ) this.page_land_link( first_link.str )
-					}
+					const first = ( pages.items() ?? [] )[ 0 ]
+					if( first ) this.page_land_link( first.str )
 				}
 			}
 			return event
