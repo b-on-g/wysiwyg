@@ -28,6 +28,32 @@ namespace $ {
 			minWidth: 0,
 		},
 
+		/** Says out loud what a write refused to store. Click dismisses it. */
+		Notice: {
+			position: 'fixed',
+			zIndex: 100,
+			bottom: '1rem',
+			left: '1rem',
+			right: '1rem',
+			margin: {
+				left: 'auto',
+				right: 'auto',
+			},
+			maxWidth: '30rem',
+			textAlign: 'left',
+			justifyContent: 'flex-start',
+			borderRadius: '0.5rem',
+			padding: '0.75rem',
+			color: $mol_theme.text,
+			background: {
+				color: $mol_theme.focus,
+			},
+
+			':not([bog_wysiwyg_notice_showed])': {
+				display: 'none',
+			},
+		},
+
 		Block_list: {
 			flex: {
 				shrink: 1,

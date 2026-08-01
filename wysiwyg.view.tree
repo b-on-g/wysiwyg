@@ -1,5 +1,6 @@
 $bog_wysiwyg $mol_view
 	page_land_link \
+	notice_too_long @ \That is more text than one block can hold, so it was not saved. Split it up.
 	readonly false
 	block_ids? /
 	Block* $bog_wysiwyg_block
@@ -19,6 +20,8 @@ $bog_wysiwyg $mol_view
 		on_slash?event <=> block_slash*?event null
 		on_menu_key?event <=> block_menu_key*?event null
 		on_image?src <=> block_image*?src null
+		on_image_file?file <=> block_image_file*?file null
+		on_link?event <=> block_link*?event null
 		on_ai?event <=> block_ai*?event null
 		on_ai_key?event <=> block_ai_key*?event null
 		on_paste_blocks?val <=> block_paste_blocks*?val null
@@ -76,3 +79,27 @@ $bog_wysiwyg $mol_view
 		<= History $bog_wysiwyg_history
 			page_land_link <= page_land_link
 			showed? <=> history_showed? false
+		<= Image_prompt $bog_wysiwyg_prompt
+			showed <= image_prompt_showed? false
+			pos_y <= prompt_pos_y? 0
+			pos_x <= prompt_pos_x? 0
+			file_shown true
+			label @ \Picture: choose a file or paste an address
+			hint \https://example.com/picture.png
+			value?val <=> image_url?val \
+			files? <=> image_files? /File
+			submit? <=> image_submit? null
+		<= Link_prompt $bog_wysiwyg_prompt
+			showed <= link_prompt_showed? false
+			pos_y <= prompt_pos_y?
+			pos_x <= prompt_pos_x?
+			label @ \Link address
+			hint \https://example.com
+			value?val <=> link_url?val \
+			submit? <=> link_submit? null
+		<= Notice $mol_button_minor
+			title <= notice? \
+			click? <=> notice_dismiss? null
+			attr *
+				^
+				bog_wysiwyg_notice_showed <= notice_showed false

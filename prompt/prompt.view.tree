@@ -1,0 +1,42 @@
+- A small panel asking for an address, and optionally for a file.
+- Replaces the native `prompt()`: a browser modal freezes the renderer, and a
+- frozen renderer answers neither the user nor the debug protocol.
+$bog_wysiwyg_prompt $mol_view
+	showed false
+	pos_y 0
+	pos_x 0
+	label @ \Address
+	hint \
+	file_shown false
+	value?val \
+	files? /File
+	submit? null
+	sub <= content /
+	Label $mol_paragraph
+		title <= label
+	Field $mol_string
+		hint <= hint
+		value?val <=> value?val
+		submit? <=> submit?
+	Submit $mol_button_minor
+		title @ \Insert
+		click? <=> submit?
+	Row $mol_view
+		sub /
+			<= Field
+			<= Submit
+	Open $mol_button_open
+		accept \image/*
+		multiple false
+		files? <=> files? /File
+		sub /
+			<= Open_icon $mol_icon_upload
+			<= Open_label $mol_paragraph
+				title @ \Choose a file
+	attr *
+		^
+		bog_wysiwyg_prompt_showed <= showed
+	style *
+		^
+		top <= pos_y_str \0px
+		left <= pos_x_str \0px

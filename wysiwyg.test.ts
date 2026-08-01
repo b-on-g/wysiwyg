@@ -1352,7 +1352,12 @@ namespace $.$$ {
 			$mol_assert_equal( editor.block_type( 'b1' ), 'paragraph' )
 		},
 
-		'menu_picked with image prompts for URL'() {
+		/*
+		 * The picture command used to call a native `prompt()`. That freezes the renderer, so the
+		 * tab stops answering the user and the debug protocol alike, and an address was the only
+		 * thing it could ever ask for. It opens the editor's own panel now.
+		 */
+		'menu_picked with image opens the picture panel'() {
 
 			const editor = new $bog_wysiwyg()
 			editor.active_block_id( 'b1' )
@@ -1360,37 +1365,76 @@ namespace $.$$ {
 			editor.menu_showed( true )
 			editor.focus_block = () => {}
 
-			const ctx = editor.$.$mol_dom_context as any
-			const original_prompt = ctx.prompt
-			ctx.prompt = () => 'https://example.com/img.png'
+			editor.menu_picked( 'image' )
+
+			$mol_assert_equal( editor.image_prompt_showed(), true )
+			$mol_assert_equal( editor.menu_showed(), false )
+			// Nothing is committed until the panel answers
+			$mol_assert_equal( editor.block_type( 'b1' ), 'paragraph' )
+		},
+
+		'an address typed into the picture panel makes the picture'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.active_block_id( 'b1' )
+			editor.block_ids( [ 'b1' ] )
+			editor.focus_block = () => {}
 
 			editor.menu_picked( 'image' )
+			editor.image_url( 'https://example.com/img.png' )
+			editor.image_submit()
 
 			$mol_assert_equal( editor.block_type( 'b1' ), 'image' )
 			$mol_assert_ok( editor.block_html( 'b1' ).includes( 'https://example.com/img.png' ) )
-			$mol_assert_equal( editor.menu_showed(), false )
-
-			ctx.prompt = original_prompt
+			$mol_assert_equal( editor.image_prompt_showed(), false )
 		},
 
-		'menu_picked with image cancelled prompt keeps paragraph'() {
+		'an empty picture panel leaves the block alone'() {
 
 			const editor = new $bog_wysiwyg()
 			editor.active_block_id( 'b1' )
 			editor.block_ids( [ 'b1' ] )
-			editor.menu_showed( true )
 			editor.focus_block = () => {}
 
-			const ctx = editor.$.$mol_dom_context as any
-			const original_prompt = ctx.prompt
-			ctx.prompt = () => null
-
 			editor.menu_picked( 'image' )
+			editor.image_submit()
 
 			$mol_assert_equal( editor.block_type( 'b1' ), 'paragraph' )
-			$mol_assert_equal( editor.menu_showed(), false )
+			$mol_assert_equal( editor.image_prompt_showed(), false )
+		},
 
-			ctx.prompt = original_prompt
+		'the link panel wraps the selection through the block'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'b1' ] )
+			editor.focus_block = () => {}
+
+			const applied = [] as string[]
+			editor.block_view = ()=> ( { link_apply: ( url: string )=> { applied.push( url ) } } ) as never
+
+			editor.block_link( 'b1', new $mol_dom_context.Event( 'keydown' ) )
+			$mol_assert_equal( editor.link_prompt_showed(), true )
+
+			editor.link_url( 'https://example.com' )
+			editor.link_submit()
+
+			$mol_assert_equal( applied, [ 'https://example.com' ] )
+			$mol_assert_equal( editor.link_prompt_showed(), false )
+		},
+
+		'the link panel makes an embed block when the plugin asked'() {
+
+			const editor = new $bog_wysiwyg()
+			editor.block_ids( [ 'b1' ] )
+			editor.focus_block = () => {}
+
+			editor.link_prompt_open( 'b1', 'embed' )
+			editor.link_url( 'https://example.com/page' )
+			editor.link_submit()
+
+			$mol_assert_equal( editor.block_type( 'b1' ), 'embed' )
+			$mol_assert_ok( editor.block_html( 'b1' ).includes( 'https://example.com/page' ) )
+			$mol_assert_equal( editor.link_prompt_showed(), false )
 		},
 
 		// === Drag & Drop ===

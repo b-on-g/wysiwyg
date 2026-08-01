@@ -17,6 +17,23 @@ namespace $ {
 		return text
 	}
 
+	/** An `<img>` for a block body, with both attributes escaped. */
+	export function $bog_wysiwyg_image_html( src: string, alt = '' ) {
+		const quote = ( text: string )=> text.replace( /&/g, '&amp;' ).replace( /"/g, '&quot;' )
+		return '<img src="' + quote( src ) + '"'
+			+ ( alt ? ' alt="' + quote( alt ) + '"' : '' )
+			+ '>'
+	}
+
+	/**
+	 * Bytes a single Sand can carry, minus room for the Unit header.
+	 *
+	 * `$giper_baza_unit_sand.make` throws above 2**16, and the throw used to happen deep inside a
+	 * write nobody was watching, so the text just went missing. Anything this long is refused up
+	 * front and out loud instead.
+	 */
+	export const $bog_wysiwyg_text_limit = 2 ** 16 - 64
+
 	/**
 	 * Read or write a text field of a Baza model.
 	 * An atomic register exposes `val`, a mergeable text pawn exposes `text`.
@@ -130,10 +147,37 @@ namespace $.$$ {
 			if( !this.has_baza() ) return super.block_html( id, next )
 			const block = this.baza_block( id )
 			if( next !== undefined ) {
+				if( !this.text_fits( next ) ) return this.block_html( id )
 				block.Content( 'auto' )?.val( next )
 				return next
 			}
 			return block.Content()?.val() ?? ''
+		}
+
+		/**
+		 * Whether a block body fits one Sand, complaining out loud when it does not.
+		 *
+		 * The write below would otherwise throw `Size too large` somewhere deep inside Giper Baza,
+		 * where nobody is listening, and the text would be gone without a word.
+		 */
+		text_fits( text: string ) {
+
+			// Three bytes per character is the worst UTF-8 does below the surrogates, so ordinary
+			// text never pays for the encoding.
+			if( text.length * 3 < $bog_wysiwyg_text_limit ) return true
+			if( $mol_charset_encode( text ).length <= $bog_wysiwyg_text_limit ) return true
+
+			this.notice( this.notice_too_long() )
+			return false
+		}
+
+		notice_showed() {
+			return !!this.notice()
+		}
+
+		notice_dismiss( event?: Event ) {
+			this.notice( '' )
+			return event
 		}
 
 		/** Override block_type to sync with Baza when connected */
@@ -464,13 +508,7 @@ namespace $.$$ {
 
 			if( cmd === 'image' ) {
 				this.menu_showed( false )
-				const url = this.$.$mol_dom_context.prompt( this.$.$mol_locale.text( '$bog_wysiwyg_image_url_prompt' ) )
-				if( !url ) {
-					this.focus_block( id )
-					return
-				}
-				this.block_type( id, 'image' )
-				this.block_html( id, '<img src="' + url.replace( /"/g, '&quot;' ) + '">' )
+				this.image_prompt_open( id )
 				return
 			}
 
@@ -579,13 +617,165 @@ namespace $.$$ {
 			return val
 		}
 
+		// === Pictures ===
+
 		block_image( id: string, src?: string ) {
 			if( !src ) return null
+			if( this.readonly() ) return null
 			this.history_record()
 			this.block_type( id, 'image' )
-			this.block_html( id, '<img src="' + src.replace( /"/g, '&quot;' ) + '">' )
+			this.block_html( id, $bog_wysiwyg_image_html( src ) )
 			this.history_record()
 			return src
+		}
+
+		/**
+		 * A picture straight from a file, without ever becoming a data uri.
+		 *
+		 * One Sand holds at most 64 KB, so a base64 picture past that size simply does not fit
+		 * the block text — and used to be dropped without a word. The bytes go into a
+		 * `$giper_baza_file` pawn of the page Land instead, split into chunks by the file itself,
+		 * and the block keeps only the `?BAZA:file=…` address. That is the form the exporter and
+		 * the reader already speak.
+		 *
+		 * Returns null when there is no Land to put the file in, and the caller falls back to a
+		 * data uri — small pictures then keep working in a Land-less editor exactly as before.
+		 */
+		@ $mol_action
+		block_image_file( id: string, file?: File ) {
+
+			if( !file ) return null
+			if( this.readonly() ) return null
+
+			const land = this.page_land()
+			if( !land ) return null
+
+			const pawn = land.Pawn( $giper_baza_file ).Head( land.self_make() )
+			if( $giper_baza_file.meta ) pawn.meta( $giper_baza_file.meta )
+			pawn.blob( file )
+
+			this.history_record()
+			this.block_type( id, 'image' )
+			this.block_html( id, $bog_wysiwyg_image_html( pawn.uri(), file.name ) )
+			this.history_record()
+
+			return file
+		}
+
+		/** No Land to keep the bytes in, so the picture stays inline. Small ones only. */
+		@ $mol_action
+		image_data_uri( file: File ) {
+			const bytes = new Uint8Array( $mol_wire_sync( file ).arrayBuffer() )
+			return 'data:' + ( file.type || 'image/png' ) + ';base64,' + $mol_base64_encode( bytes )
+		}
+
+		// === Prompt panels ===
+		//
+		// Everything here used to be a native `prompt()`. A browser modal freezes the renderer,
+		// and a frozen renderer answers neither the user nor the debug protocol — so an automated
+		// pass over the editor died on the very first picture. It also only ever asked for an
+		// address, while the thing people actually want is to pick a file.
+
+		/** Put a panel right under the block it was called from, like the slash menu. */
+		prompt_anchor( id: string ) {
+			const rect = ( this.Block( id ).dom_node() as HTMLElement ).getBoundingClientRect()
+			this.prompt_pos_y( rect.bottom )
+			this.prompt_pos_x( rect.left )
+		}
+
+		image_prompt_open( id: string ) {
+			this.active_block_id( id )
+			this.prompt_anchor( id )
+			this.image_url( '' )
+			this.image_prompt_showed( true )
+		}
+
+		/** Address typed into the picture panel. */
+		image_submit( event?: Event ) {
+
+			const id = this.active_block_id()
+			const url = this.image_url().trim()
+
+			this.image_prompt_showed( false )
+			if( !id || !url ) return null
+
+			this.image_url( '' )
+			this.block_image( id, url )
+
+			return event ?? null
+		}
+
+		/** File picked in the picture panel. */
+		@ $mol_mem
+		image_files( next?: readonly File[] ) {
+
+			const file = next?.[ 0 ]
+			const id = this.active_block_id()
+
+			if( file && id ) {
+				this.image_prompt_showed( false )
+				if( !this.block_image_file( id, file ) ) {
+					this.block_image( id, this.image_data_uri( file ) )
+				}
+			}
+
+			return next ?? []
+		}
+
+		/**
+		 * What the link panel is being filled in for: an inline link inside the text, or a
+		 * standalone embed block. Plain field — nothing renders off it.
+		 */
+		link_target = '' as '' | 'embed'
+
+		/** Ctrl+K inside a block. */
+		block_link( id: string, event?: Event ) {
+			if( !event ) return null
+			if( this.readonly() ) return null
+			this.link_prompt_open( id, '' )
+			return event
+		}
+
+		link_prompt_open( id: string, target: '' | 'embed' ) {
+			this.active_block_id( id )
+			this.prompt_anchor( id )
+			this.link_url( '' )
+			this.link_target = target
+			this.link_prompt_showed( true )
+		}
+
+		link_submit( event?: Event ) {
+
+			const id = this.active_block_id()
+			const url = this.link_url().trim()
+			const target = this.link_target
+
+			this.link_prompt_showed( false )
+			this.link_target = ''
+			if( !id || !url ) return null
+
+			this.link_url( '' )
+
+			if( target === 'embed' ) this.block_embed( id, url )
+			else this.block_view( id ).link_apply( url )
+
+			return event ?? null
+		}
+
+		/** A link on a line of its own, as the embed plugin makes it. */
+		block_embed( id: string, url: string ) {
+
+			const quote = ( text: string )=> text.replace( /&/g, '&amp;' ).replace( /"/g, '&quot;' ).replace( /</g, '&lt;' )
+
+			let display = url.replace( /^https?:\/\//, '' )
+			if( display.length > 60 ) display = display.slice( 0, 57 ) + '...'
+
+			this.history_record()
+			this.block_type( id, 'embed' )
+			this.block_html( id,
+				'<a href="' + quote( url ) + '" target="_blank" rel="noopener">' + quote( display ) + '</a>'
+			)
+			this.history_record()
 		}
 
 		@ $mol_mem

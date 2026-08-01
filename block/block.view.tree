@@ -15,6 +15,8 @@ $bog_wysiwyg_block $mol_view
 	on_slash?event null
 	on_menu_key?event null
 	on_image?src null
+	on_image_file?file null
+	on_link?event null
 	ai_open false
 	on_ai?event null
 	on_ai_key?event null

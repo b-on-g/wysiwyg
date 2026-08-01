@@ -203,6 +203,31 @@ namespace $.$$ {
 			return this.type() === 'image'
 		}
 
+		/**
+		 * Body with every `?BAZA:file=…` turned into something the browser can fetch.
+		 *
+		 * That address is a Harp query resolved by an offline service worker, and no app here
+		 * installs one, so an object url over the file bytes is what actually shows a picture.
+		 * Only the static branch of `auto()` uses this: an editable block writes its innerHTML
+		 * back into the model, and an object url must never be what gets written.
+		 */
+		html_shown() {
+			const html = this.html()
+			if( !html.includes( '?BAZA:file=' ) ) return html
+			return html.replace(
+				/\?BAZA:file=([^;"'\s]+)[^"']*/g,
+				( whole, link: string )=> this.file_uri( link ) || whole,
+			)
+		}
+
+		/** Object url over the bytes of a file pawn. Empty while the file is still coming in. */
+		@ $mol_mem_key
+		file_uri( link: string ) {
+			const file = this.$.$giper_baza_glob.Pawn( new $giper_baza_link( link ), $giper_baza_file )
+			if( !file.filled() ) return ''
+			return URL.createObjectURL( file.blob() )
+		}
+
 		is_static() {
 			if( this.type() === 'image' || this.type() === 'embed' ) return true
 			const plugin = $bog_wysiwyg_plugin_registry.get( this.type() )
@@ -410,7 +435,7 @@ namespace $.$$ {
 
 			if( readonly || this.is_static() ) {
 				node.contentEditable = 'false'
-				const html = this.html()
+				const html = this.html_shown()
 				if( node.innerHTML !== html ) {
 					node.innerHTML = html
 				}
@@ -543,15 +568,34 @@ namespace $.$$ {
 			return event
 		}
 
+		/** Where the link goes, remembered while the panel holds the focus. */
+		link_range = null as Range | null
+
 		link_exec( event?: KeyboardEvent ) {
 			if( !event ) return null
 			event.preventDefault()
 
-			const url = this.$.$mol_dom_context.prompt( this.$.$mol_locale.text( '$bog_wysiwyg_block_link_url_prompt' ) )
-			if( !url ) return event
+			const sel = this.selection()
+			this.link_range = sel && sel.rangeCount ? sel.getRangeAt( 0 ).cloneRange() : null
+
+			this.on_link( event )
+			return event
+		}
+
+		/** Put a link where the caret was when the panel opened. */
+		link_apply( url: string ) {
 
 			const doc = this.$.$mol_dom_context.document
-			const sel = doc.defaultView?.getSelection()
+			const node = this.node_el()
+			node.focus()
+
+			const sel = this.selection()
+			if( sel && this.link_range ) {
+				sel.removeAllRanges()
+				sel.addRange( this.link_range )
+			}
+			this.link_range = null
+
 			if( sel && sel.toString().length > 0 ) {
 				doc.execCommand( 'createLink', false, url )
 			} else {
@@ -561,8 +605,7 @@ namespace $.$$ {
 				doc.execCommand( 'insertHTML', false, a.outerHTML )
 			}
 
-			this.html( ( this.dom_node() as HTMLElement ).innerHTML )
-			return event
+			this.html( node.innerHTML )
 		}
 
 		paste_event( event?: ClipboardEvent ) {
@@ -673,7 +716,18 @@ namespace $.$$ {
 			return event
 		}
 
+		/**
+		 * The bytes go to the editor as they are.
+		 *
+		 * Turning them into a data uri first grows them by a third and, past 64 KB, the result no
+		 * longer fits one Giper Baza Sand — which is how pasted pictures used to disappear. The
+		 * reader stays as the fallback for an editor with no Land behind it, where there is
+		 * nowhere to put a file pawn.
+		 */
 		insert_image_file( file: File ) {
+
+			if( this.on_image_file( file ) ) return
+
 			const reader = new FileReader()
 			reader.onload = () => {
 				const src = reader.result as string
