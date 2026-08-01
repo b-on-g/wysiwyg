@@ -650,13 +650,41 @@ namespace $.$$ {
 			const land = this.page_land()
 			if( !land ) return null
 
-			const pawn = land.Pawn( $giper_baza_file ).Head( land.self_make() )
-			if( $giper_baza_file.meta ) pawn.meta( $giper_baza_file.meta )
-			pawn.blob( file )
+			let uri = ''
 
+			try {
+
+				// Bytes first: reading the blob is the step that suspends the fiber, and nothing
+				// has been put into the Land by the time it does.
+				const buffer = new Uint8Array( $mol_wire_sync( file ).arrayBuffer() )
+
+				const pawn = land.Pawn( $giper_baza_file ).Head( land.self_make() )
+				if( $giper_baza_file.meta ) pawn.meta( $giper_baza_file.meta )
+				pawn.buffer( buffer )
+				pawn.type( file.type || 'image/png' )
+				// `blob()` takes a name only off a DOM `File`, and not every caller hands one over
+				if( file.name ) pawn.name( file.name )
+
+				uri = pawn.uri()
+
+			} catch( error ) {
+
+				// A suspended fiber is not a failure: let it through so the action can resume
+				if( $mol_promise_like( error ) ) $mol_fail_hidden( error )
+
+				// Losing a picture in silence is the whole bug this came from, so say it happened
+				this.notice( this.notice_image_failed() )
+				$mol_fail_log( error )
+
+				// Handled: the caller must not go on to inline it as a data uri
+				return file
+			}
+
+			// The block changes only once the bytes are safely in the Land, so a failed write
+			// leaves a paragraph rather than a picture block with nothing in it.
 			this.history_record()
 			this.block_type( id, 'image' )
-			this.block_html( id, $bog_wysiwyg_image_html( pawn.uri(), file.name ) )
+			this.block_html( id, $bog_wysiwyg_image_html( uri, file.name ) )
 			this.history_record()
 
 			return file

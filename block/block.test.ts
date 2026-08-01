@@ -894,6 +894,32 @@ namespace $.$$ {
 			$mol_assert_equal( reached, false )
 		},
 
+		'html_shown keeps an old inline data uri working'() {
+			const block = new $bog_wysiwyg_block()
+			// How every picture was stored before they moved into file pawns
+			block.html = ()=> '<img src="data:image/png;base64,AAAA">'
+			$mol_assert_equal( block.html_shown(), '<img src="data:image/png;base64,AAAA">' )
+		},
+
+		'only a picture block explains itself when empty'() {
+
+			// A block apiece: `placeholder` is memoized, so one instance answers once
+			const make = ( type: string )=> {
+				const block = new $bog_wysiwyg_block()
+				block.type = ()=> type
+				// $mol_locale reads its dictionary relative to the cwd, which a bare run has not got
+				block.placeholder_image = ()=> '\u{1F5BC} Pick a picture or paste its address'
+				return block
+			}
+
+			const hint = make( 'image' ).placeholder()
+			$mol_assert_ok( hint.includes( 'picture' ) )
+			// Words, not a run-together string
+			$mol_assert_ok( hint.includes( ' ' ) )
+
+			$mol_assert_equal( make( 'paragraph' ).placeholder(), '' )
+		},
+
 		'html_shown leaves ordinary markup alone'() {
 			const block = new $bog_wysiwyg_block()
 			block.html = ()=> '<img src="https://x.dev/a.png" alt="A">'

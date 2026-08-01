@@ -186,6 +186,17 @@ namespace $.$$ {
 		}
 
 		@ $mol_mem
+		/**
+		 * Hint drawn inside an empty block.
+		 *
+		 * The css for it has always been there, but nothing ever filled the attribute, so a
+		 * picture block with no picture in it was a blank box that said nothing about what it
+		 * was waiting for. Only that block has a hint: an empty paragraph is self-explanatory.
+		 */
+		override placeholder() {
+			return this.type() === 'image' ? this.placeholder_image() : ''
+		}
+
 		is_empty() {
 			const html = this.html()
 			if( this.type() === 'image' && html?.includes( '<img' ) ) return false

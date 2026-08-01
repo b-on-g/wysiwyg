@@ -142,6 +142,22 @@ namespace $ {
 				margin: { top: '0.5rem', bottom: '0.5rem' },
 				textAlign: 'center',
 			},
+
+			/**
+			 * One block is one item, and the reader draws a bullet for each. Without this the
+			 * editor drew none, so a list looked exactly like a run of paragraphs.
+			 */
+			list: {
+				padding: { left: '2rem' },
+
+				'::before': {
+					content: '"\\2022"',
+					position: 'absolute',
+					left: '0.75rem',
+					color: $mol_theme.shade,
+					pointerEvents: 'none',
+				},
+			},
 		},
 
 		'@media': {

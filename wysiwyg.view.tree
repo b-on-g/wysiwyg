@@ -1,6 +1,7 @@
 $bog_wysiwyg $mol_view
 	page_land_link \
 	notice_too_long @ \That is more text than one block can hold, so it was not saved. Split it up.
+	notice_image_failed @ \The picture could not be saved. Try again, or pick a smaller one.
 	readonly false
 	block_ids? /
 	Block* $bog_wysiwyg_block

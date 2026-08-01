@@ -1,4 +1,8 @@
 {
 	"$bog_wysiwyg_history_Save_button_title": "Сохранить версию",
-	"$bog_wysiwyg_history_version_label": "Версия"
+	"$bog_wysiwyg_history_version_label": "Версия",
+	"$bog_wysiwyg_Image_prompt_label": "Картинка: выберите файл или вставьте адрес",
+	"$bog_wysiwyg_Link_prompt_label": "Адрес ссылки",
+	"$bog_wysiwyg_notice_too_long": "Столько текста в один блок не помещается, он не сохранён. Разбейте на части.",
+	"$bog_wysiwyg_notice_image_failed": "Картинку не удалось сохранить. Попробуйте ещё раз или возьмите поменьше."
 }
