@@ -35165,12 +35165,14 @@ var $;
             block_view(id) {
                 return this.Block(id);
             }
-            /** Blocks that hold no editable text and can not be glued with neighbours */
-            block_is_static(id) {
-                const type = this.block_type(id);
+            /** Kinds of block that hold no editable text and can not be glued with neighbours */
+            type_is_static(type) {
                 if (type === 'image' || type === 'embed' || type === 'divider')
                     return true;
                 return !!$bog_wysiwyg_plugin_registry.get(type)?.render;
+            }
+            block_is_static(id) {
+                return this.type_is_static(this.block_type(id));
             }
             /** Allocate an id for a new block, creating the Baza pawn when connected */
             make_block_id() {
@@ -35436,58 +35438,76 @@ var $;
                 this.block_html(id, '');
                 this.focus_block(id);
             }
+            /** Plain text length of an html fragment */
+            html_text_length(html) {
+                return $bog_wysiwyg_html_text(this.$.$mol_dom_context.document, html).length;
+            }
+            /**
+             * Clipboard drafts into the page around the caret. The whole paste is one
+             * undo step: the head of the target block keeps the pasted content, the
+             * tail moves behind everything that was pasted.
+             */
             block_paste_blocks(id, val) {
-                if (!val || !val.length)
+                const drafts = val?.drafts ?? [];
+                if (!drafts.length)
                     return null;
+                if (this.readonly())
+                    return null;
+                const head = val?.head ?? '';
+                const tail = val?.tail ?? '';
                 this.history_record();
-                // First block replaces the current one
-                this.block_type(id, val[0].type);
-                this.block_html(id, val[0].content);
-                if (val[0].level)
-                    this.block_level(id, val[0].level);
-                // Remaining blocks are inserted after
-                const ids = [...this.block_ids()];
-                const index = ids.indexOf(id);
-                let last_id = id;
-                for (let i = 1; i < val.length; i++) {
-                    const block = val[i];
-                    let new_id;
-                    if (this.has_baza()) {
-                        const data = this.page_data();
-                        const blocks_list = data?.Blocks('auto');
-                        if (blocks_list) {
-                            const pawn = blocks_list.make(null);
-                            $.$bog_wysiwyg_pawn_text(pawn.Type('auto'), block.type);
-                            pawn.Content('auto')?.val(block.content);
-                            if (block.level)
-                                pawn.Level('auto')?.val(block.level);
-                            new_id = pawn.link().str;
-                        }
-                        else {
-                            new_id = this.generate_id();
-                        }
+                if (val?.inline) {
+                    const content = head + drafts[0].content;
+                    this.block_html(id, content + tail);
+                    this.focus_block(id, this.html_text_length(content));
+                    this.history_record();
+                    return val;
+                }
+                const own_type = this.block_type(id);
+                const own_level = this.block_level(id);
+                const slots = [];
+                const first = drafts[0];
+                if (!head && !tail) {
+                    // An untouched block takes the kind of the first pasted one
+                    slots.push({ type: first.type, level: first.level ?? own_level, content: first.content });
+                }
+                else if (this.type_is_static(first.type)) {
+                    // A picture or a divider can not swallow the text before the caret
+                    slots.push({ type: own_type, level: own_level, content: head });
+                    slots.push({ type: first.type, level: first.level ?? 1, content: first.content });
+                }
+                else {
+                    slots.push({ type: own_type, level: own_level, content: head + first.content });
+                }
+                for (const draft of drafts.slice(1)) {
+                    slots.push({ type: draft.type, level: draft.level ?? 1, content: draft.content });
+                }
+                // The caret ends up right after everything pasted, before the old tail
+                let caret_slot = slots.length - 1;
+                let caret_offset = this.html_text_length(slots[caret_slot].content);
+                if (tail) {
+                    const last = slots[slots.length - 1];
+                    if (this.type_is_static(last.type)) {
+                        slots.push({ type: own_type, level: own_level, content: tail });
+                        caret_slot = slots.length - 1;
+                        caret_offset = 0;
                     }
                     else {
-                        new_id = this.generate_id();
+                        last.content += tail;
                     }
-                    const insert_at = ids.indexOf(last_id) + 1;
-                    ids.splice(insert_at, 0, new_id);
-                    last_id = new_id;
                 }
+                const slot_ids = [id];
+                while (slot_ids.length < slots.length)
+                    slot_ids.push(this.make_block_id());
+                const ids = [...this.block_ids()];
+                ids.splice(ids.indexOf(id) + 1, 0, ...slot_ids.slice(1));
                 this.block_ids(ids);
-                // Set data for non-baza blocks
-                if (!this.has_baza()) {
-                    let pos = index + 1;
-                    for (let i = 1; i < val.length; i++) {
-                        const new_id = ids[pos];
-                        this.block_type(new_id, val[i].type);
-                        this.block_html(new_id, val[i].content);
-                        if (val[i].level)
-                            this.block_level(new_id, val[i].level);
-                        pos++;
-                    }
+                for (let i = 0; i < slots.length; i++) {
+                    this.block_type(slot_ids[i], slots[i].type);
+                    this.block_level(slot_ids[i], slots[i].level);
+                    this.block_html(slot_ids[i], slots[i].content);
                 }
-                this.focus_block(last_id);
+                this.focus_block(slot_ids[caret_slot], caret_offset);
                 this.history_record();
                 return val;
             }
@@ -38878,6 +38898,621 @@ var $;
 
 ;
 "use strict";
+var $;
+(function ($) {
+    /**
+     * Clipboard to blocks. Pure functions, no DOM editor and no storage.
+     * Inline markup in `content` is limited to what the block renderer understands:
+     * b, i, u, s, code, a[href], br, img[src].
+     */
+    class $bog_wysiwyg_paste {
+        /** Sniffs the clipboard format. Markdown is guessed from plain text when html is missing or has no semantics. */
+        static detect(data) {
+            const html = paste_get(data, 'text/html');
+            if (html.trim() && paste_rich(html))
+                return 'html';
+            const text = paste_get(data, 'text/plain');
+            return paste_markdownish(text) ? 'markdown' : 'text';
+        }
+        /** Sniffs the format and parses with the matching parser. */
+        static from_data(data) {
+            switch (this.detect(data)) {
+                case 'html': return this.from_html(paste_get(data, 'text/html'));
+                case 'markdown': return this.from_markdown(paste_get(data, 'text/plain'));
+                default: return this.from_text(paste_get(data, 'text/plain'));
+            }
+        }
+        /** Parses clipboard html into block drafts, dropping editor junk. */
+        static from_html(html) {
+            if (!html.trim())
+                return [];
+            const doc = $mol_dom_parse(html, 'text/html');
+            const drafts = [];
+            paste_walk(doc.body, drafts);
+            return drafts;
+        }
+        /** Parses markdown source into block drafts. */
+        static from_markdown(md) {
+            const drafts = [];
+            const lines = md.replace(/\r\n?/g, '\n').split('\n');
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i];
+                const trimmed = line.trim();
+                if (!trimmed) {
+                    i++;
+                    continue;
+                }
+                const fence = /^(`{3,}|~{3,})\s*([\w+#.-]*)/.exec(trimmed);
+                if (fence) {
+                    const marker = fence[1][0];
+                    const lang = paste_lang_clean(fence[2]);
+                    const body = [];
+                    i++;
+                    while (i < lines.length && !new RegExp('^\\s*\\' + marker + '{3,}\\s*$').test(lines[i])) {
+                        body.push(lines[i]);
+                        i++;
+                    }
+                    if (i < lines.length)
+                        i++;
+                    drafts.push(paste_code(body.join('\n'), lang));
+                    continue;
+                }
+                const heading = /^(#{1,6})\s+(.*)$/.exec(trimmed);
+                if (heading) {
+                    const content = paste_md_inline(heading[2].replace(/\s+#+\s*$/, ''));
+                    if (content)
+                        drafts.push({ type: 'heading', level: Math.min(3, heading[1].length), content });
+                    i++;
+                    continue;
+                }
+                if (/^(?:\*\s*){3,}$|^(?:-\s*){3,}$|^(?:_\s*){3,}$/.test(trimmed)) {
+                    drafts.push({ type: 'divider', content: '' });
+                    i++;
+                    continue;
+                }
+                if (trimmed.startsWith('>')) {
+                    const quote = [];
+                    while (i < lines.length && lines[i].trim().startsWith('>')) {
+                        quote.push(lines[i].trim().replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    const content = paste_md_inline(quote.join('\n'));
+                    if (content)
+                        drafts.push({ type: 'quote', content });
+                    continue;
+                }
+                if (paste_md_item.test(line)) {
+                    const items = [];
+                    while (i < lines.length) {
+                        const item = paste_md_item.exec(lines[i]);
+                        if (item) {
+                            items.push(item[1]);
+                            i++;
+                            continue;
+                        }
+                        if (items.length && /^\s+\S/.test(lines[i])) {
+                            items[items.length - 1] += ' ' + lines[i].trim();
+                            i++;
+                            continue;
+                        }
+                        break;
+                    }
+                    for (const item of items) {
+                        const content = paste_md_inline(item);
+                        if (content)
+                            drafts.push({ type: 'list', content });
+                    }
+                    continue;
+                }
+                if (/^\|.*\|$/.test(trimmed)) {
+                    while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+                        const cells = lines[i].trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(cell => cell.trim());
+                        const ruler = cells.length > 0 && cells.every(cell => /^:?-{2,}:?$/.test(cell));
+                        if (!ruler) {
+                            const content = cells.map(cell => paste_md_inline(cell)).filter(Boolean).join(' | ');
+                            if (content)
+                                drafts.push({ type: 'paragraph', content });
+                        }
+                        i++;
+                    }
+                    continue;
+                }
+                const image = paste_md_image.exec(trimmed);
+                if (image) {
+                    const draft = paste_image_draft(paste_md_url(image[2]), image[1]);
+                    if (draft)
+                        drafts.push(draft);
+                    i++;
+                    continue;
+                }
+                const para = [];
+                while (i < lines.length && lines[i].trim() && !paste_md_break(lines[i])) {
+                    para.push(lines[i]);
+                    i++;
+                }
+                if (!para.length) {
+                    i++;
+                    continue;
+                }
+                const content = paste_md_inline(para.join('\n'));
+                if (content)
+                    drafts.push({ type: 'paragraph', content });
+            }
+            return drafts;
+        }
+        /** Splits plain text into paragraphs by blank lines, keeping line breaks. */
+        static from_text(text) {
+            return text
+                .replace(/\r\n?/g, '\n')
+                .split(/\n[ \t]*\n+/)
+                .map(chunk => paste_escape(chunk.replace(/\u00A0/g, ' ')).trim().replace(/\n/g, '<br>'))
+                .filter(Boolean)
+                .map(content => ({ type: 'paragraph', content }));
+        }
+    }
+    $.$bog_wysiwyg_paste = $bog_wysiwyg_paste;
+    const paste_md_item = /^\s{0,8}(?:[-*+]|\d+[.)])\s+(.*)$/;
+    /** Url part of a markdown link. Allows one level of nested parens, as in wiki links. */
+    const paste_md_link_url = '((?:[^\\s()]|\\([^()]*\\))+)(?:\\s+["\'][^"\']*["\'])?\\s*';
+    const paste_md_image = new RegExp('^!\\[([^\\]]*)\\]\\(\\s*' + paste_md_link_url + '\\)$');
+    function paste_md_break(line) {
+        const trimmed = line.trim();
+        if (/^(`{3,}|~{3,})/.test(trimmed))
+            return true;
+        if (/^#{1,6}\s/.test(trimmed))
+            return true;
+        if (/^(?:\*\s*){3,}$|^(?:-\s*){3,}$|^(?:_\s*){3,}$/.test(trimmed))
+            return true;
+        if (trimmed.startsWith('>'))
+            return true;
+        if (paste_md_item.test(line))
+            return true;
+        if (/^\|.*\|$/.test(trimmed))
+            return true;
+        if (paste_md_image.test(trimmed))
+            return true;
+        return false;
+    }
+    function paste_get(data, type) {
+        return data.getData(type) ?? '';
+    }
+    /** Elements that on their own prove the html is worth parsing as html. */
+    const paste_rich_query = 'h1,h2,h3,h4,h5,h6,p,ul,ol,li,blockquote,pre,table,img,hr,a,code';
+    /** True when html carries structure or emphasis worth keeping. */
+    function paste_rich(html) {
+        const doc = $mol_dom_parse(html, 'text/html');
+        if (doc.body.querySelector(paste_rich_query))
+            return true;
+        for (const el of Array.from(doc.body.querySelectorAll('b,strong,i,em,u,s,strike,del,span,font'))) {
+            if (paste_marks(el, el.tagName.toLowerCase()).length)
+                return true;
+        }
+        return false;
+    }
+    const paste_md_signs = [
+        /^\s{0,3}#{1,6}\s+\S/m,
+        /^\s{0,3}(?:[-*+]|\d+[.)])\s+\S/m,
+        /^\s{0,3}(?:`{3,}|~{3,})/m,
+        /^\s{0,3}>\s?\S/m,
+        /^\s{0,3}(?:\*\s*){3,}$|^\s{0,3}(?:-\s*){3,}$|^\s{0,3}(?:_\s*){3,}$/m,
+        /!?\[[^\]\n]+\]\([^)\s]+\)/,
+        /\*\*[^*\n]+\*\*/,
+        /~~[^~\n]+~~/,
+        /(?:^|[^`])`[^`\n]+`/,
+        /^\s*\|.+\|\s*$/m,
+    ];
+    function paste_markdownish(text) {
+        if (!text.trim())
+            return false;
+        return paste_md_signs.some(sign => sign.test(text));
+    }
+    const paste_blocks = new Set([
+        'address', 'article', 'aside', 'blockquote', 'body', 'dd', 'div', 'dl', 'dt',
+        'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4',
+        'h5', 'h6', 'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section',
+        'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul',
+    ]);
+    const paste_drops = new Set([
+        'audio', 'base', 'button', 'canvas', 'col', 'colgroup', 'embed', 'head',
+        'iframe', 'input', 'link', 'math', 'meta', 'noscript', 'object', 'option',
+        'script', 'select', 'source', 'style', 'svg', 'template', 'textarea',
+        'title', 'track', 'video', 'xml',
+    ]);
+    const paste_block_query = 'h1,h2,h3,h4,h5,h6,p,div,ul,ol,li,blockquote,pre,hr,table,tr,td,th,img,'
+        + 'section,article,figure,dl,dd,dt,header,footer,main,nav,aside';
+    /**
+     * Namespaced office tags are not listed here on purpose: `o:p` is empty filler that
+     * unwraps to nothing, while `w:sdt` wraps real text that must survive.
+     */
+    function paste_skip(el) {
+        const tag = el.tagName.toLowerCase();
+        if (paste_drops.has(tag))
+            return true;
+        const style = (el.getAttribute('style') ?? '').toLowerCase();
+        if (style.includes('mso-list:ignore'))
+            return true;
+        if (/display\s*:\s*none/.test(style))
+            return true;
+        return false;
+    }
+    function paste_walk(parent, out) {
+        let buf = '';
+        const flush = () => {
+            const content = paste_tidy(buf);
+            buf = '';
+            if (content)
+                out.push({ type: 'paragraph', content });
+        };
+        for (const node of Array.from(parent.childNodes)) {
+            if (node.nodeType === 3) {
+                buf += paste_escape(paste_plain_text(node.textContent ?? ''));
+                continue;
+            }
+            if (node.nodeType !== 1)
+                continue;
+            const el = node;
+            if (paste_skip(el))
+                continue;
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'br') {
+                buf += '<br>';
+                continue;
+            }
+            if (tag === 'img') {
+                flush();
+                const draft = paste_image_draft(el.getAttribute('src') ?? '', el.getAttribute('alt') ?? '');
+                if (draft)
+                    out.push(draft);
+                continue;
+            }
+            if (!paste_blocks.has(tag)) {
+                if (paste_has_block(el)) {
+                    flush();
+                    paste_walk(el, out);
+                    continue;
+                }
+                buf += paste_inline_el(el);
+                continue;
+            }
+            flush();
+            paste_emit(el, tag, out);
+        }
+        flush();
+    }
+    function paste_has_block(el) {
+        return !!el.querySelector(paste_block_query);
+    }
+    function paste_emit(el, tag, out) {
+        if (/^h[1-6]$/.test(tag)) {
+            const content = paste_tidy(paste_inline_nodes(el));
+            if (content)
+                out.push({ type: 'heading', level: Math.min(3, Number(tag[1])), content });
+            paste_images(el, out);
+            return;
+        }
+        if (tag === 'hr') {
+            out.push({ type: 'divider', content: '' });
+            return;
+        }
+        if (tag === 'pre') {
+            const inner = el.querySelector('code');
+            const lang = paste_lang(el) ?? (inner ? paste_lang(inner) : null);
+            out.push(paste_code((el.textContent ?? '').replace(/\u00A0/g, ' ').replace(/\r\n?/g, '\n'), lang));
+            return;
+        }
+        if (tag === 'ul' || tag === 'ol') {
+            paste_list(el, out);
+            return;
+        }
+        if (tag === 'blockquote') {
+            const parts = [];
+            paste_quote_parts(el, parts);
+            const content = parts.join('<br>');
+            if (content)
+                out.push({ type: 'quote', content });
+            paste_images(el, out);
+            return;
+        }
+        if (tag === 'table') {
+            paste_table(el, out);
+            return;
+        }
+        if (tag === 'p' && paste_word_item(el)) {
+            const content = paste_tidy(paste_inline_nodes(el)).replace(/^(?:[•·▪◦‣§*]|\d+[.)]|[a-z][.)])\s*/i, '');
+            if (content)
+                out.push({ type: 'list', content });
+            paste_images(el, out);
+            return;
+        }
+        paste_walk(el, out);
+    }
+    /** Word marks list items with a MsoListParagraph class or an mso-list style. */
+    function paste_word_item(el) {
+        const cls = el.getAttribute('class') ?? '';
+        if (/mso-?list/i.test(cls))
+            return true;
+        return /mso-list\s*:/i.test(el.getAttribute('style') ?? '');
+    }
+    function paste_list(el, out) {
+        for (const node of Array.from(el.children)) {
+            const tag = node.tagName.toLowerCase();
+            if (tag === 'ul' || tag === 'ol') {
+                paste_list(node, out);
+                continue;
+            }
+            if (tag !== 'li')
+                continue;
+            if (paste_skip(node))
+                continue;
+            const nested = [];
+            const images = [];
+            let buf = '';
+            const gather = (parent) => {
+                for (const child of Array.from(parent.childNodes)) {
+                    if (child.nodeType === 3) {
+                        buf += paste_escape(paste_plain_text(child.textContent ?? ''));
+                        continue;
+                    }
+                    if (child.nodeType !== 1)
+                        continue;
+                    const sub = child;
+                    if (paste_skip(sub))
+                        continue;
+                    const sub_tag = sub.tagName.toLowerCase();
+                    if (sub_tag === 'ul' || sub_tag === 'ol') {
+                        nested.push(sub);
+                        continue;
+                    }
+                    if (sub_tag === 'img') {
+                        images.push(sub);
+                        continue;
+                    }
+                    if (sub_tag === 'br') {
+                        buf += '<br>';
+                        continue;
+                    }
+                    if (paste_blocks.has(sub_tag)) {
+                        if (buf.trim())
+                            buf += '<br>';
+                        gather(sub);
+                        continue;
+                    }
+                    if (paste_has_block(sub)) {
+                        gather(sub);
+                        continue;
+                    }
+                    buf += paste_inline_el(sub);
+                }
+            };
+            gather(node);
+            const content = paste_tidy(buf);
+            if (content)
+                out.push({ type: 'list', content });
+            for (const image of images) {
+                const draft = paste_image_draft(image.getAttribute('src') ?? '', image.getAttribute('alt') ?? '');
+                if (draft)
+                    out.push(draft);
+            }
+            for (const sub of nested)
+                paste_list(sub, out);
+        }
+    }
+    function paste_quote_parts(parent, parts) {
+        let buf = '';
+        const flush = () => {
+            const content = paste_tidy(buf);
+            buf = '';
+            if (content)
+                parts.push(content);
+        };
+        for (const node of Array.from(parent.childNodes)) {
+            if (node.nodeType === 3) {
+                buf += paste_escape(paste_plain_text(node.textContent ?? ''));
+                continue;
+            }
+            if (node.nodeType !== 1)
+                continue;
+            const el = node;
+            if (paste_skip(el))
+                continue;
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'img')
+                continue;
+            if (tag === 'br') {
+                buf += '<br>';
+                continue;
+            }
+            if (paste_blocks.has(tag) || paste_has_block(el)) {
+                flush();
+                paste_quote_parts(el, parts);
+                continue;
+            }
+            buf += paste_inline_el(el);
+        }
+        flush();
+    }
+    function paste_table(el, out) {
+        for (const row of Array.from(el.querySelectorAll('tr'))) {
+            const cells = [];
+            for (const cell of Array.from(row.children)) {
+                const tag = cell.tagName.toLowerCase();
+                if (tag !== 'td' && tag !== 'th')
+                    continue;
+                cells.push(paste_tidy(paste_inline_nodes(cell)));
+            }
+            const content = cells.filter(Boolean).join(' | ');
+            if (content)
+                out.push({ type: 'paragraph', content });
+        }
+        paste_images(el, out);
+    }
+    function paste_images(el, out) {
+        for (const image of Array.from(el.querySelectorAll('img'))) {
+            const draft = paste_image_draft(image.getAttribute('src') ?? '', image.getAttribute('alt') ?? '');
+            if (draft)
+                out.push(draft);
+        }
+    }
+    function paste_inline_nodes(parent) {
+        let out = '';
+        for (const node of Array.from(parent.childNodes)) {
+            if (node.nodeType === 3) {
+                out += paste_escape(paste_plain_text(node.textContent ?? ''));
+                continue;
+            }
+            if (node.nodeType !== 1)
+                continue;
+            const el = node;
+            if (paste_skip(el))
+                continue;
+            out += paste_inline_el(el);
+        }
+        return out;
+    }
+    function paste_inline_el(el) {
+        const tag = el.tagName.toLowerCase();
+        if (tag === 'br')
+            return '<br>';
+        if (tag === 'img')
+            return '';
+        const inner = paste_inline_nodes(el);
+        if (inner === '')
+            return '';
+        if (!inner.trim())
+            return inner;
+        if (tag === 'a') {
+            const href = paste_href(el.getAttribute('href') ?? '');
+            return href ? '<a href="' + paste_attr(href) + '">' + inner + '</a>' : inner;
+        }
+        let out = inner;
+        const marks = paste_marks(el, tag).filter(mark => mark !== 'u' || !paste_wraps_link(inner));
+        for (let i = marks.length - 1; i >= 0; i--)
+            out = '<' + marks[i] + '>' + out + '</' + marks[i] + '>';
+        return out;
+    }
+    /** Editors underline every link with a wrapper span. The underline is already implied by the link. */
+    function paste_wraps_link(inner) {
+        return /^<a\b[^>]*>[\s\S]*<\/a>$/.test(inner);
+    }
+    /**
+     * Which of b/i/u/s/code an element stands for, by tag name and by inline style.
+     * Declarations are anchored at a semicolon so that vendor properties like
+     * `mso-bidi-font-weight` do not pass for `font-weight`.
+     */
+    function paste_marks(el, tag) {
+        const marks = [];
+        const style = (el.getAttribute('style') ?? '').toLowerCase();
+        const weight = /(?:^|;)\s*font-weight\s*:\s*([^;]+)/.exec(style)?.[1]?.trim();
+        const bold_style = weight === 'bold' || weight === 'bolder' || (!!weight && Number(weight) >= 600);
+        const guid = /^docs-internal-guid/.test(el.getAttribute('id') ?? '');
+        const bold_tag = (tag === 'b' || tag === 'strong') && !guid && !(!!weight && !bold_style);
+        if (bold_tag || bold_style)
+            marks.push('b');
+        const slant = /(?:^|;)\s*font-style\s*:\s*([^;]+)/.exec(style)?.[1]?.trim();
+        const italic_tag = (tag === 'i' || tag === 'em') && slant !== 'normal';
+        if (italic_tag || slant === 'italic' || slant === 'oblique')
+            marks.push('i');
+        const deco = /(?:^|;)\s*text-decoration(?:-line)?\s*:\s*([^;]+)/.exec(style)?.[1] ?? '';
+        if ((tag === 'u' && !/none/.test(deco)) || /underline/.test(deco))
+            marks.push('u');
+        const strike_tag = tag === 's' || tag === 'strike' || tag === 'del';
+        if ((strike_tag && !/none/.test(deco)) || /line-through/.test(deco))
+            marks.push('s');
+        if (tag === 'code' || tag === 'tt' || tag === 'kbd' || tag === 'samp' || tag === 'var')
+            marks.push('code');
+        return marks;
+    }
+    function paste_code(text, lang) {
+        const body = paste_escape(text.replace(/\n+$/, ''));
+        return {
+            type: 'code',
+            content: lang ? '<code class="language-' + lang + '">' + body + '</code>' : body,
+        };
+    }
+    function paste_lang(el) {
+        const found = /(?:^|\s)(?:language|lang)-([\w+#.-]+)/.exec(el.getAttribute('class') ?? '');
+        return found ? paste_lang_clean(found[1]) : null;
+    }
+    function paste_lang_clean(lang) {
+        const clean = lang.toLowerCase().replace(/[^a-z0-9+#._-]/g, '');
+        return clean || null;
+    }
+    function paste_image_draft(src, alt) {
+        const clean = src.trim();
+        if (!clean)
+            return null;
+        if (/^(?:javascript|vbscript|file):/i.test(clean))
+            return null;
+        const label = alt.trim();
+        return {
+            type: 'image',
+            content: '<img src="' + paste_attr(clean) + '"' + (label ? ' alt="' + paste_attr(label) + '"' : '') + '>',
+        };
+    }
+    function paste_href(href) {
+        const clean = href.trim().replace(/\s+/g, ' ');
+        if (!clean)
+            return null;
+        if (/^(?:javascript|vbscript|data|file):/i.test(clean))
+            return null;
+        return clean;
+    }
+    function paste_plain_text(text) {
+        return text.replace(/\u00A0/g, ' ').replace(/[\t\n\r ]+/g, ' ');
+    }
+    function paste_escape(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function paste_attr(text) {
+        return paste_escape(text).replace(/"/g, '&quot;');
+    }
+    function paste_tidy(html) {
+        return html
+            .replace(/[\t\n\r ]+/g, ' ')
+            .replace(/^(?:\s|<br>)+/, '')
+            .replace(/(?:\s|<br>)+$/, '');
+    }
+    /** Markdown inline markup to the subset of html the block renderer understands. */
+    function paste_md_inline(src) {
+        const codes = [];
+        let text = paste_escape(src.replace(/\u00A0/g, ' '));
+        text = text.replace(/`([^`\n]+)`/g, (all, body) => {
+            codes.push(body.trim());
+            return '\u0000' + (codes.length - 1) + '\u0000';
+        });
+        text = text.replace(new RegExp('!\\[([^\\]]*)\\]\\(\\s*' + paste_md_link_url + '\\)', 'g'), (all, alt, url) => {
+            const href = paste_href(paste_md_url(url));
+            if (!href)
+                return alt;
+            return '<a href="' + paste_attr_escaped(href) + '">' + (alt || href) + '</a>';
+        });
+        text = text.replace(new RegExp('\\[([^\\]]+)\\]\\(\\s*' + paste_md_link_url + '\\)', 'g'), (all, label, url) => {
+            const href = paste_href(paste_md_url(url));
+            if (!href)
+                return label;
+            return '<a href="' + paste_attr_escaped(href) + '">' + label + '</a>';
+        });
+        text = text.replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<b>$1</b>');
+        text = text.replace(/(?<![\w_])__(?=\S)([\s\S]*?\S)__(?![\w_])/g, '<b>$1</b>');
+        text = text.replace(/~~(?=\S)([\s\S]*?\S)~~/g, '<s>$1</s>');
+        text = text.replace(/(?<![*\w])\*(?=\S)([^*\n]*?\S)\*(?!\*)/g, '<i>$1</i>');
+        text = text.replace(/(?<![\w_])_(?=\S)([^_\n]*?\S)_(?![\w_])/g, '<i>$1</i>');
+        text = text.replace(/\u0000(\d+)\u0000/g, (all, index) => '<code>' + codes[Number(index)] + '</code>');
+        return text.trim().replace(/\n/g, '<br>');
+    }
+    /** Strips angle brackets markdown allows around a url. Runs on already escaped text. */
+    function paste_md_url(url) {
+        return url.replace(/^&lt;/, '').replace(/&gt;$/, '');
+    }
+    /** Quotes a value that went through paste_escape already. */
+    function paste_attr_escaped(text) {
+        return text.replace(/"/g, '&quot;');
+    }
+})($ || ($ = {}));
+
+;
+"use strict";
 
 
 ;
@@ -39415,10 +40050,10 @@ var $;
                     event.preventDefault();
                     return event;
                 }
-                const items = event.clipboardData?.items;
-                if (!items)
+                const data = event.clipboardData;
+                if (!data)
                     return event;
-                for (const item of items) {
+                for (const item of data.items) {
                     if (item.type.startsWith('image/')) {
                         event.preventDefault();
                         const file = item.getAsFile();
@@ -39427,16 +40062,62 @@ var $;
                         return event;
                     }
                 }
-                const text = event.clipboardData?.getData('text/plain') ?? '';
-                if (text.includes('\n')) {
-                    event.preventDefault();
-                    const blocks = $.$bog_wysiwyg_parse_markdown(text);
-                    if (blocks.length > 0) {
-                        this.on_paste_blocks(blocks);
-                    }
-                    return event;
-                }
+                // Nothing from the clipboard reaches the DOM as is: the editor rebuilds it from drafts
+                event.preventDefault();
+                this.paste_data(data);
                 return event;
+            }
+            /**
+             * Clipboard content to editor content. Split off `paste_event` so it can be
+             * driven with a bare `getData` and without a DataTransfer.
+             */
+            paste_data(data) {
+                // A code block takes the clipboard as plain text, markup and all
+                if (this.type() === 'code') {
+                    const text = data.getData('text/plain') ?? '';
+                    if (!text)
+                        return;
+                    this.paste_at_caret([{ type: 'code', content: $.$bog_wysiwyg_escape_html(text) }], true);
+                    return;
+                }
+                const drafts = $bog_wysiwyg_paste.from_data(data);
+                if (!drafts.length)
+                    return;
+                // A single unbroken paragraph belongs in the current text, not in a block of its own
+                const inline = drafts.length === 1
+                    && drafts[0].type === 'paragraph'
+                    && !drafts[0].content.includes('<br>');
+                if (!inline) {
+                    this.paste_at_caret(drafts, false);
+                    return;
+                }
+                // Every draft comes trimmed, but a fragment copied mid sentence needs its spaces back
+                const text = data.getData('text/plain') ?? '';
+                const lead = /^\s/.test(text) ? ' ' : '';
+                const trail = /\s$/.test(text) ? ' ' : '';
+                this.paste_at_caret([{ type: 'paragraph', content: lead + drafts[0].content + trail }], true);
+            }
+            /** Hands the drafts to the page together with the two halves of the block around the caret */
+            paste_at_caret(drafts, inline) {
+                const node = this.node_el();
+                const caret = Math.max(0, this.caret_offset());
+                let from = caret;
+                let to = caret;
+                const sel = this.selection();
+                if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
+                    // A selection running into other blocks is none of this block's business
+                    if (node.contains(range.startContainer) && node.contains(range.endContainer)) {
+                        from = $.$bog_wysiwyg_offset_of(node, range.startContainer, range.startOffset);
+                        to = $.$bog_wysiwyg_offset_of(node, range.endContainer, range.endOffset);
+                    }
+                }
+                this.on_paste_blocks({
+                    drafts,
+                    head: this.html_before(from),
+                    tail: this.html_after(to),
+                    inline,
+                });
             }
             drop_event(event) {
                 if (!event)
@@ -42122,6 +42803,240 @@ var $;
 
 ;
 "use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'encode empty'() {
+            $mol_assert_equal($mol_charset_encode(''), new Uint8Array([]));
+        },
+        'encode 1 octet'() {
+            $mol_assert_equal($mol_charset_encode('F'), new Uint8Array([0x46]));
+        },
+        'encode 2 octet'() {
+            $mol_assert_equal($mol_charset_encode('Б'), new Uint8Array([0xd0, 0x91]));
+        },
+        'encode 3 octet'() {
+            $mol_assert_equal($mol_charset_encode('ह'), new Uint8Array([0xe0, 0xa4, 0xb9]));
+        },
+        'encode 4 octet'() {
+            $mol_assert_equal($mol_charset_encode('𐍈'), new Uint8Array([0xf0, 0x90, 0x8d, 0x88]));
+        },
+        'encode surrogate pair'() {
+            $mol_assert_equal($mol_charset_encode('😀'), new Uint8Array([0xf0, 0x9f, 0x98, 0x80]));
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    const png = new Uint8Array([0x1a, 0x0a, 0x00, 0x49, 0x48, 0x78, 0xda]);
+    $mol_test({
+        'base64 encode string'() {
+            $mol_assert_equal($mol_base64_encode($mol_charset_encode('Hello, ΧΨΩЫ')), 'SGVsbG8sIM6nzqjOqdCr');
+        },
+        'base64 encode binary'() {
+            $mol_assert_equal($mol_base64_encode(png), 'GgoASUh42g==');
+        },
+        'base64 encode string with plus'() {
+            $mol_assert_equal($mol_base64_encode($mol_charset_encode('шоешпо')), '0YjQvtC10YjQv9C+');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    const png = new Uint8Array([0x1a, 0x0a, 0x00, 0x49, 0x48, 0x78, 0xda]);
+    const with_plus = new TextEncoder().encode('шоешпо');
+    $mol_test({
+        'base64 decode string'() {
+            $mol_assert_equal($mol_base64_decode('SGVsbG8sIM6nzqjOqdCr'), new TextEncoder().encode('Hello, ΧΨΩЫ'));
+        },
+        'base64 decode binary'() {
+            $mol_assert_equal($mol_base64_decode('GgoASUh42g=='), png);
+        },
+        'base64 decode binary - without equals'() {
+            $mol_assert_equal($mol_base64_decode('GgoASUh42g'), png);
+        },
+        'base64 decode with plus'() {
+            $mol_assert_equal($mol_base64_decode('0YjQvtC10YjQv9C+'), with_plus);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'run callback'() {
+            class Plus1 extends $mol_wrapper {
+                static wrap(task) {
+                    return function (...args) {
+                        return task.call(this, ...args) + 1;
+                    };
+                }
+            }
+            $mol_assert_equal(Plus1.run(() => 2), 3);
+        },
+        'wrap function'() {
+            class Plus1 extends $mol_wrapper {
+                static wrap(task) {
+                    return function (...args) {
+                        return task.call(this, ...args) + 1;
+                    };
+                }
+            }
+            const obj = {
+                level: 2,
+                pow: Plus1.func(function (a) {
+                    return a ** this.level;
+                })
+            };
+            $mol_assert_equal(obj.pow(2), 5);
+        },
+        'decorate field getter'() {
+            class Plus1 extends $mol_wrapper {
+                static last = 0;
+                static wrap(task) {
+                    return function (...args) {
+                        return Plus1.last = (task.call(this, ...args) || 0) + 1;
+                    };
+                }
+            }
+            class Foo {
+                static get two() {
+                    return 1;
+                }
+                static set two(next) { }
+            }
+            __decorate([
+                Plus1.field
+            ], Foo, "two", null);
+            $mol_assert_equal(Foo.two, 2);
+            Foo.two = 3;
+            $mol_assert_equal(Plus1.last, 2);
+            $mol_assert_equal(Foo.two, 2);
+        },
+        'decorate instance method'() {
+            class Plus1 extends $mol_wrapper {
+                static wrap(task) {
+                    return function (...args) {
+                        return task.call(this, ...args) + 1;
+                    };
+                }
+            }
+            class Foo1 {
+                level = 2;
+                pow(a) {
+                    return a ** this.level;
+                }
+            }
+            __decorate([
+                Plus1.method
+            ], Foo1.prototype, "pow", null);
+            const Foo2 = Foo1;
+            const foo = new Foo2;
+            $mol_assert_equal(foo.pow(2), 5);
+        },
+        'decorate static method'() {
+            class Plus1 extends $mol_wrapper {
+                static wrap(task) {
+                    return function (...args) {
+                        return task.call(this, ...args) + 1;
+                    };
+                }
+            }
+            class Foo {
+                static level = 2;
+                static pow(a) {
+                    return a ** this.level;
+                }
+            }
+            __decorate([
+                Plus1.method
+            ], Foo, "pow", null);
+            $mol_assert_equal(Foo.pow(2), 5);
+        },
+        'decorate class'() {
+            class BarInc extends $mol_wrapper {
+                static wrap(task) {
+                    return function (...args) {
+                        const foo = task.call(this, ...args);
+                        foo.bar++;
+                        return foo;
+                    };
+                }
+            }
+            let Foo = class Foo {
+                bar;
+                constructor(bar) {
+                    this.bar = bar;
+                }
+            };
+            Foo = __decorate([
+                BarInc.class
+            ], Foo);
+            $mol_assert_equal(new Foo(2).bar, 3);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'memoize field'() {
+            class Foo {
+                static one = 1;
+                static get two() {
+                    return ++this.one;
+                }
+                static set two(next) { }
+            }
+            __decorate([
+                $mol_memo.field
+            ], Foo, "two", null);
+            $mol_assert_equal(Foo.two, 2);
+            $mol_assert_equal(Foo.two, 2);
+            Foo.two = 3;
+            $mol_assert_equal(Foo.two, 3);
+            $mol_assert_equal(Foo.two, 3);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'empty hash'() {
+            $mol_assert_equal($mol_crypto2_hash(new Uint8Array([])), new Uint8Array([218, 57, 163, 238, 94, 107, 75, 13, 50, 85, 191, 239, 149, 96, 24, 144, 175, 216, 7, 9]));
+        },
+        'three bytes hash'() {
+            $mol_assert_equal($mol_crypto2_hash(new Uint8Array([255, 254, 253])), new Uint8Array([240, 150, 38, 243, 255, 128, 96, 0, 72, 215, 207, 228, 19, 149, 113, 52, 2, 125, 27, 77]));
+        },
+        'six bytes hash'() {
+            $mol_assert_equal($mol_crypto2_hash(new Uint8Array([0, 255, 10, 250, 32, 128])), new Uint8Array([23, 25, 155, 181, 46, 200, 221, 83, 254, 0, 166, 68, 91, 255, 67, 140, 114, 88, 218, 155]));
+        },
+        'seven bytes hash'() {
+            $mol_assert_equal($mol_crypto2_hash(new Uint8Array([1, 2, 3, 4, 5, 6, 7])), new Uint8Array([140, 31, 40, 252, 47, 72, 194, 113, 214, 196, 152, 240, 242, 73, 205, 222, 54, 92, 84, 197]));
+        },
+        'unaligned hash'() {
+            const data = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
+            $mol_assert_equal($mol_crypto2_hash(new Uint8Array(data.buffer, 1, 7)), new Uint8Array([140, 31, 40, 252, 47, 72, 194, 113, 214, 196, 152, 240, 242, 73, 205, 222, 54, 92, 84, 197]));
+        },
+        async 'reference'() {
+            const data = new Uint8Array([255, 254, 253]);
+            $mol_assert_equal($mol_crypto2_hash(data), new Uint8Array(await $mol_crypto_native.subtle.digest('SHA-1', data)));
+        },
+    });
+})($ || ($ = {}));
 
 ;
 "use strict";
@@ -42229,6 +43144,391 @@ var $;
             $mol_assert_fail(() => $mol_jsx(Foo, { id: "foo" }), 'JSX already has tag with id "foo/icon"');
         },
     });
+})($ || ($ = {}));
+
+;
+"use strict";
+/** @jsx $mol_jsx */
+var $;
+(function ($) {
+    $mol_test({
+        'Primitives'() {
+            $mol_assert_equal($mol_key(null), 'null');
+            $mol_assert_equal($mol_key(false), 'false');
+            $mol_assert_equal($mol_key(true), 'true');
+            $mol_assert_equal($mol_key(0), '0');
+            $mol_assert_equal($mol_key(1n << 64n), '18446744073709551616n');
+            $mol_assert_equal($mol_key(''), '""');
+        },
+        'Array & POJO'() {
+            $mol_assert_equal($mol_key([null]), '[null]');
+            $mol_assert_equal($mol_key({ foo: 0 }), '{"foo":0}');
+            $mol_assert_equal($mol_key({ foo: [false] }), '{"foo":[false]}');
+        },
+        'Uint8Array'() {
+            $mol_assert_equal($mol_key(new Uint8Array([1, 2])), 'Uint8Array([1,2])');
+            $mol_assert_equal($mol_key([new Uint8Array([1, 2])]), '[Uint8Array([1,2])]');
+            $mol_assert_equal($mol_key({ foo: new Uint8Array([1, 2]) }), '{"foo":Uint8Array([1,2])}');
+        },
+        'Function'() {
+            const func = () => { };
+            $mol_assert_equal($mol_key(func), $mol_key(func));
+            $mol_assert_unique($mol_key(func), $mol_key(() => { }));
+        },
+        'Objects'() {
+            class User {
+            }
+            const jin = new User();
+            $mol_assert_equal($mol_key(jin), $mol_key(jin));
+            $mol_assert_unique($mol_key(jin), $mol_key(new User()));
+        },
+        'Elements'() {
+            const foo = $mol_jsx("div", null, "bar");
+            $mol_assert_equal($mol_key(foo), $mol_key(foo));
+            $mol_assert_unique($mol_key(foo), $mol_key($mol_jsx("div", null, "bar")));
+        },
+        'Custom JSON representation'() {
+            class User {
+                toJSON() { return 'jin'; }
+            }
+            $mol_assert_unique([$mol_key(new User)], [$mol_key(new User)]);
+        },
+        'Custom key handler'() {
+            class User {
+                name;
+                age;
+                constructor(name, age) {
+                    this.name = name;
+                    this.age = age;
+                }
+                [$mol_key_handle]() { return `User(${JSON.stringify(this.name)})`; }
+            }
+            $mol_assert_equal($mol_key([new User('jin', 16)]), $mol_key([new User('jin', 18)]), '[User("jin")]');
+        },
+        'Special native classes'() {
+            $mol_assert_equal($mol_key(new Date('xyz')), 'Date(NaN)');
+            $mol_assert_equal($mol_key(new Date(12345)), 'Date(12345)');
+            $mol_assert_equal($mol_key(/./), '/./');
+            $mol_assert_equal($mol_key(/\./gimsu), '/\\./gimsu');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Float schema"($) {
+                $mol_assert_equal('$mol_schema_float', $mol_schema_float + '', $mol_key($mol_schema_float));
+                $mol_assert_equal(true, $mol_schema_float.check(0));
+                $mol_assert_equal(true, $mol_schema_float.check(Number.NaN));
+                $mol_assert_equal(true, $mol_schema_float.check(Number.POSITIVE_INFINITY));
+                $mol_assert_equal(false, $mol_schema_float.check(null));
+                $mol_assert_equal(1.5, $mol_schema_float.cast(1.5));
+                $mol_assert_equal(Number.NaN, $mol_schema_float.cast('0'));
+                $mol_assert_equal(Number.EPSILON, $mol_schema_float.guard(Number.EPSILON));
+                $mol_assert_fail(() => $mol_schema_float.guard('0'), 'Wrong type');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "String schema"($) {
+                $mol_assert_equal('$mol_schema_string', $mol_schema_string + '', $mol_key($mol_schema_string));
+                $mol_assert_equal(true, $mol_schema_string.check('foo'));
+                $mol_assert_equal(false, $mol_schema_string.check(123));
+                $mol_assert_equal('foo', $mol_schema_string.cast('foo'));
+                $mol_assert_equal('', $mol_schema_string.cast(123));
+                $mol_assert_equal('foo', $mol_schema_string.guard('foo'));
+                $mol_assert_fail(() => $mol_schema_string.guard(123), 'Wrong type');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Cache of maybe schema"($) {
+                $mol_assert_equal($mol_schema_maybe($mol_schema_float), $mol_schema_maybe($mol_schema_float));
+                $mol_assert_unique($mol_schema_maybe($mol_schema_float), $mol_schema_maybe($mol_schema_string));
+            },
+            "Optional value"($) {
+                const Config = $mol_schema_maybe($mol_schema_string);
+                $mol_assert_equal('$mol_schema_maybe<$mol_schema_string>', Config + '');
+                $mol_assert_equal(true, Config.check('foo'));
+                $mol_assert_equal(true, Config.check(undefined));
+                $mol_assert_equal(true, Config.check(null));
+                $mol_assert_equal(false, Config.check(0));
+                $mol_assert_equal('foo', Config.cast('foo'));
+                $mol_assert_equal(undefined, Config.cast(undefined));
+                $mol_assert_equal(null, Config.cast(null));
+                $mol_assert_equal(null, Config.cast(0));
+                $mol_assert_equal('foo', Config.guard('foo'));
+                $mol_assert_fail(() => Config.guard(123), 'Wrong type');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Cache of instance schema"($) {
+                $mol_assert_equal($mol_schema_instance(Uint8Array), $mol_schema_instance(Uint8Array));
+                $mol_assert_unique($mol_schema_instance(Uint8Array), $mol_schema_instance(Int8Array));
+            },
+            "Class instance schema"($) {
+                const Blob = $mol_schema_instance(Uint8Array);
+                $mol_assert_equal('$mol_schema_instance<Uint8Array>', Blob + '', $mol_key(Blob));
+                $mol_assert_equal(true, Blob.check(new Uint8Array));
+                $mol_assert_equal(false, Blob.check(new Int8Array));
+                $mol_assert_equal(false, Blob.check(null));
+                $mol_assert_equal(new Uint8Array([0, 1]), Blob.cast(new Uint8Array([0, 1])));
+                $mol_assert_fail(() => Blob.cast(new Int8Array), 'Wrong class');
+                $mol_assert_equal(new Uint8Array, Blob.guard(new Uint8Array));
+                $mol_assert_fail(() => Blob.guard(new Int8Array), 'Wrong class');
+            },
+            "Boxed instance schema"($) {
+                const Str = $mol_schema_instance(String);
+                $mol_assert_equal('$mol_schema_instance<String>', Str + '', $mol_key(Str));
+                $mol_assert_equal(true, Str.check(Object('')));
+                $mol_assert_equal(true, Str.check(''));
+                $mol_assert_equal(true, Object('') instanceof Str);
+            },
+            "Schema instance schema"($) {
+                const Str = $mol_schema_instance($mol_schema_instance(String));
+                $mol_assert_equal('$mol_schema_instance<String>', Str + '', $mol_key(Str));
+                $mol_assert_equal(true, Str.check(Object('')));
+                $mol_assert_equal(true, Str.check(''));
+                $mol_assert_equal(true, Object('') instanceof Str);
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Validation"($) {
+                $mol_assert_fail(() => new $giper_baza_link('qwertyui_asdfghjk123'), 'Wrong Link (qwertyui_asdfghjk123)');
+            },
+            "From integer"($) {
+                $mol_assert_equal($giper_baza_link.from_int(178308648732587), new $giper_baza_link('qwertyui'));
+            },
+            "Pick Lord only"($) {
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').lord(), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').lord(), new $giper_baza_link('qwertyui_asdfghjk').lord(), new $giper_baza_link('qwertyui_asdfghjk'));
+            },
+            "Pick Land only"($) {
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').land(), new $giper_baza_link('qwertyui_asdfghjk').land(), new $giper_baza_link('qwertyui_asdfghjk'));
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').land(), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').land(), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed'));
+            },
+            "Pick Peer only"($) {
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').peer(), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').peer(), new $giper_baza_link('qwertyui'));
+                $mol_assert_equal(new $giper_baza_link('___qazwsxed').peer(), new $giper_baza_link(''));
+            },
+            "Pick Head only"($) {
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').head(), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').head(), new $giper_baza_link('zxcvbnm0'));
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').head(), new $giper_baza_link('qwertyui_asdfghjk').head(), new $giper_baza_link(''));
+            },
+            "Pick Area only"($) {
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').area(), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').area(), new $giper_baza_link('qazwsxed'));
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').area(), new $giper_baza_link('qwertyui_asdfghjk').area(), new $giper_baza_link('').area(), new $giper_baza_link(''));
+            },
+            "Binary encoding"($) {
+                const pawn = new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').toBin();
+                const land = new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').toBin();
+                const lord = new $giper_baza_link('qwertyui_asdfghjk').toBin();
+                const rel_pawn = new $giper_baza_link('___zxcvbnm0').toBin();
+                const rel_root = new $giper_baza_link('').toBin();
+                $mol_assert_equal(pawn.length, 24);
+                $mol_assert_equal(land.length, 18);
+                $mol_assert_equal(lord.length, 12);
+                $mol_assert_equal(rel_pawn.length, 6);
+                $mol_assert_equal(rel_root.length, 0);
+                $mol_assert_equal($giper_baza_link.from_bin(pawn), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0'));
+                $mol_assert_equal($giper_baza_link.from_bin(land), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed'));
+                $mol_assert_equal($giper_baza_link.from_bin(lord), new $giper_baza_link('qwertyui_asdfghjk'));
+                $mol_assert_equal($giper_baza_link.from_bin(rel_pawn), new $giper_baza_link('zxcvbnm0'));
+                $mol_assert_equal($giper_baza_link.from_bin(rel_root), new $giper_baza_link(''));
+            },
+            "Relate to base"($) {
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').relate(new $giper_baza_link('QWERTYUI_ASDFGHJK')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').relate(new $giper_baza_link('QWERTYUI_ASDFGHJK__ZXCVBNM0')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0'));
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').relate(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed')), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').relate(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_12345678')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').relate(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').relate(new $giper_baza_link('qwertyui_asdfghjk__12345678')), new $giper_baza_link('___zxcvbnm0'));
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').relate(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').relate(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed')), new $giper_baza_link('qwertyui_asdfghjk').relate(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk').relate(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link(''));
+            },
+            "Resolve Link from base"($) {
+                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').resolve(new $giper_baza_link('QWERTYUI_ASDFGHJK__ZXCVBNM0')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').resolve(new $giper_baza_link('QWERTYUI_ASDFGHJK')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').resolve(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0'));
+                $mol_assert_equal(new $giper_baza_link('___12345678').resolve(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link('___12345678').resolve(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk__12345678'));
+                $mol_assert_equal(new $giper_baza_link('___12345678').resolve(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed')), new $giper_baza_link('___12345678').resolve(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_12345678'));
+                $mol_assert_equal(new $giper_baza_link('').resolve(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link('').resolve(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk'));
+                $mol_assert_equal(new $giper_baza_link('').resolve(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed')), new $giper_baza_link('').resolve(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed'));
+            },
+            'Hashing'() {
+                $mol_assert_equal($giper_baza_link.hash_bin(new Uint8Array([1, 2, 3])), new $giper_baza_link('cDeAcZjC_Kn0rCAc3'));
+                $mol_assert_equal($giper_baza_link.hash_str('foo bar'), new $giper_baza_link('N3PeplFW_kJg4æmwi'));
+            }
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        async 'str & bin sizes'() {
+            const signer = await $$.$mol_crypto2_signer.generate();
+            const auditor = signer.auditor();
+            $mol_assert_equal(signer.toStringPrivate().length, $mol_crypto2_signer.size_str);
+            $mol_assert_equal(auditor.toString().length, $mol_crypto2_auditor.size_str);
+            $mol_assert_equal(signer.asArrayPrivate().length, $mol_crypto2_signer.size_bin);
+            $mol_assert_equal(auditor.asArray().length, $mol_crypto2_auditor.size_bin);
+            const data = new Uint8Array([1, 2, 3]);
+            const sign = await signer.sign(data);
+            $mol_assert_equal(sign.byteLength, $mol_crypto2_signer.size_sign);
+        },
+        async 'verify self signed with auto generated key'() {
+            const Alice = await $$.$mol_crypto2_signer.generate();
+            const data = new Uint8Array([1, 2, 3]);
+            const sign = await Alice.sign(data);
+            $mol_assert_equal(true, await Alice.auditor().verify(data, sign));
+        },
+        async 'verify signed with str exported auto generated key'() {
+            const Alice = await $$.$mol_crypto2_signer.generate();
+            const data = new Uint8Array([1, 2, 3]);
+            const Bella = $mol_crypto2_signer.from(Alice.toString() + Alice.toStringPrivate());
+            const sign = await Bella.sign(data);
+            const Catie = $mol_crypto2_auditor.from(Alice.auditor().toString());
+            $mol_assert_equal(true, await Catie.verify(data, sign));
+            const Diana = $mol_crypto2_auditor.from(Alice.toString());
+            $mol_assert_equal(true, await Diana.verify(data, sign));
+        },
+        async 'verify signed with bin exported auto generated key'() {
+            const Alice = await $$.$mol_crypto2_signer.generate();
+            const data = new Uint8Array([1, 2, 3]);
+            const Bella = $mol_crypto2_signer.from(new Uint8Array([...Alice.asArray(), ...Alice.asArrayPrivate()]));
+            const sign = await Bella.sign(data);
+            const Catie = $mol_crypto2_auditor.from(Alice.auditor().asArray());
+            $mol_assert_equal(true, await Catie.verify(data, sign));
+            const Diana = $mol_crypto2_auditor.from(Alice.asArray());
+            $mol_assert_equal(true, await Diana.verify(data, sign));
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        async 'Sizes'() {
+            const secret = $mol_crypto_sacred.make();
+            const key = secret.asArray();
+            $mol_assert_equal(key.byteLength, $mol_crypto_sacred.size);
+            const data = new Uint8Array([1, 2, 3]);
+            const salt = $mol_crypto_salt();
+            const closed = await secret.encrypt(data, salt);
+            $mol_assert_equal(closed.byteLength, $mol_crypto_sacred.size);
+            const self_closed = await secret.close(secret, salt);
+            $mol_assert_equal(self_closed.byteLength, $mol_crypto_sacred.size);
+        },
+        async 'Decrypt self encrypted'() {
+            const secret = $mol_crypto_sacred.make();
+            const data = new Uint8Array([1, 2, 3]);
+            const salt = $mol_crypto_salt();
+            const closed = await secret.encrypt(data, salt);
+            const opened = await secret.decrypt(closed, salt);
+            $mol_assert_equal(data, opened);
+        },
+        async 'Decrypt encrypted with exported key'() {
+            const data = new Uint8Array([1, 2, 3]);
+            const salt = $mol_crypto_salt();
+            const Alice = $mol_crypto_sacred.make();
+            const closed = await Alice.encrypt(data, salt);
+            const Bob = $mol_crypto_sacred.from(Alice.asArray());
+            const opened = await Bob.decrypt(closed, salt);
+            $mol_assert_equal(data, opened);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        async 'str & bin sizes'() {
+            const cipher = await $$.$mol_crypto2_cipher.generate();
+            const socket = cipher.socket();
+            $mol_assert_equal(cipher.toStringPrivate().length, $mol_crypto2_cipher.size_str);
+            $mol_assert_equal(socket.toString().length, $mol_crypto2_socket.size_str);
+            $mol_assert_equal(cipher.asArrayPrivate().length, $mol_crypto2_cipher.size_bin);
+            $mol_assert_equal(socket.asArray().length, $mol_crypto2_socket.size_bin);
+            const secret = await cipher.secret(socket);
+            $mol_assert_equal(secret.byteLength, $mol_crypto2_cipher.size_secret);
+        },
+        async 'Shared secret from public & private keys'() {
+            const A = await $mol_crypto2_cipher.generate();
+            const B = await $mol_crypto2_cipher.generate();
+            const SA = await A.secret(B.socket());
+            const SB = await B.secret(A.socket());
+            $mol_assert_equal(SA.asArray(), SB.asArray());
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            async "Signing & encryption"($) {
+                const Alice = await $mol_crypto2_private.generate();
+                const Bella = await $mol_crypto2_private.generate();
+                const secretA = await Alice.cipher().secret(Bella.socket());
+                const secretB = await Bella.cipher().secret(Alice.socket());
+                $mol_assert_equal(secretA, secretB);
+                const data = new Uint8Array([1, 2, 3]);
+                const nonce = $mol_crypto2_nonce();
+                const closed = await secretA.encrypt(data, nonce);
+                const digest = $mol_crypto2_hash(closed);
+                const sign = await Alice.signer().sign(digest);
+                $mol_assert_equal(true, await Alice.auditor().verify(digest, sign));
+                $mol_assert_equal(data, await secretA.decrypt(closed, nonce));
+            },
+            async "Serial & Deserial"($) {
+                const orig = await $mol_crypto2_private.generate();
+                const bin = new Uint8Array([...orig.asArray(), ...orig.asArrayPrivate()]);
+                const str = orig.toString() + orig.toStringPrivate();
+                $mol_assert_equal(orig, $mol_crypto2_private.from(bin), $mol_crypto2_private.from(str));
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
 })($ || ($ = {}));
 
 ;
@@ -42913,115 +44213,28 @@ var $;
 var $;
 (function ($) {
     $mol_test({
-        'run callback'() {
-            class Plus1 extends $mol_wrapper {
-                static wrap(task) {
-                    return function (...args) {
-                        return task.call(this, ...args) + 1;
-                    };
-                }
-            }
-            $mol_assert_equal(Plus1.run(() => 2), 3);
+        'const returns stored value'() {
+            const foo = { bar: $mol_const(Math.random()) };
+            $mol_assert_equal(foo.bar(), foo.bar());
+            $mol_assert_equal(foo.bar(), foo.bar['()']);
         },
-        'wrap function'() {
-            class Plus1 extends $mol_wrapper {
-                static wrap(task) {
-                    return function (...args) {
-                        return task.call(this, ...args) + 1;
-                    };
-                }
-            }
-            const obj = {
-                level: 2,
-                pow: Plus1.func(function (a) {
-                    return a ** this.level;
-                })
-            };
-            $mol_assert_equal(obj.pow(2), 5);
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class TestClass extends Uint8Array {
+    }
+    $mol_test({
+        'Uint8Array vs itself'() {
+            $mol_assert_ok($mol_compare_array(new Uint8Array, new Uint8Array));
+            $mol_assert_ok($mol_compare_array(new Uint8Array([0]), new Uint8Array([0])));
+            $mol_assert_not($mol_compare_array(new Uint8Array([0]), new Uint8Array([1])));
         },
-        'decorate field getter'() {
-            class Plus1 extends $mol_wrapper {
-                static last = 0;
-                static wrap(task) {
-                    return function (...args) {
-                        return Plus1.last = (task.call(this, ...args) || 0) + 1;
-                    };
-                }
-            }
-            class Foo {
-                static get two() {
-                    return 1;
-                }
-                static set two(next) { }
-            }
-            __decorate([
-                Plus1.field
-            ], Foo, "two", null);
-            $mol_assert_equal(Foo.two, 2);
-            Foo.two = 3;
-            $mol_assert_equal(Plus1.last, 2);
-            $mol_assert_equal(Foo.two, 2);
-        },
-        'decorate instance method'() {
-            class Plus1 extends $mol_wrapper {
-                static wrap(task) {
-                    return function (...args) {
-                        return task.call(this, ...args) + 1;
-                    };
-                }
-            }
-            class Foo1 {
-                level = 2;
-                pow(a) {
-                    return a ** this.level;
-                }
-            }
-            __decorate([
-                Plus1.method
-            ], Foo1.prototype, "pow", null);
-            const Foo2 = Foo1;
-            const foo = new Foo2;
-            $mol_assert_equal(foo.pow(2), 5);
-        },
-        'decorate static method'() {
-            class Plus1 extends $mol_wrapper {
-                static wrap(task) {
-                    return function (...args) {
-                        return task.call(this, ...args) + 1;
-                    };
-                }
-            }
-            class Foo {
-                static level = 2;
-                static pow(a) {
-                    return a ** this.level;
-                }
-            }
-            __decorate([
-                Plus1.method
-            ], Foo, "pow", null);
-            $mol_assert_equal(Foo.pow(2), 5);
-        },
-        'decorate class'() {
-            class BarInc extends $mol_wrapper {
-                static wrap(task) {
-                    return function (...args) {
-                        const foo = task.call(this, ...args);
-                        foo.bar++;
-                        return foo;
-                    };
-                }
-            }
-            let Foo = class Foo {
-                bar;
-                constructor(bar) {
-                    this.bar = bar;
-                }
-            };
-            Foo = __decorate([
-                BarInc.class
-            ], Foo);
-            $mol_assert_equal(new Foo(2).bar, 3);
+        'Uint8Array vs subclassed array'() {
+            $mol_assert_not($mol_compare_array(new Uint8Array, new TestClass));
         },
     });
 })($ || ($ = {}));
@@ -43031,91 +44244,50 @@ var $;
 var $;
 (function ($) {
     $mol_test({
-        'memoize field'() {
-            class Foo {
-                static one = 1;
-                static get two() {
-                    return ++this.one;
-                }
-                static set two(next) { }
-            }
-            __decorate([
-                $mol_memo.field
-            ], Foo, "two", null);
-            $mol_assert_equal(Foo.two, 2);
-            $mol_assert_equal(Foo.two, 2);
-            Foo.two = 3;
-            $mol_assert_equal(Foo.two, 3);
-            $mol_assert_equal(Foo.two, 3);
+        'decode utf8 string'() {
+            const str = 'Hello, ΧΨΩЫ';
+            const encoded = new Uint8Array([72, 101, 108, 108, 111, 44, 32, 206, 167, 206, 168, 206, 169, 208, 171]);
+            $mol_assert_equal($mol_charset_decode(encoded), str);
+            $mol_assert_equal($mol_charset_decode(encoded, 'utf8'), str);
+        },
+        'decode empty string'() {
+            const encoded = new Uint8Array([]);
+            $mol_assert_equal($mol_charset_decode(encoded), '');
         },
     });
 })($ || ($ = {}));
 
 ;
 "use strict";
-/** @jsx $mol_jsx */
 var $;
 (function ($) {
     $mol_test({
-        'Primitives'() {
-            $mol_assert_equal($mol_key(null), 'null');
-            $mol_assert_equal($mol_key(false), 'false');
-            $mol_assert_equal($mol_key(true), 'true');
-            $mol_assert_equal($mol_key(0), '0');
-            $mol_assert_equal($mol_key(1n << 64n), '18446744073709551616n');
-            $mol_assert_equal($mol_key(''), '""');
+        'local get set delete'() {
+            var key = '$mol_state_local_test:' + Math.random();
+            $mol_assert_equal($mol_state_local.value(key), null);
+            $mol_state_local.value(key, 123);
+            $mol_assert_equal($mol_state_local.value(key), 123);
+            $mol_state_local.value(key, null);
+            $mol_assert_equal($mol_state_local.value(key), null);
         },
-        'Array & POJO'() {
-            $mol_assert_equal($mol_key([null]), '[null]');
-            $mol_assert_equal($mol_key({ foo: 0 }), '{"foo":0}');
-            $mol_assert_equal($mol_key({ foo: [false] }), '{"foo":[false]}');
-        },
-        'Uint8Array'() {
-            $mol_assert_equal($mol_key(new Uint8Array([1, 2])), 'Uint8Array([1,2])');
-            $mol_assert_equal($mol_key([new Uint8Array([1, 2])]), '[Uint8Array([1,2])]');
-            $mol_assert_equal($mol_key({ foo: new Uint8Array([1, 2]) }), '{"foo":Uint8Array([1,2])}');
-        },
-        'Function'() {
-            const func = () => { };
-            $mol_assert_equal($mol_key(func), $mol_key(func));
-            $mol_assert_unique($mol_key(func), $mol_key(() => { }));
-        },
-        'Objects'() {
-            class User {
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test_mocks.push(context => {
+        class $mol_state_local_mock extends $mol_state_local {
+            static state = {};
+            static value(key, next = this.state[key]) {
+                return this.state[key] = (next || null);
             }
-            const jin = new User();
-            $mol_assert_equal($mol_key(jin), $mol_key(jin));
-            $mol_assert_unique($mol_key(jin), $mol_key(new User()));
-        },
-        'Elements'() {
-            const foo = $mol_jsx("div", null, "bar");
-            $mol_assert_equal($mol_key(foo), $mol_key(foo));
-            $mol_assert_unique($mol_key(foo), $mol_key($mol_jsx("div", null, "bar")));
-        },
-        'Custom JSON representation'() {
-            class User {
-                toJSON() { return 'jin'; }
-            }
-            $mol_assert_unique([$mol_key(new User)], [$mol_key(new User)]);
-        },
-        'Custom key handler'() {
-            class User {
-                name;
-                age;
-                constructor(name, age) {
-                    this.name = name;
-                    this.age = age;
-                }
-                [$mol_key_handle]() { return `User(${JSON.stringify(this.name)})`; }
-            }
-            $mol_assert_equal($mol_key([new User('jin', 16)]), $mol_key([new User('jin', 18)]), '[User("jin")]');
-        },
-        'Special native classes'() {
-            $mol_assert_equal($mol_key(new Date('xyz')), 'Date(NaN)');
-            $mol_assert_equal($mol_key(new Date(12345)), 'Date(12345)');
-            $mol_assert_equal($mol_key(/./), '/./');
-            $mol_assert_equal($mol_key(/\./gimsu), '/\\./gimsu');
-        },
+        }
+        __decorate([
+            $mol_mem_key
+        ], $mol_state_local_mock, "value", null);
+        context.$mol_state_local = $mol_state_local_mock;
     });
 })($ || ($ = {}));
 
@@ -43630,2275 +44802,6 @@ var $;
 var $;
 (function ($) {
     $mol_wire_log.active();
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'const returns stored value'() {
-            const foo = { bar: $mol_const(Math.random()) };
-            $mol_assert_equal(foo.bar(), foo.bar());
-            $mol_assert_equal(foo.bar(), foo.bar['()']);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    $mol_test({
-        'id auto generation'($) {
-            class $mol_view_test_item extends $mol_view {
-            }
-            class $mol_view_test_block extends $mol_view {
-                static $ = $;
-                element(id) {
-                    return new $mol_view_test_item();
-                }
-            }
-            __decorate([
-                $mol_mem_key
-            ], $mol_view_test_block.prototype, "element", null);
-            var x = $mol_view_test_block.Root(0);
-            $mol_assert_equal(x.dom_node().id, '$mol_view_test_block.Root(0)');
-            $mol_assert_equal(x.element(0).dom_node().id, '$mol_view_test_block.Root(0).element(0)');
-        },
-        'caching ref to dom node'($) {
-            var x = new class extends $mol_view {
-            };
-            x.$ = $;
-            $mol_assert_equal(x.dom_node(), x.dom_node());
-        },
-        'content render'($) {
-            class $mol_view_test extends $mol_view {
-                sub() {
-                    return ['lol', 5];
-                }
-            }
-            var x = new $mol_view_test();
-            x.$ = $;
-            var node = x.dom_tree();
-            $mol_assert_equal(node.innerHTML, 'lol5');
-        },
-        'bem attributes generation'($) {
-            class $mol_view_test_item extends $mol_view {
-            }
-            class $mol_view_test_block extends $mol_view {
-                Element(id) {
-                    return new $mol_view_test_item();
-                }
-            }
-            __decorate([
-                $mol_mem_key
-            ], $mol_view_test_block.prototype, "Element", null);
-            var x = new $mol_view_test_block();
-            x.$ = $;
-            $mol_assert_equal(x.dom_node().getAttribute('mol_view_test_block'), '');
-            $mol_assert_equal(x.dom_node().getAttribute('mol_view'), '');
-            $mol_assert_equal(x.Element(0).dom_node().getAttribute('mol_view_test_block_element'), '');
-            $mol_assert_equal(x.Element(0).dom_node().getAttribute('mol_view_test_item'), '');
-            $mol_assert_equal(x.Element(0).dom_node().getAttribute('mol_view'), '');
-        },
-        'render custom attributes'($) {
-            class $mol_view_test extends $mol_view {
-                attr() {
-                    return {
-                        'href': '#haha',
-                        'required': true,
-                        'hidden': false,
-                    };
-                }
-            }
-            var x = new $mol_view_test();
-            x.$ = $;
-            var node = x.dom_tree();
-            $mol_assert_equal(node.getAttribute('href'), '#haha');
-            $mol_assert_equal(node.getAttribute('required'), 'true');
-            $mol_assert_equal(node.getAttribute('hidden'), null);
-        },
-        'render custom fields'($) {
-            class $mol_view_test extends $mol_view {
-                field() {
-                    return {
-                        'hidden': true
-                    };
-                }
-            }
-            var x = new $mol_view_test();
-            x.$ = $;
-            var node = x.dom_tree();
-            $mol_assert_equal(node.hidden, true);
-        },
-        'attach event handlers'($) {
-            var clicked = false;
-            class $mol_view_test extends $mol_view {
-                event() {
-                    return {
-                        'click': (next) => this.event_click(next)
-                    };
-                }
-                event_click(next) {
-                    clicked = true;
-                }
-            }
-            var x = new $mol_view_test();
-            x.$ = $;
-            var node = x.dom_node();
-            node.click();
-            $mol_assert_ok(clicked);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    class TestClass extends Uint8Array {
-    }
-    $mol_test({
-        'Uint8Array vs itself'() {
-            $mol_assert_ok($mol_compare_array(new Uint8Array, new Uint8Array));
-            $mol_assert_ok($mol_compare_array(new Uint8Array([0]), new Uint8Array([0])));
-            $mol_assert_not($mol_compare_array(new Uint8Array([0]), new Uint8Array([1])));
-        },
-        'Uint8Array vs subclassed array'() {
-            $mol_assert_not($mol_compare_array(new Uint8Array, new TestClass));
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'decode utf8 string'() {
-            const str = 'Hello, ΧΨΩЫ';
-            const encoded = new Uint8Array([72, 101, 108, 108, 111, 44, 32, 206, 167, 206, 168, 206, 169, 208, 171]);
-            $mol_assert_equal($mol_charset_decode(encoded), str);
-            $mol_assert_equal($mol_charset_decode(encoded, 'utf8'), str);
-        },
-        'decode empty string'() {
-            const encoded = new Uint8Array([]);
-            $mol_assert_equal($mol_charset_decode(encoded), '');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'encode empty'() {
-            $mol_assert_equal($mol_charset_encode(''), new Uint8Array([]));
-        },
-        'encode 1 octet'() {
-            $mol_assert_equal($mol_charset_encode('F'), new Uint8Array([0x46]));
-        },
-        'encode 2 octet'() {
-            $mol_assert_equal($mol_charset_encode('Б'), new Uint8Array([0xd0, 0x91]));
-        },
-        'encode 3 octet'() {
-            $mol_assert_equal($mol_charset_encode('ह'), new Uint8Array([0xe0, 0xa4, 0xb9]));
-        },
-        'encode 4 octet'() {
-            $mol_assert_equal($mol_charset_encode('𐍈'), new Uint8Array([0xf0, 0x90, 0x8d, 0x88]));
-        },
-        'encode surrogate pair'() {
-            $mol_assert_equal($mol_charset_encode('😀'), new Uint8Array([0xf0, 0x9f, 0x98, 0x80]));
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'local get set delete'() {
-            var key = '$mol_state_local_test:' + Math.random();
-            $mol_assert_equal($mol_state_local.value(key), null);
-            $mol_state_local.value(key, 123);
-            $mol_assert_equal($mol_state_local.value(key), 123);
-            $mol_state_local.value(key, null);
-            $mol_assert_equal($mol_state_local.value(key), null);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test_mocks.push(context => {
-        class $mol_state_local_mock extends $mol_state_local {
-            static state = {};
-            static value(key, next = this.state[key]) {
-                return this.state[key] = (next || null);
-            }
-        }
-        __decorate([
-            $mol_mem_key
-        ], $mol_state_local_mock, "value", null);
-        context.$mol_state_local = $mol_state_local_mock;
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    $mol_test_mocks.push($ => {
-        class $mol_locale_mock extends $mol_locale {
-            lang(next = 'en') { return next; }
-            static source(lang) {
-                return {};
-            }
-        }
-        __decorate([
-            $mol_mem
-        ], $mol_locale_mock.prototype, "lang", null);
-        __decorate([
-            $mol_mem_key
-        ], $mol_locale_mock, "source", null);
-        $.$mol_locale = $mol_locale_mock;
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    class $mol_style_sheet_test1 extends $mol_view {
-        Item() { return new $mol_view; }
-    }
-    $.$mol_style_sheet_test1 = $mol_style_sheet_test1;
-    class $mol_style_sheet_test2 extends $mol_view {
-        List() { return new $mol_style_sheet_test1; }
-    }
-    $.$mol_style_sheet_test2 = $mol_style_sheet_test2;
-    $mol_test({
-        'component block styles'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                display: 'block',
-                zIndex: 1,
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tdisplay: block;\n\tz-index: 1;\n}\n');
-        },
-        'various units'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                width: '50%',
-                height: '50px',
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\twidth: 50%;\n\theight: 50px;\n}\n');
-        },
-        'various functions'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const { calc } = $mol_style_func;
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                width: calc(`100% - 1px`),
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\twidth: calc(100% - 1px);\n}\n');
-        },
-        'property groups'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                flex: {
-                    grow: 5,
-                    shrink: 10,
-                }
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tflex-grow: 5;\n\tflex-shrink: 10;\n}\n');
-        },
-        'custom properties'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                '--isVariable': 'yes',
-                '--is_variable': 'no',
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\t--is-variable: yes;\n\t--is_variable: no;\n}\n');
-        },
-        'custom property groups'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                '--variable': {
-                    test1: '5px',
-                    test2: '10px',
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\t--variable-test1: 5px;\n\t--variable-test2: 10px;\n}\n');
-        },
-        'property shorthand'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                padding: ['5px', 'auto'],
-                margin: ['10px', 'auto'],
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tpadding: 5px auto;\n\tmargin: 10px auto;\n}\n');
-        },
-        'sequenced values'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const { url } = $mol_style_func;
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                background: {
-                    image: [[url('foo')], [url('bar')]],
-                    size: [['cover'], ['contain']],
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tbackground-image: url("foo"),url("bar");\n\tbackground-size: cover,contain;\n}\n');
-        },
-        'sequenced structs'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                box: {
-                    shadow: [
-                        {
-                            inset: true,
-                            x: 0,
-                            y: 0,
-                            blur: '0.5rem',
-                            spread: 0,
-                            color: 'red',
-                        },
-                        {
-                            inset: false,
-                            x: 0,
-                            y: 0,
-                            blur: '0.5rem',
-                            spread: 0,
-                            color: 'blue',
-                        },
-                    ],
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tbox-shadow: inset 0 0 0.5rem 0 red,0 0 0.5rem 0 blue;\n}\n');
-        },
-        'component block styles with pseudo class'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                color: 'red',
-                ':focus': {
-                    display: 'block',
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test]:focus {\n\tdisplay: block;\n}\n');
-        },
-        'component block styles with pseudo element'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                color: 'red',
-                '::first-line': {
-                    display: 'block',
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test]::first-line {\n\tdisplay: block;\n}\n');
-        },
-        'component block styles with media query'() {
-            class $mol_style_sheet_test extends $mol_view {
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                color: 'red',
-                '@media': {
-                    'print': {
-                        display: 'block',
-                    },
-                    '(max-width: 640px)': {
-                        display: 'inline',
-                    },
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n@media print {\n[mol_style_sheet_test] {\n\tdisplay: block;\n}\n}\n@media (max-width: 640px) {\n[mol_style_sheet_test] {\n\tdisplay: inline;\n}\n}\n');
-        },
-        'component block styles with attribute value'() {
-            class $mol_style_sheet_test extends $mol_view {
-                attr() {
-                    return {
-                        mol_theme: '$mol_theme_dark'
-                    };
-                }
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                color: 'red',
-                '@': {
-                    mol_theme: {
-                        '$mol_theme_dark': {
-                            display: 'block',
-                        },
-                    },
-                    disabled: {
-                        'true': {
-                            width: '100%',
-                        },
-                    },
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test]:where([mol_theme="$mol_theme_dark"]) {\n\tdisplay: block;\n}\n[mol_style_sheet_test]:where([disabled="true"]) {\n\twidth: 100%;\n}\n');
-        },
-        'component block styles with attribute value (short syntax)'() {
-            class $mol_style_sheet_test extends $mol_view {
-                attr() {
-                    return {
-                        mol_theme: '$mol_theme_dark'
-                    };
-                }
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                color: 'red',
-                '[mol_theme]': {
-                    '$mol_theme_dark': {
-                        display: 'block',
-                    },
-                },
-                '[disabled]': {
-                    'true': {
-                        width: '100%',
-                    },
-                    'false': {
-                        width: '50%',
-                    },
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test]:where([mol_theme="$mol_theme_dark"]) {\n\tdisplay: block;\n}\n[mol_style_sheet_test]:where([disabled="true"]) {\n\twidth: 100%;\n}\n[mol_style_sheet_test]:where([disabled="false"]) {\n\twidth: 50%;\n}\n');
-        },
-        'component element styles'() {
-            class $mol_style_sheet_test extends $mol_view {
-                Item() { return new $mol_view; }
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                color: 'red',
-                Item: {
-                    display: 'block',
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test_item] {\n\tdisplay: block;\n}\n');
-        },
-        'component element of element styles'() {
-            const sheet = $mol_style_sheet($mol_style_sheet_test2, {
-                width: '100%',
-                List: {
-                    color: 'red',
-                    Item: {
-                        display: 'block',
-                    },
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test2] {\n\twidth: 100%;\n}\n[mol_style_sheet_test2_list] {\n\tcolor: red;\n}\n[mol_style_sheet_test2_list_item] {\n\tdisplay: block;\n}\n');
-        },
-        'component element styles with block attribute value'() {
-            class $mol_style_sheet_test extends $mol_view {
-                Item() { return new $mol_view; }
-                attr() {
-                    return {
-                        mol_theme: '$mol_theme_dark',
-                        disabled: true,
-                    };
-                }
-            }
-            const sheet = $mol_style_sheet($mol_style_sheet_test, {
-                '@': {
-                    mol_theme: {
-                        '$mol_theme_dark': {
-                            Item: {
-                                color: 'red',
-                            },
-                        },
-                    },
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test]:where([mol_theme="$mol_theme_dark"]) :where([mol_style_sheet_test_item]) {\n\tcolor: red;\n}\n');
-        },
-        'inner component styles by class'() {
-            const sheet = $mol_style_sheet($mol_style_sheet_test2, {
-                color: 'red',
-                $mol_style_sheet_test1: {
-                    display: 'block',
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test2] {\n\tcolor: red;\n}\n[mol_style_sheet_test2] :where([mol_style_sheet_test1]) {\n\tdisplay: block;\n}\n');
-        },
-        'child component styles by class'() {
-            const sheet = $mol_style_sheet($mol_style_sheet_test2, {
-                color: 'red',
-                '>': {
-                    $mol_style_sheet_test1: {
-                        display: 'block',
-                    },
-                    $mol_style_sheet_test2: {
-                        display: 'inline',
-                    },
-                },
-            });
-            $mol_assert_equal(sheet, '[mol_style_sheet_test2] {\n\tcolor: red;\n}\n[mol_style_sheet_test2] > :where([mol_style_sheet_test1]) {\n\tdisplay: block;\n}\n[mol_style_sheet_test2] > :where([mol_style_sheet_test2]) {\n\tdisplay: inline;\n}\n');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        /** Helper: create a contenteditable div with text, place cursor at end, run try_markdown */
-        function apply_markdown(input) {
-            const doc = $mol_dom_context.document;
-            const div = doc.createElement('div');
-            div.contentEditable = 'true';
-            doc.body.appendChild(div);
-            try {
-                div.textContent = input;
-                const text_node = div.firstChild;
-                const sel = doc.defaultView.getSelection();
-                const range = doc.createRange();
-                range.setStart(text_node, input.length);
-                range.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(range);
-                const block = new $bog_wysiwyg_block();
-                block.try_markdown(div);
-                return div.innerHTML;
-            }
-            finally {
-                doc.body.removeChild(div);
-            }
-        }
-        function make_block_with_selection(html, select_text) {
-            const doc = $mol_dom_context.document;
-            const div = doc.createElement('div');
-            div.contentEditable = 'true';
-            div.innerHTML = html;
-            doc.body.appendChild(div);
-            div.focus();
-            if (select_text) {
-                const walker = doc.createTreeWalker(div, 4 /* NodeFilter.SHOW_TEXT */);
-                let node;
-                while (node = walker.nextNode()) {
-                    const idx = (node.textContent ?? '').indexOf(select_text);
-                    if (idx >= 0) {
-                        const range = doc.createRange();
-                        range.setStart(node, idx);
-                        range.setEnd(node, idx + select_text.length);
-                        const sel = doc.defaultView.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                        break;
-                    }
-                }
-            }
-            return div;
-        }
-        /** Editable node plus a block view bound to it */
-        function make_block(html) {
-            const doc = $mol_dom_context.document;
-            const node = doc.createElement('div');
-            node.contentEditable = 'true';
-            // jsdom only tracks activeElement for focusable areas
-            node.tabIndex = 0;
-            node.innerHTML = html;
-            doc.body.appendChild(node);
-            const block = new $bog_wysiwyg_block();
-            block.dom_node = () => node;
-            block.html = (next) => next ?? node.innerHTML;
-            const calls = [];
-            for (const name of ['on_enter', 'on_remove', 'on_split', 'on_merge_prev', 'on_merge_next', 'on_nav', 'on_input', 'on_slash']) {
-                block[name] = (arg) => {
-                    calls.push({ name, arg });
-                    return arg ?? null;
-                };
-            }
-            return { block, node, calls, drop: () => node.remove() };
-        }
-        function set_caret(node, offset) {
-            const doc = $mol_dom_context.document;
-            const point = $bog_wysiwyg_point_at(node, offset);
-            const range = doc.createRange();
-            range.setStart(point.node, point.offset);
-            range.collapse(true);
-            const sel = doc.defaultView.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-        }
-        function set_range(node, from, to) {
-            const doc = $mol_dom_context.document;
-            const start = $bog_wysiwyg_point_at(node, from);
-            const end = $bog_wysiwyg_point_at(node, to);
-            const range = doc.createRange();
-            range.setStart(start.node, start.offset);
-            range.setEnd(end.node, end.offset);
-            const sel = doc.defaultView.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-        }
-        function key(name, mods = {}) {
-            return new KeyboardEvent('keydown', { key: name, cancelable: true, ...mods });
-        }
-        $mol_test({
-            // === Text offsets ===
-            'point_at walks through nested inline tags'() {
-                const { node, drop } = make_block('ab<b>cd</b>ef');
-                try {
-                    $mol_assert_equal($bog_wysiwyg_point_at(node, 0).offset, 0);
-                    $mol_assert_equal($bog_wysiwyg_point_at(node, 3).node.data, 'cd');
-                    $mol_assert_equal($bog_wysiwyg_point_at(node, 3).offset, 1);
-                    $mol_assert_equal($bog_wysiwyg_point_at(node, 6).node.data, 'ef');
-                    $mol_assert_equal($bog_wysiwyg_point_at(node, 6).offset, 2);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'point_at clamps beyond the end'() {
-                const { node, drop } = make_block('abc');
-                try {
-                    $mol_assert_equal($bog_wysiwyg_point_at(node, 100).offset, 3);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'offset_of is inverse of point_at'() {
-                const { node, drop } = make_block('ab<b>cd</b>ef');
-                try {
-                    for (let i = 0; i <= 6; i++) {
-                        const point = $bog_wysiwyg_point_at(node, i);
-                        $mol_assert_equal($bog_wysiwyg_offset_of(node, point.node, point.offset), i);
-                    }
-                }
-                finally {
-                    drop();
-                }
-            },
-            'offset_of rejects a node outside the block'() {
-                const { node, drop } = make_block('abc');
-                const other = $mol_dom_context.document.createElement('div');
-                try {
-                    $mol_assert_equal($bog_wysiwyg_offset_of(node, other, 0), -1);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'html_text strips markup'() {
-                $mol_assert_equal($bog_wysiwyg_html_text($mol_dom_context.document, 'a<b>b</b><i>c</i>'), 'abc');
-            },
-            'escape_html protects angle brackets'() {
-                $mol_assert_equal($bog_wysiwyg_escape_html('<&>'), '&lt;&amp;&gt;');
-            },
-            // === Caret ===
-            'caret_offset counts through inline tags'() {
-                const { block, node, drop } = make_block('ab<b>cd</b>ef');
-                try {
-                    set_caret(node, 5);
-                    $mol_assert_equal(block.caret_offset(), 5);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'caret_offset is -1 when the caret is in another block'() {
-                const one = make_block('first');
-                const two = make_block('second');
-                try {
-                    set_caret(two.node, 2);
-                    $mol_assert_equal(one.block.caret_offset(), -1);
-                }
-                finally {
-                    one.drop();
-                    two.drop();
-                }
-            },
-            'caret survives an innerHTML rewrite'() {
-                const { block, node, drop } = make_block('hello world');
-                try {
-                    set_caret(node, 5);
-                    const offset = block.caret_offset();
-                    // Nodes are recreated, the old Range would be lost
-                    node.innerHTML = 'hello <b>world</b>';
-                    block.caret_place(offset);
-                    $mol_assert_equal(block.caret_offset(), 5);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'auto keeps the caret when the focused block is resynced'() {
-                const { block, node, drop } = make_block('hello world');
-                try {
-                    node.focus();
-                    set_caret(node, 5);
-                    block.html = (next) => next ?? 'hello <b>world</b>';
-                    block.auto();
-                    $mol_assert_equal(node.innerHTML, 'hello <b>world</b>');
-                    $mol_assert_equal(block.caret_offset(), 5);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'auto rewrites an unfocused block without touching the selection'() {
-                const { block, node, drop } = make_block('old');
-                const other = make_block('elsewhere');
-                try {
-                    set_caret(other.node, 3);
-                    block.html = (next) => next ?? 'new';
-                    block.auto();
-                    $mol_assert_equal(node.innerHTML, 'new');
-                    $mol_assert_equal(other.block.caret_offset(), 3);
-                }
-                finally {
-                    drop();
-                    other.drop();
-                }
-            },
-            'focus_at clamps the offset to the text length'() {
-                const { block, node, drop } = make_block('abc');
-                try {
-                    block.focus_at(100);
-                    $mol_assert_equal(block.caret_offset(), 3);
-                }
-                finally {
-                    drop();
-                }
-            },
-            // === Splitting content ===
-            'html_before and html_after keep markup'() {
-                const { block, drop } = make_block('ab<b>cdef</b>gh');
-                try {
-                    $mol_assert_equal(block.html_before(4), 'ab<b>cd</b>');
-                    $mol_assert_equal(block.html_after(4), '<b>ef</b>gh');
-                }
-                finally {
-                    drop();
-                }
-            },
-            'html_before at zero is empty and html_after at zero is everything'() {
-                const { block, drop } = make_block('a<i>b</i>');
-                try {
-                    $mol_assert_equal(block.html_before(0), '');
-                    $mol_assert_equal(block.html_after(0), 'a<i>b</i>');
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Enter in the middle asks the page to split the block'() {
-                const { block, node, calls, drop } = make_block('hello world');
-                try {
-                    set_caret(node, 5);
-                    block.keydown_event(key('Enter'));
-                    $mol_assert_equal(calls.length, 1);
-                    $mol_assert_equal(calls[0].name, 'on_split');
-                    $mol_assert_equal(calls[0].arg, { head: 'hello', tail: ' world' });
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Enter at the end appends a fresh block'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 5);
-                    block.keydown_event(key('Enter'));
-                    $mol_assert_equal(calls.length, 1);
-                    $mol_assert_equal(calls[0].name, 'on_enter');
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Enter at the start pushes the whole text into a new block'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 0);
-                    block.keydown_event(key('Enter'));
-                    $mol_assert_equal(calls[0].name, 'on_split');
-                    $mol_assert_equal(calls[0].arg, { head: '', tail: 'hello' });
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Enter on an empty block appends a fresh block'() {
-                const { block, node, calls, drop } = make_block('');
-                try {
-                    set_caret(node, 0);
-                    block.keydown_event(key('Enter'));
-                    $mol_assert_equal(calls[0].name, 'on_enter');
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Enter over a selection inside the block wipes it and splits there'() {
-                const { block, node, calls, drop } = make_block('hello world');
-                try {
-                    set_range(node, 5, 8);
-                    block.keydown_event(key('Enter'));
-                    $mol_assert_equal(calls[0].name, 'on_split');
-                    $mol_assert_equal(calls[0].arg, { head: 'hello', tail: 'rld' });
-                }
-                finally {
-                    drop();
-                }
-            },
-            'delete_range drops the selected content and keeps the caret'() {
-                const { block, node, drop } = make_block('hello world');
-                try {
-                    set_range(node, 5, 8);
-                    $mol_assert_equal(block.delete_range(), true);
-                    $mol_assert_equal(node.textContent, 'hellorld');
-                    $mol_assert_equal(block.caret_offset(), 5);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'delete_range refuses a selection reaching outside the block'() {
-                const one = make_block('first');
-                const two = make_block('second');
-                try {
-                    const doc = $mol_dom_context.document;
-                    const range = doc.createRange();
-                    range.setStart(one.node.firstChild, 1);
-                    range.setEnd(two.node.firstChild, 1);
-                    const sel = doc.defaultView.getSelection();
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                    $mol_assert_equal(one.block.delete_range(), false);
-                    $mol_assert_equal(one.node.textContent, 'first');
-                }
-                finally {
-                    one.drop();
-                    two.drop();
-                }
-            },
-            'Shift+Enter is left to the browser'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 2);
-                    const event = key('Enter', { shiftKey: true });
-                    block.keydown_event(event);
-                    $mol_assert_equal(calls.length, 0);
-                    $mol_assert_equal(event.defaultPrevented, false);
-                }
-                finally {
-                    drop();
-                }
-            },
-            // === Block boundaries ===
-            'Backspace at the start of a filled block asks to merge with the previous'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 0);
-                    const event = key('Backspace');
-                    block.keydown_event(event);
-                    $mol_assert_equal(calls[0].name, 'on_merge_prev');
-                    $mol_assert_equal(event.defaultPrevented, true);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Backspace in the middle is left to the browser'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 3);
-                    const event = key('Backspace');
-                    block.keydown_event(event);
-                    $mol_assert_equal(calls.length, 0);
-                    $mol_assert_equal(event.defaultPrevented, false);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Backspace on an empty block still removes it'() {
-                const { block, node, calls, drop } = make_block('');
-                try {
-                    set_caret(node, 0);
-                    block.keydown_event(key('Backspace'));
-                    $mol_assert_equal(calls[0].name, 'on_remove');
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Backspace over a selection is left to the browser'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_range(node, 0, 3);
-                    block.keydown_event(key('Backspace'));
-                    $mol_assert_equal(calls.length, 0);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Delete at the end asks to pull the next block in'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 5);
-                    const event = key('Delete');
-                    block.keydown_event(event);
-                    $mol_assert_equal(calls[0].name, 'on_merge_next');
-                    $mol_assert_equal(event.defaultPrevented, true);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Delete in the middle is left to the browser'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 2);
-                    const event = key('Delete');
-                    block.keydown_event(event);
-                    $mol_assert_equal(calls.length, 0);
-                    $mol_assert_equal(event.defaultPrevented, false);
-                }
-                finally {
-                    drop();
-                }
-            },
-            // === Vertical navigation ===
-            'caret_lines reports both edges without a layout engine'() {
-                const { block, node, drop } = make_block('hello');
-                try {
-                    set_caret(node, 2);
-                    const lines = block.caret_lines();
-                    $mol_assert_equal(lines.first, true);
-                    $mol_assert_equal(lines.last, true);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'caret_lines reports both edges for an empty block'() {
-                const { block, node, drop } = make_block('');
-                try {
-                    set_caret(node, 0);
-                    $mol_assert_equal(block.caret_lines(), { first: true, last: true });
-                }
-                finally {
-                    drop();
-                }
-            },
-            'ArrowUp on the first line asks to step up'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 3);
-                    const event = key('ArrowUp');
-                    block.keydown_event(event);
-                    $mol_assert_equal(calls[0].name, 'on_nav');
-                    $mol_assert_equal(calls[0].arg, { dir: 'up', x: 0, offset: 3 });
-                    $mol_assert_equal(event.defaultPrevented, true);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'ArrowDown on the last line asks to step down'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 1);
-                    block.keydown_event(key('ArrowDown'));
-                    $mol_assert_equal(calls[0].name, 'on_nav');
-                    $mol_assert_equal(calls[0].arg, { dir: 'down', x: 0, offset: 1 });
-                }
-                finally {
-                    drop();
-                }
-            },
-            'Shift+ArrowUp extends the selection instead of stepping'() {
-                const { block, node, calls, drop } = make_block('hello');
-                try {
-                    set_caret(node, 3);
-                    block.keydown_event(key('ArrowUp', { shiftKey: true }));
-                    $mol_assert_equal(calls.length, 0);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'focus_column falls back to the text offset without a layout engine'() {
-                const { block, node, drop } = make_block('hello world');
-                try {
-                    block.focus_column(0, 4, true);
-                    $mol_assert_equal(block.caret_offset(), 4);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'focus_column clamps the offset to a shorter block'() {
-                const { block, node, drop } = make_block('ab');
-                try {
-                    block.focus_column(0, 9, false);
-                    $mol_assert_equal(block.caret_offset(), 2);
-                }
-                finally {
-                    drop();
-                }
-            },
-            // === Input notification ===
-            'input_event notifies the page'() {
-                const { block, node, calls, drop } = make_block('hi');
-                try {
-                    const event = new Event('input');
-                    Object.defineProperty(event, 'target', { value: node });
-                    block.input_event(event);
-                    $mol_assert_equal(calls.some(call => call.name === 'on_input'), true);
-                }
-                finally {
-                    drop();
-                }
-            },
-            'bold markdown converts to HTML'() {
-                $mol_assert_equal(apply_markdown('hello **world** end'), 'hello <b>world</b> end');
-            },
-            'italic markdown converts to HTML'() {
-                $mol_assert_equal(apply_markdown('hello *world* end'), 'hello <i>world</i> end');
-            },
-            'inline code markdown converts to HTML'() {
-                $mol_assert_equal(apply_markdown('hello `code` end'), 'hello <code>code</code> end');
-            },
-            'strikethrough markdown converts to HTML'() {
-                $mol_assert_equal(apply_markdown('hello ~~strike~~ end'), 'hello <s>strike</s> end');
-            },
-            'link markdown converts to HTML'() {
-                const result = apply_markdown('click [here](https://example.com) now');
-                $mol_assert_equal(result, 'click <a href="https://example.com">here</a> now');
-            },
-            'wiki link [[page_id]] converts to anchor'() {
-                const result = apply_markdown('see [[my_page]] for info');
-                $mol_assert_ok(result.includes('<a '));
-                $mol_assert_ok(result.includes('data-wiki-link="my_page"'));
-                $mol_assert_ok(result.includes('href="#my_page"'));
-                $mol_assert_ok(result.includes('>my_page</a>'));
-            },
-            'wiki link with empty content does not convert'() {
-                $mol_assert_equal(apply_markdown('hello [[]] end'), 'hello [[]] end');
-            },
-            'partially typed wiki link does not convert'() {
-                $mol_assert_equal(apply_markdown('[[not closed'), '[[not closed');
-            },
-            'empty bold content does not convert'() {
-                $mol_assert_equal(apply_markdown('hello **** end'), 'hello **** end');
-            },
-            'single star inside double stars does not break bold'() {
-                const result = apply_markdown('**bold text** end');
-                $mol_assert_equal(result, '<b>bold text</b> end');
-            },
-            'multiple patterns in one block: only first converts per pass'() {
-                // First pass converts the first match
-                const first = apply_markdown('**bold** and *italic*');
-                $mol_assert_equal(first, '<b>bold</b> and *italic*');
-            },
-            'partially typed bold does not convert'() {
-                $mol_assert_equal(apply_markdown('**not closed'), '**not closed');
-            },
-            'partially typed italic does not convert'() {
-                $mol_assert_equal(apply_markdown('*not closed'), '*not closed');
-            },
-            'partially typed strikethrough does not convert'() {
-                $mol_assert_equal(apply_markdown('~~not closed'), '~~not closed');
-            },
-            'partially typed link does not convert'() {
-                $mol_assert_equal(apply_markdown('[text](no-close'), '[text](no-close');
-            },
-            'link with empty url does not convert'() {
-                $mol_assert_equal(apply_markdown('[text]() end'), '[text]() end');
-            },
-            'link with empty text does not convert'() {
-                $mol_assert_equal(apply_markdown('[](https://example.com) end'), '[](https://example.com) end');
-            },
-            'bold at start of text'() {
-                $mol_assert_equal(apply_markdown('**start** rest'), '<b>start</b> rest');
-            },
-            'bold at end of text'() {
-                $mol_assert_equal(apply_markdown('rest **end**'), 'rest <b>end</b>');
-            },
-            'code with special characters inside'() {
-                $mol_assert_equal(apply_markdown('run `npm install` now'), 'run <code>npm install</code> now');
-            },
-            'strike_exec without event returns null'() {
-                const block = new $bog_wysiwyg_block();
-                $mol_assert_equal(block.strike_exec(), null);
-            },
-            'strike_exec wraps selection in strikethrough'() {
-                if (typeof document === 'undefined')
-                    return;
-                const div = make_block_with_selection('hello world end', 'world');
-                try {
-                    const block = new $bog_wysiwyg_block();
-                    block.dom_node = () => div;
-                    block.html = (val) => val ?? div.innerHTML;
-                    const event = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, shiftKey: true });
-                    const result = block.strike_exec(event);
-                    $mol_assert_ok(result);
-                    $mol_assert_ok(div.innerHTML.includes('<strike>') || div.innerHTML.includes('<s>'));
-                    $mol_assert_ok(div.innerHTML.includes('world'));
-                }
-                finally {
-                    div.remove();
-                }
-            },
-            'link_exec without event returns null'() {
-                const block = new $bog_wysiwyg_block();
-                $mol_assert_equal(block.link_exec(), null);
-            },
-            'link_exec with cancelled prompt does nothing'() {
-                if (typeof document === 'undefined')
-                    return;
-                const div = make_block_with_selection('hello world end', 'world');
-                try {
-                    const original_prompt = globalThis.prompt;
-                    globalThis.prompt = () => null;
-                    const block = new $bog_wysiwyg_block();
-                    block.dom_node = () => div;
-                    block.html = (val) => val ?? div.innerHTML;
-                    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
-                    const result = block.link_exec(event);
-                    $mol_assert_ok(result);
-                    $mol_assert_equal(div.innerHTML, 'hello world end');
-                    globalThis.prompt = original_prompt;
-                }
-                finally {
-                    div.remove();
-                }
-            },
-            'link_exec creates link from selected text'() {
-                if (typeof document === 'undefined')
-                    return;
-                const div = make_block_with_selection('click here now', 'here');
-                try {
-                    const original_prompt = globalThis.prompt;
-                    globalThis.prompt = () => 'https://example.com';
-                    const block = new $bog_wysiwyg_block();
-                    block.dom_node = () => div;
-                    block.html = (val) => val ?? div.innerHTML;
-                    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
-                    block.link_exec(event);
-                    $mol_assert_ok(div.innerHTML.includes('<a '));
-                    $mol_assert_ok(div.innerHTML.includes('https://example.com'));
-                    $mol_assert_ok(div.innerHTML.includes('here'));
-                    globalThis.prompt = original_prompt;
-                }
-                finally {
-                    div.remove();
-                }
-            },
-            'link_exec inserts url as text when no selection'() {
-                if (typeof document === 'undefined')
-                    return;
-                const div = make_block_with_selection('hello world');
-                try {
-                    div.focus();
-                    // Place cursor at end without selecting
-                    const sel = $mol_dom_context.document.defaultView.getSelection();
-                    const range = $mol_dom_context.document.createRange();
-                    range.selectNodeContents(div);
-                    range.collapse(false);
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                    const original_prompt = globalThis.prompt;
-                    globalThis.prompt = () => 'https://example.com';
-                    const block = new $bog_wysiwyg_block();
-                    block.dom_node = () => div;
-                    block.html = (val) => val ?? div.innerHTML;
-                    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
-                    block.link_exec(event);
-                    $mol_assert_ok(div.innerHTML.includes('<a '));
-                    $mol_assert_ok(div.innerHTML.includes('https://example.com'));
-                    globalThis.prompt = original_prompt;
-                }
-                finally {
-                    div.remove();
-                }
-            },
-            // === Image block ===
-            'paste_event without event returns null'() {
-                const block = new $bog_wysiwyg_block();
-                $mol_assert_equal(block.paste_event(), null);
-            },
-            'paste_event with image prevents default'() {
-                if (typeof document === 'undefined')
-                    return;
-                let prevented = false;
-                const block = new $bog_wysiwyg_block();
-                let image_src = '';
-                block.on_image = (src) => {
-                    if (src)
-                        image_src = src;
-                    return image_src || null;
-                };
-                const blob = new Blob([''], { type: 'image/png' });
-                const file = new File([blob], 'test.png', { type: 'image/png' });
-                const dt = new DataTransfer();
-                dt.items.add(file);
-                const event = new ClipboardEvent('paste', { clipboardData: dt });
-                Object.defineProperty(event, 'preventDefault', { value: () => { prevented = true; } });
-                const result = block.paste_event(event);
-                $mol_assert_ok(result);
-                $mol_assert_ok(prevented);
-            },
-            'paste_event without image does not prevent default'() {
-                if (typeof document === 'undefined')
-                    return;
-                const block = new $bog_wysiwyg_block();
-                const dt = new DataTransfer();
-                dt.items.add('hello', 'text/plain');
-                const event = new ClipboardEvent('paste', { clipboardData: dt });
-                let prevented = false;
-                Object.defineProperty(event, 'preventDefault', { value: () => { prevented = true; } });
-                const result = block.paste_event(event);
-                $mol_assert_ok(result);
-                $mol_assert_equal(prevented, false);
-            },
-            'drop_event without event returns null'() {
-                const block = new $bog_wysiwyg_block();
-                $mol_assert_equal(block.drop_event(), null);
-            },
-            'is_image returns true for image type'() {
-                const block = new $bog_wysiwyg_block();
-                block.type = () => 'image';
-                $mol_assert_equal(block.is_image(), true);
-            },
-            'is_image returns false for paragraph type'() {
-                const block = new $bog_wysiwyg_block();
-                block.type = () => 'paragraph';
-                $mol_assert_equal(block.is_image(), false);
-            },
-            // === parse_markdown ===
-            'parse_markdown: single paragraph'() {
-                const blocks = $bog_wysiwyg_parse_markdown('hello world');
-                $mol_assert_equal(blocks.length, 1);
-                $mol_assert_equal(blocks[0].type, 'paragraph');
-                $mol_assert_equal(blocks[0].content, 'hello world');
-            },
-            'parse_markdown: two paragraphs separated by empty line'() {
-                const blocks = $bog_wysiwyg_parse_markdown('first\n\nsecond');
-                $mol_assert_equal(blocks.length, 2);
-                $mol_assert_equal(blocks[0].content, 'first');
-                $mol_assert_equal(blocks[1].content, 'second');
-            },
-            'parse_markdown: heading levels 1-3'() {
-                const blocks = $bog_wysiwyg_parse_markdown('# H1\n\n## H2\n\n### H3');
-                $mol_assert_equal(blocks.length, 3);
-                $mol_assert_equal(blocks[0].type, 'heading');
-                $mol_assert_equal(blocks[0].level, 1);
-                $mol_assert_equal(blocks[0].content, 'H1');
-                $mol_assert_equal(blocks[1].level, 2);
-                $mol_assert_equal(blocks[2].level, 3);
-            },
-            'parse_markdown: code block'() {
-                const blocks = $bog_wysiwyg_parse_markdown('```\nconst x = 1\nconst y = 2\n```');
-                $mol_assert_equal(blocks.length, 1);
-                $mol_assert_equal(blocks[0].type, 'code');
-                $mol_assert_equal(blocks[0].content, 'const x = 1\nconst y = 2');
-            },
-            'parse_markdown: code block escapes HTML'() {
-                const blocks = $bog_wysiwyg_parse_markdown('```\n<div>&</div>\n```');
-                $mol_assert_equal(blocks[0].content, '&lt;div&gt;&amp;&lt;/div&gt;');
-            },
-            'parse_markdown: blockquote'() {
-                const blocks = $bog_wysiwyg_parse_markdown('> line one\n> line two');
-                $mol_assert_equal(blocks.length, 1);
-                $mol_assert_equal(blocks[0].type, 'quote');
-                $mol_assert_equal(blocks[0].content, 'line one<br>line two');
-            },
-            'parse_markdown: divider ---'() {
-                const blocks = $bog_wysiwyg_parse_markdown('above\n\n---\n\nbelow');
-                $mol_assert_equal(blocks.length, 3);
-                $mol_assert_equal(blocks[1].type, 'divider');
-                $mol_assert_equal(blocks[1].content, '');
-            },
-            'parse_markdown: divider ***'() {
-                const blocks = $bog_wysiwyg_parse_markdown('***');
-                $mol_assert_equal(blocks[0].type, 'divider');
-            },
-            'parse_markdown: inline bold'() {
-                const blocks = $bog_wysiwyg_parse_markdown('hello **world**');
-                $mol_assert_equal(blocks[0].content, 'hello <b>world</b>');
-            },
-            'parse_markdown: inline italic'() {
-                const blocks = $bog_wysiwyg_parse_markdown('hello *world*');
-                $mol_assert_equal(blocks[0].content, 'hello <i>world</i>');
-            },
-            'parse_markdown: inline code'() {
-                const blocks = $bog_wysiwyg_parse_markdown('run `npm install`');
-                $mol_assert_equal(blocks[0].content, 'run <code>npm install</code>');
-            },
-            'parse_markdown: inline strike'() {
-                const blocks = $bog_wysiwyg_parse_markdown('hello ~~world~~');
-                $mol_assert_equal(blocks[0].content, 'hello <s>world</s>');
-            },
-            'parse_markdown: inline link'() {
-                const blocks = $bog_wysiwyg_parse_markdown('click [here](https://example.com)');
-                $mol_assert_equal(blocks[0].content, 'click <a href="https://example.com">here</a>');
-            },
-            'parse_markdown: multi-line paragraph joins with br'() {
-                const blocks = $bog_wysiwyg_parse_markdown('line one\nline two\nline three');
-                $mol_assert_equal(blocks.length, 1);
-                $mol_assert_equal(blocks[0].content, 'line one<br>line two<br>line three');
-            },
-            'parse_markdown: mixed content article'() {
-                const md = '# Title\n\nSome text **bold**.\n\n```\ncode here\n```\n\n> quote\n\n---\n\nEnd.';
-                const blocks = $bog_wysiwyg_parse_markdown(md);
-                $mol_assert_equal(blocks.length, 6);
-                $mol_assert_equal(blocks[0].type, 'heading');
-                $mol_assert_equal(blocks[1].type, 'paragraph');
-                $mol_assert_equal(blocks[2].type, 'code');
-                $mol_assert_equal(blocks[3].type, 'quote');
-                $mol_assert_equal(blocks[4].type, 'divider');
-                $mol_assert_equal(blocks[5].type, 'paragraph');
-            },
-            'parse_markdown: empty input returns empty array'() {
-                $mol_assert_equal($bog_wysiwyg_parse_markdown('').length, 0);
-            },
-            'parse_markdown: only empty lines returns empty array'() {
-                $mol_assert_equal($bog_wysiwyg_parse_markdown('\n\n\n').length, 0);
-            },
-            'parse_markdown: unclosed code block collects to end'() {
-                const blocks = $bog_wysiwyg_parse_markdown('```\ncode without closing');
-                $mol_assert_equal(blocks.length, 1);
-                $mol_assert_equal(blocks[0].type, 'code');
-                $mol_assert_equal(blocks[0].content, 'code without closing');
-            },
-        });
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            'handle clicks by default'($) {
-                let clicked = false;
-                const clicker = $mol_button.make({
-                    $,
-                    click: (event) => { clicked = true; },
-                });
-                const element = clicker.dom_tree();
-                const event = $mol_dom_context.document.createEvent('mouseevent');
-                event.initEvent('click', true, true);
-                element.dispatchEvent(event);
-                $mol_assert_ok(clicked);
-            },
-            'no handle clicks if disabled'($) {
-                let clicked = false;
-                const clicker = $mol_button.make({
-                    $,
-                    click: (event) => { clicked = true; },
-                    enabled: () => false,
-                });
-                const element = clicker.dom_tree();
-                const event = $mol_dom_context.document.createEvent('mouseevent');
-                event.initEvent('click', true, true);
-                element.dispatchEvent(event);
-                $mol_assert_not(clicked);
-            },
-            async 'Store error'($) {
-                const clicker = $mol_button.make({
-                    $,
-                    click: (event) => $.$mol_fail(new Error('Test error')),
-                });
-                const event = $mol_dom_context.document.createEvent('mouseevent');
-                $mol_assert_fail(() => clicker.event_activate(event), 'Test error');
-                await Promise.resolve();
-                $mol_assert_equal(clicker.status()[0].message, 'Test error');
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        const locale_en = {
-            '$bog_wysiwyg_menu_command_paragraph': 'Text',
-            '$bog_wysiwyg_menu_command_heading1': 'Heading 1',
-            '$bog_wysiwyg_menu_command_heading2': 'Heading 2',
-            '$bog_wysiwyg_menu_command_heading3': 'Heading 3',
-            '$bog_wysiwyg_menu_command_code': 'Code',
-            '$bog_wysiwyg_menu_command_quote': 'Quote',
-            '$bog_wysiwyg_menu_command_list': 'List',
-            '$bog_wysiwyg_menu_command_divider': 'Divider',
-            '$bog_wysiwyg_menu_command_image': 'Image',
-        };
-        function menu_make() {
-            $mol_locale.texts('en', locale_en);
-            return new $bog_wysiwyg_menu();
-        }
-        $mol_test({
-            'Menu commands returns builtin commands'() {
-                const menu = menu_make();
-                const cmds = menu.commands();
-                $mol_assert_ok(cmds.length >= 9);
-                $mol_assert_equal(cmds[0].id, 'paragraph');
-                $mol_assert_equal(cmds[1].id, 'heading1');
-                $mol_assert_equal(cmds[2].id, 'heading2');
-                $mol_assert_equal(cmds[3].id, 'heading3');
-                $mol_assert_equal(cmds[4].id, 'code');
-                $mol_assert_equal(cmds[5].id, 'quote');
-                $mol_assert_equal(cmds[6].id, 'list');
-                $mol_assert_equal(cmds[7].id, 'divider');
-                $mol_assert_equal(cmds[8].id, 'image');
-            },
-            'Menu option_rows returns views matching commands length'() {
-                const menu = menu_make();
-                const rows = menu.option_rows();
-                $mol_assert_equal(rows.length, menu.commands().length);
-            },
-            'Menu option_title returns title for known command id'() {
-                const menu = menu_make();
-                const title = menu.option_title('paragraph');
-                $mol_assert_ok(title.length > 0);
-            },
-            'Menu option_title returns empty string for unknown id'() {
-                const menu = menu_make();
-                const title = menu.option_title('nonexistent');
-                $mol_assert_equal(title, '');
-            },
-            'Menu option_active returns true when index matches'() {
-                const menu = menu_make();
-                menu.index(0);
-                const first_id = menu.commands()[0].id;
-                $mol_assert_equal(menu.option_active(first_id), true);
-            },
-            'Menu option_active returns false for non-matching id'() {
-                const menu = menu_make();
-                menu.index(0);
-                $mol_assert_equal(menu.option_active('nonexistent'), false);
-            },
-            'Menu option_active tracks index changes'() {
-                const menu = menu_make();
-                menu.index(2);
-                const cmd = menu.commands()[2];
-                $mol_assert_equal(menu.option_active(cmd.id), true);
-                $mol_assert_equal(menu.option_active(menu.commands()[0].id), false);
-            },
-            'Menu option_click calls picked and hides menu'() {
-                const menu = menu_make();
-                menu.showed(true);
-                let picked_val = '';
-                menu.picked = (next) => {
-                    if (next !== undefined)
-                        picked_val = next;
-                    return picked_val;
-                };
-                const event = { type: 'click' };
-                menu.option_click('heading1', event);
-                $mol_assert_equal(picked_val, 'heading1');
-                $mol_assert_equal(menu.showed(), false);
-            },
-            'Menu option_click without event returns null'() {
-                const menu = menu_make();
-                $mol_assert_equal(menu.option_click('paragraph'), null);
-            },
-            'Menu pos_y_str returns pixel string'() {
-                const menu = menu_make();
-                menu.pos_y(200);
-                $mol_assert_equal(menu.pos_y_str(), '200px');
-            },
-            'Menu pos_x_str returns pixel string'() {
-                const menu = menu_make();
-                menu.pos_x(350);
-                $mol_assert_equal(menu.pos_x_str(), '350px');
-            },
-        });
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'escape'() {
-            const specials = $mol_regexp.from('.*+?^${}()|[]\\');
-            $mol_assert_equal(specials.source, '\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\');
-        },
-        'char code'() {
-            const space = $mol_regexp.from(32);
-            $mol_assert_like(' '.match(space), [' ']);
-        },
-        'repeat fixed'() {
-            const { repeat, decimal_only: digit } = $mol_regexp;
-            const year = repeat(digit, 4, 4);
-            $mol_assert_like('#2020#'.match(year), ['2020']);
-        },
-        'greedy repeat'() {
-            const { repeat, repeat_greedy, latin_only: letter } = $mol_regexp;
-            $mol_assert_like('abc'.match(repeat(letter, 1, 2)), ['a', 'b', 'c']);
-            $mol_assert_like('abc'.match(repeat_greedy(letter, 1, 2)), ['ab', 'c']);
-        },
-        'repeat range'() {
-            const { repeat_greedy, decimal_only: digit } = $mol_regexp;
-            const year = repeat_greedy(digit, 2, 4);
-            $mol_assert_like('#2#'.match(year), null);
-            $mol_assert_like('#20#'.match(year), ['20']);
-            $mol_assert_like('#2020#'.match(year), ['2020']);
-            $mol_assert_like('#20201#'.match(year), ['2020']);
-        },
-        'repeat from'() {
-            const { repeat_greedy, latin_only: letter } = $mol_regexp;
-            const name = repeat_greedy(letter, 2);
-            $mol_assert_like('##'.match(name), null);
-            $mol_assert_like('#a#'.match(name), null);
-            $mol_assert_like('#ab#'.match(name), ['ab']);
-            $mol_assert_like('#abc#'.match(name), ['abc']);
-        },
-        'from string'() {
-            const regexp = $mol_regexp.from('[\\d]');
-            $mol_assert_equal(regexp.source, '\\[\\\\d\\]');
-            $mol_assert_equal(regexp.flags, 'gsu');
-        },
-        'from regexp'() {
-            const regexp = $mol_regexp.from(/[\d]/i);
-            $mol_assert_equal(regexp.source, '[\\d]');
-            $mol_assert_equal(regexp.flags, 'i');
-        },
-        'split'() {
-            const regexp = $mol_regexp.from(';');
-            $mol_assert_like('aaa;bbb;ccc'.split(regexp), ['aaa', ';', 'bbb', ';', 'ccc']);
-            $mol_assert_like('aaa;;ccc'.split(regexp), ['aaa', ';', '', ';', 'ccc']);
-            $mol_assert_like('aaa'.split(regexp), ['aaa']);
-            $mol_assert_like(''.split(regexp), ['']);
-        },
-        'test for matching'() {
-            const regexp = $mol_regexp.from('foo');
-            $mol_assert_like(regexp.test(''), false);
-            $mol_assert_like(regexp.test('fo'), false);
-            $mol_assert_like(regexp.test('foo'), true);
-            $mol_assert_like(regexp.test('foobar'), true);
-            $mol_assert_like(regexp.test('barfoo'), true);
-        },
-        'case ignoring'() {
-            const xxx = $mol_regexp.from('x', { ignoreCase: true });
-            $mol_assert_like(xxx.flags, 'gisu');
-            $mol_assert_like(xxx.exec('xx')[0], 'x');
-            $mol_assert_like(xxx.exec('XX')[0], 'X');
-        },
-        'multiline mode'() {
-            const { end, from } = $mol_regexp;
-            const xxx = from(['x', end], { multiline: true });
-            $mol_assert_like(xxx.exec('x\ny')[0], 'x');
-            $mol_assert_like(xxx.flags, 'gmsu');
-        },
-        'flags override'() {
-            const triplet = $mol_regexp.from($mol_regexp.from(/.../, { ignoreCase: true }), { multiline: true });
-            $mol_assert_like(triplet.toString(), '/.../gmsu');
-        },
-        'sequence'() {
-            const { begin, end, decimal_only: digit, repeat, from } = $mol_regexp;
-            const year = repeat(digit, 4, 4);
-            const dash = '-';
-            const month = repeat(digit, 2, 2);
-            const day = repeat(digit, 2, 2);
-            const date = from([begin, year, dash, month, dash, day, end]);
-            $mol_assert_like(date.exec('2020-01-02')[0], '2020-01-02');
-        },
-        'optional'() {
-            const name = $mol_regexp.from(['A', ['4']]);
-            $mol_assert_equal('AB'.match(name)[0], 'A');
-            $mol_assert_equal('A4'.match(name)[0], 'A4');
-        },
-        'anon variants'() {
-            const name = $mol_regexp.from(['A', $mol_regexp.vary(['4', '5'])]);
-            $mol_assert_equal('AB'.match(name), null);
-            $mol_assert_equal('A4'.match(name)[0], 'A4');
-            $mol_assert_equal('A5'.match(name)[0], 'A5');
-        },
-        'only groups'() {
-            const regexp = $mol_regexp.from({ dog: '@' });
-            $mol_assert_like([...'#'.matchAll(regexp)][0].groups, undefined);
-            $mol_assert_like([...'@'.matchAll(regexp)][0].groups, { dog: '@' });
-        },
-        'catch skipped'() {
-            const regexp = $mol_regexp.from(/(@)(\d?)/g);
-            $mol_assert_like([...'[[@]]'.matchAll(regexp)].map(f => [...f]), [
-                ['[['],
-                ['@', '@', ''],
-                [']]'],
-            ]);
-        },
-        'enum variants'() {
-            let Sex;
-            (function (Sex) {
-                Sex["male"] = "male";
-                Sex["female"] = "female";
-            })(Sex || (Sex = {}));
-            const sexism = $mol_regexp.from(Sex);
-            $mol_assert_like([...''.matchAll(sexism)].length, 0);
-            $mol_assert_like([...'trans'.matchAll(sexism)][0].groups, undefined);
-            $mol_assert_like([...'male'.matchAll(sexism)][0].groups, { male: 'male', female: '' });
-            $mol_assert_like([...'female'.matchAll(sexism)][0].groups, { male: '', female: 'female' });
-        },
-        'recursive only groups'() {
-            let Sex;
-            (function (Sex) {
-                Sex["male"] = "male";
-                Sex["female"] = "female";
-            })(Sex || (Sex = {}));
-            const sexism = $mol_regexp.from({ Sex });
-            $mol_assert_like([...''.matchAll(sexism)].length, 0);
-            $mol_assert_like([...'male'.matchAll(sexism)][0].groups, { Sex: 'male', male: 'male', female: '' });
-            $mol_assert_like([...'female'.matchAll(sexism)][0].groups, { Sex: 'female', male: '', female: 'female' });
-        },
-        'sequence with groups'() {
-            const { begin, end, decimal_only: digit, repeat, from } = $mol_regexp;
-            const year = repeat(digit, 4, 4);
-            const dash = '-';
-            const month = repeat(digit, 2, 2);
-            const day = repeat(digit, 2, 2);
-            const regexp = from([begin, { year }, dash, { month }, dash, { day }, end]);
-            const found = [...'2020-01-02'.matchAll(regexp)];
-            $mol_assert_like(found[0].groups, {
-                year: '2020',
-                month: '01',
-                day: '02',
-            });
-        },
-        'sequence with groups of mixed type'() {
-            const prefix = '/';
-            const postfix = '/';
-            const regexp = $mol_regexp.from([{ prefix }, /(\w+)/, { postfix }, /([gumi]*)/]);
-            $mol_assert_like([...'/foo/mi'.matchAll(regexp)], [
-                Object.assign(["/foo/mi", "/", "foo", "/", "mi"], {
-                    groups: {
-                        prefix: '/',
-                        postfix: '/',
-                    },
-                    index: 0,
-                    input: "/",
-                }),
-            ]);
-        },
-        'recursive sequence with groups'() {
-            const { begin, end, decimal_only: digit, repeat, from } = $mol_regexp;
-            const year = repeat(digit, 4, 4);
-            const dash = '-';
-            const month = repeat(digit, 2, 2);
-            const day = repeat(digit, 2, 2);
-            const regexp = from([
-                begin, { date: [{ year }, dash, { month }] }, dash, { day }, end
-            ]);
-            const found = [...'2020-01-02'.matchAll(regexp)];
-            $mol_assert_like(found[0].groups, {
-                date: '2020-01',
-                year: '2020',
-                month: '01',
-                day: '02',
-            });
-        },
-        'parse multiple'() {
-            const { decimal_only: digit, from } = $mol_regexp;
-            const regexp = from({ digit });
-            $mol_assert_like([...'123'.matchAll(regexp)].map(f => f.groups), [
-                { digit: '1' },
-                { digit: '2' },
-                { digit: '3' },
-            ]);
-        },
-        'named variants'() {
-            const { begin, or, end, from } = $mol_regexp;
-            const sexism = from([
-                begin, 'sex = ', { sex: ['male', or, 'female'] }, end
-            ]);
-            $mol_assert_like([...'sex = male'.matchAll(sexism)][0].groups, { sex: 'male' });
-            $mol_assert_like([...'sex = female'.matchAll(sexism)][0].groups, { sex: 'female' });
-            $mol_assert_like([...'sex = malefemale'.matchAll(sexism)][0].groups, undefined);
-        },
-        'force after'() {
-            const { latin_only: letter, force_after, from } = $mol_regexp;
-            const regexp = from([letter, force_after('.')]);
-            $mol_assert_like('x.'.match(regexp), ['x']);
-            $mol_assert_like('x,'.match(regexp), null);
-        },
-        'forbid after'() {
-            const { latin_only: letter, forbid_after, from } = $mol_regexp;
-            const regexp = from([letter, forbid_after('.')]);
-            $mol_assert_like('x.'.match(regexp), null);
-            $mol_assert_like('x,'.match(regexp), ['x']);
-        },
-        'char except'() {
-            const { char_except, latin_only, tab } = $mol_regexp;
-            const name = char_except(latin_only, tab);
-            $mol_assert_like('a'.match(name), null);
-            $mol_assert_like('\t'.match(name), null);
-            $mol_assert_like('('.match(name), ['(']);
-        },
-        'unicode only'() {
-            const { unicode_only, from } = $mol_regexp;
-            const name = from([
-                unicode_only('Script', 'Cyrillic'),
-                unicode_only('Hex_Digit'),
-            ]);
-            $mol_assert_like('FF'.match(name), null);
-            $mol_assert_like('ФG'.match(name), null);
-            $mol_assert_like('ФF'.match(name), ['ФF']);
-        },
-        'generate by optional with inner group'() {
-            const { begin, end, from } = $mol_regexp;
-            const animals = from([begin, '#', ['^', { dog: '@' }], end]);
-            $mol_assert_equal(animals.generate({}), '#');
-            $mol_assert_equal(animals.generate({ dog: false }), '#');
-            $mol_assert_equal(animals.generate({ dog: true }), '#^@');
-            $mol_assert_fail(() => animals.generate({ dog: '$' }), 'Wrong param: dog=$');
-        },
-        'generate by optional with inner group with variants'() {
-            const { begin, end, from } = $mol_regexp;
-            const animals = from([begin, '#', ['^', { animal: { dog: '@', fox: '&' } }], end]);
-            $mol_assert_equal(animals.generate({}), '#');
-            $mol_assert_equal(animals.generate({ dog: true }), '#^@');
-            $mol_assert_equal(animals.generate({ fox: true }), '#^&');
-            $mol_assert_fail(() => animals.generate({ dog: '$' }), 'Wrong param: dog=$');
-        },
-        'complex example'() {
-            const { begin, end, char_only, char_range, latin_only, slash_back, repeat_greedy, from, } = $mol_regexp;
-            const atom_char = char_only(latin_only, "!#$%&'*+/=?^`{|}~-");
-            const atom = repeat_greedy(atom_char, 1);
-            const dot_atom = from([atom, repeat_greedy(['.', atom])]);
-            const name_letter = char_only(char_range(0x01, 0x08), 0x0b, 0x0c, char_range(0x0e, 0x1f), 0x21, char_range(0x23, 0x5b), char_range(0x5d, 0x7f));
-            const quoted_pair = from([
-                slash_back,
-                char_only(char_range(0x01, 0x09), 0x0b, 0x0c, char_range(0x0e, 0x7f))
-            ]);
-            const name = repeat_greedy({ name_letter, quoted_pair });
-            const quoted_name = from(['"', { name }, '"']);
-            const local_part = from({ dot_atom, quoted_name });
-            const domain = dot_atom;
-            const mail = from([begin, local_part, '@', { domain }, end]);
-            $mol_assert_equal('foo..bar@example.org'.match(mail), null);
-            $mol_assert_equal('foo..bar"@example.org'.match(mail), null);
-            $mol_assert_like([...'foo.bar@example.org'.matchAll(mail)][0].groups, {
-                dot_atom: "foo.bar",
-                quoted_name: "",
-                name: "",
-                name_letter: "",
-                quoted_pair: "",
-                domain: "example.org",
-            });
-            $mol_assert_like([...'"foo..bar"@example.org'.matchAll(mail)][0].groups, {
-                dot_atom: "",
-                quoted_name: '"foo..bar"',
-                name: "foo..bar",
-                name_letter: "r",
-                quoted_pair: "",
-                domain: "example.org",
-            });
-            $mol_assert_equal(mail.generate({ dot_atom: 'foo.bar', domain: 'example.org' }), 'foo.bar@example.org');
-            $mol_assert_equal(mail.generate({ name: 'foo..bar', domain: 'example.org' }), '"foo..bar"@example.org');
-            $mol_assert_fail(() => mail.generate({ dot_atom: 'foo..bar', domain: 'example.org' }), 'Wrong param: dot_atom=foo..bar');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            'Empty needle'() {
-                const app = new $mol_dimmer;
-                app.needle = () => '  ';
-                app.haystack = () => 'foo  bar';
-                $mol_assert_like(app.strings(), ['foo  bar']);
-            },
-            'Empty haystack'() {
-                const app = new $mol_dimmer;
-                app.needle = () => 'foo  bar';
-                app.haystack = () => '';
-                $mol_assert_like(app.strings(), ['']);
-            },
-            'Not found'() {
-                const app = new $mol_dimmer;
-                app.needle = () => 'foo';
-                app.haystack = () => ' bar ';
-                $mol_assert_like(app.strings(), [' bar ']);
-            },
-            'One found'() {
-                const app = new $mol_dimmer;
-                app.needle = () => 'foo';
-                app.haystack = () => ' barfoo ';
-                $mol_assert_like(app.strings(), [' bar', 'foo', ' ']);
-            },
-            'Multiple found'() {
-                const app = new $mol_dimmer;
-                app.needle = () => 'foo';
-                app.haystack = () => ' foobarfoo foo';
-                $mol_assert_like(app.strings(), [' ', 'foo', 'bar', 'foo', ' ', 'foo']);
-            },
-            'Fuzzy search'() {
-                const app = new $mol_dimmer;
-                app.needle = () => 'foo bar';
-                app.haystack = () => ' barfoo ';
-                $mol_assert_like(app.strings(), [' ', 'bar', '', 'foo', ' ']);
-            },
-        });
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        '$mol_syntax2_md_flow'() {
-            const check = (input, right) => {
-                const tokens = [];
-                $mol_syntax2_md_flow.tokenize(input, (...token) => tokens.push(token));
-                $mol_assert_equal(tokens, right);
-            };
-            check('Hello,\nWorld..\r\n\r\n\nof Love!', [
-                ['block', 'Hello,\n', ['Hello,', '\n'], 0],
-                ['block', 'World..\r\n\r\n\n', ['World..', '\r\n\r\n\n'], 7],
-                ['block', 'of Love!', ['of Love!', ''], 19],
-            ]);
-            check('# Header1\n\nHello!\n\n## Header2', [
-                ['header', '# Header1\n\n', ['#', ' ', 'Header1', '\n\n'], 0],
-                ['block', 'Hello!\n\n', ['Hello!', '\n\n'], 11],
-                ['header', '## Header2', ['##', ' ', 'Header2', ''], 19],
-            ]);
-            check('```\nstart()\n```\n\n```jam.js\nrestart()\n```\n\nHello!\n\n```\nstop()\n```', [
-                ['code', '```\nstart()\n```\n\n', ['```', '', 'start()\n', '```', '\n\n'], 0],
-                ['code', '```jam.js\nrestart()\n```\n\n', ['```', 'jam.js', 'restart()\n', '```', '\n\n'], 17],
-                ['block', 'Hello!\n\n', ['Hello!', '\n\n'], 42],
-                ['code', '```\nstop()\n```', ['```', '', 'stop()\n', '```', ''], 50],
-            ]);
-            check('| header1 | header2\n|----|----\n| Cell11 | Cell12\n| Cell21 | Cell22\n\n| Cell11 | Cell12\n| Cell21 | Cell22\n', [
-                ['table', '| header1 | header2\n|----|----\n| Cell11 | Cell12\n| Cell21 | Cell22\n\n', ['| header1 | header2\n|----|----\n| Cell11 | Cell12\n| Cell21 | Cell22\n', '\n'], 0],
-                ['table', '| Cell11 | Cell12\n| Cell21 | Cell22\n', ['| Cell11 | Cell12\n| Cell21 | Cell22\n', ''], 68],
-            ]);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    const png = new Uint8Array([0x1a, 0x0a, 0x00, 0x49, 0x48, 0x78, 0xda]);
-    $mol_test({
-        'base64 encode string'() {
-            $mol_assert_equal($mol_base64_encode($mol_charset_encode('Hello, ΧΨΩЫ')), 'SGVsbG8sIM6nzqjOqdCr');
-        },
-        'base64 encode binary'() {
-            $mol_assert_equal($mol_base64_encode(png), 'GgoASUh42g==');
-        },
-        'base64 encode string with plus'() {
-            $mol_assert_equal($mol_base64_encode($mol_charset_encode('шоешпо')), '0YjQvtC10YjQv9C+');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    const png = new Uint8Array([0x1a, 0x0a, 0x00, 0x49, 0x48, 0x78, 0xda]);
-    const with_plus = new TextEncoder().encode('шоешпо');
-    $mol_test({
-        'base64 decode string'() {
-            $mol_assert_equal($mol_base64_decode('SGVsbG8sIM6nzqjOqdCr'), new TextEncoder().encode('Hello, ΧΨΩЫ'));
-        },
-        'base64 decode binary'() {
-            $mol_assert_equal($mol_base64_decode('GgoASUh42g=='), png);
-        },
-        'base64 decode binary - without equals'() {
-            $mol_assert_equal($mol_base64_decode('GgoASUh42g'), png);
-        },
-        'base64 decode with plus'() {
-            $mol_assert_equal($mol_base64_decode('0YjQvtC10YjQv9C+'), with_plus);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'empty hash'() {
-            $mol_assert_equal($mol_crypto2_hash(new Uint8Array([])), new Uint8Array([218, 57, 163, 238, 94, 107, 75, 13, 50, 85, 191, 239, 149, 96, 24, 144, 175, 216, 7, 9]));
-        },
-        'three bytes hash'() {
-            $mol_assert_equal($mol_crypto2_hash(new Uint8Array([255, 254, 253])), new Uint8Array([240, 150, 38, 243, 255, 128, 96, 0, 72, 215, 207, 228, 19, 149, 113, 52, 2, 125, 27, 77]));
-        },
-        'six bytes hash'() {
-            $mol_assert_equal($mol_crypto2_hash(new Uint8Array([0, 255, 10, 250, 32, 128])), new Uint8Array([23, 25, 155, 181, 46, 200, 221, 83, 254, 0, 166, 68, 91, 255, 67, 140, 114, 88, 218, 155]));
-        },
-        'seven bytes hash'() {
-            $mol_assert_equal($mol_crypto2_hash(new Uint8Array([1, 2, 3, 4, 5, 6, 7])), new Uint8Array([140, 31, 40, 252, 47, 72, 194, 113, 214, 196, 152, 240, 242, 73, 205, 222, 54, 92, 84, 197]));
-        },
-        'unaligned hash'() {
-            const data = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
-            $mol_assert_equal($mol_crypto2_hash(new Uint8Array(data.buffer, 1, 7)), new Uint8Array([140, 31, 40, 252, 47, 72, 194, 113, 214, 196, 152, 240, 242, 73, 205, 222, 54, 92, 84, 197]));
-        },
-        async 'reference'() {
-            const data = new Uint8Array([255, 254, 253]);
-            $mol_assert_equal($mol_crypto2_hash(data), new Uint8Array(await $mol_crypto_native.subtle.digest('SHA-1', data)));
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            "Float schema"($) {
-                $mol_assert_equal('$mol_schema_float', $mol_schema_float + '', $mol_key($mol_schema_float));
-                $mol_assert_equal(true, $mol_schema_float.check(0));
-                $mol_assert_equal(true, $mol_schema_float.check(Number.NaN));
-                $mol_assert_equal(true, $mol_schema_float.check(Number.POSITIVE_INFINITY));
-                $mol_assert_equal(false, $mol_schema_float.check(null));
-                $mol_assert_equal(1.5, $mol_schema_float.cast(1.5));
-                $mol_assert_equal(Number.NaN, $mol_schema_float.cast('0'));
-                $mol_assert_equal(Number.EPSILON, $mol_schema_float.guard(Number.EPSILON));
-                $mol_assert_fail(() => $mol_schema_float.guard('0'), 'Wrong type');
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            "String schema"($) {
-                $mol_assert_equal('$mol_schema_string', $mol_schema_string + '', $mol_key($mol_schema_string));
-                $mol_assert_equal(true, $mol_schema_string.check('foo'));
-                $mol_assert_equal(false, $mol_schema_string.check(123));
-                $mol_assert_equal('foo', $mol_schema_string.cast('foo'));
-                $mol_assert_equal('', $mol_schema_string.cast(123));
-                $mol_assert_equal('foo', $mol_schema_string.guard('foo'));
-                $mol_assert_fail(() => $mol_schema_string.guard(123), 'Wrong type');
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            "Cache of maybe schema"($) {
-                $mol_assert_equal($mol_schema_maybe($mol_schema_float), $mol_schema_maybe($mol_schema_float));
-                $mol_assert_unique($mol_schema_maybe($mol_schema_float), $mol_schema_maybe($mol_schema_string));
-            },
-            "Optional value"($) {
-                const Config = $mol_schema_maybe($mol_schema_string);
-                $mol_assert_equal('$mol_schema_maybe<$mol_schema_string>', Config + '');
-                $mol_assert_equal(true, Config.check('foo'));
-                $mol_assert_equal(true, Config.check(undefined));
-                $mol_assert_equal(true, Config.check(null));
-                $mol_assert_equal(false, Config.check(0));
-                $mol_assert_equal('foo', Config.cast('foo'));
-                $mol_assert_equal(undefined, Config.cast(undefined));
-                $mol_assert_equal(null, Config.cast(null));
-                $mol_assert_equal(null, Config.cast(0));
-                $mol_assert_equal('foo', Config.guard('foo'));
-                $mol_assert_fail(() => Config.guard(123), 'Wrong type');
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            "Cache of instance schema"($) {
-                $mol_assert_equal($mol_schema_instance(Uint8Array), $mol_schema_instance(Uint8Array));
-                $mol_assert_unique($mol_schema_instance(Uint8Array), $mol_schema_instance(Int8Array));
-            },
-            "Class instance schema"($) {
-                const Blob = $mol_schema_instance(Uint8Array);
-                $mol_assert_equal('$mol_schema_instance<Uint8Array>', Blob + '', $mol_key(Blob));
-                $mol_assert_equal(true, Blob.check(new Uint8Array));
-                $mol_assert_equal(false, Blob.check(new Int8Array));
-                $mol_assert_equal(false, Blob.check(null));
-                $mol_assert_equal(new Uint8Array([0, 1]), Blob.cast(new Uint8Array([0, 1])));
-                $mol_assert_fail(() => Blob.cast(new Int8Array), 'Wrong class');
-                $mol_assert_equal(new Uint8Array, Blob.guard(new Uint8Array));
-                $mol_assert_fail(() => Blob.guard(new Int8Array), 'Wrong class');
-            },
-            "Boxed instance schema"($) {
-                const Str = $mol_schema_instance(String);
-                $mol_assert_equal('$mol_schema_instance<String>', Str + '', $mol_key(Str));
-                $mol_assert_equal(true, Str.check(Object('')));
-                $mol_assert_equal(true, Str.check(''));
-                $mol_assert_equal(true, Object('') instanceof Str);
-            },
-            "Schema instance schema"($) {
-                const Str = $mol_schema_instance($mol_schema_instance(String));
-                $mol_assert_equal('$mol_schema_instance<String>', Str + '', $mol_key(Str));
-                $mol_assert_equal(true, Str.check(Object('')));
-                $mol_assert_equal(true, Str.check(''));
-                $mol_assert_equal(true, Object('') instanceof Str);
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            "Validation"($) {
-                $mol_assert_fail(() => new $giper_baza_link('qwertyui_asdfghjk123'), 'Wrong Link (qwertyui_asdfghjk123)');
-            },
-            "From integer"($) {
-                $mol_assert_equal($giper_baza_link.from_int(178308648732587), new $giper_baza_link('qwertyui'));
-            },
-            "Pick Lord only"($) {
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').lord(), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').lord(), new $giper_baza_link('qwertyui_asdfghjk').lord(), new $giper_baza_link('qwertyui_asdfghjk'));
-            },
-            "Pick Land only"($) {
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').land(), new $giper_baza_link('qwertyui_asdfghjk').land(), new $giper_baza_link('qwertyui_asdfghjk'));
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').land(), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').land(), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed'));
-            },
-            "Pick Peer only"($) {
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').peer(), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').peer(), new $giper_baza_link('qwertyui'));
-                $mol_assert_equal(new $giper_baza_link('___qazwsxed').peer(), new $giper_baza_link(''));
-            },
-            "Pick Head only"($) {
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').head(), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').head(), new $giper_baza_link('zxcvbnm0'));
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').head(), new $giper_baza_link('qwertyui_asdfghjk').head(), new $giper_baza_link(''));
-            },
-            "Pick Area only"($) {
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').area(), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').area(), new $giper_baza_link('qazwsxed'));
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').area(), new $giper_baza_link('qwertyui_asdfghjk').area(), new $giper_baza_link('').area(), new $giper_baza_link(''));
-            },
-            "Binary encoding"($) {
-                const pawn = new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').toBin();
-                const land = new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').toBin();
-                const lord = new $giper_baza_link('qwertyui_asdfghjk').toBin();
-                const rel_pawn = new $giper_baza_link('___zxcvbnm0').toBin();
-                const rel_root = new $giper_baza_link('').toBin();
-                $mol_assert_equal(pawn.length, 24);
-                $mol_assert_equal(land.length, 18);
-                $mol_assert_equal(lord.length, 12);
-                $mol_assert_equal(rel_pawn.length, 6);
-                $mol_assert_equal(rel_root.length, 0);
-                $mol_assert_equal($giper_baza_link.from_bin(pawn), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0'));
-                $mol_assert_equal($giper_baza_link.from_bin(land), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed'));
-                $mol_assert_equal($giper_baza_link.from_bin(lord), new $giper_baza_link('qwertyui_asdfghjk'));
-                $mol_assert_equal($giper_baza_link.from_bin(rel_pawn), new $giper_baza_link('zxcvbnm0'));
-                $mol_assert_equal($giper_baza_link.from_bin(rel_root), new $giper_baza_link(''));
-            },
-            "Relate to base"($) {
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').relate(new $giper_baza_link('QWERTYUI_ASDFGHJK')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').relate(new $giper_baza_link('QWERTYUI_ASDFGHJK__ZXCVBNM0')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0'));
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').relate(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed')), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0').relate(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_12345678')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').relate(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').relate(new $giper_baza_link('qwertyui_asdfghjk__12345678')), new $giper_baza_link('___zxcvbnm0'));
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').relate(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed').relate(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed')), new $giper_baza_link('qwertyui_asdfghjk').relate(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk').relate(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link(''));
-            },
-            "Resolve Link from base"($) {
-                $mol_assert_equal(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').resolve(new $giper_baza_link('QWERTYUI_ASDFGHJK__ZXCVBNM0')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').resolve(new $giper_baza_link('QWERTYUI_ASDFGHJK')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0').resolve(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0'));
-                $mol_assert_equal(new $giper_baza_link('___12345678').resolve(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link('___12345678').resolve(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk__12345678'));
-                $mol_assert_equal(new $giper_baza_link('___12345678').resolve(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed')), new $giper_baza_link('___12345678').resolve(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_12345678'));
-                $mol_assert_equal(new $giper_baza_link('').resolve(new $giper_baza_link('qwertyui_asdfghjk')), new $giper_baza_link('').resolve(new $giper_baza_link('qwertyui_asdfghjk__zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk'));
-                $mol_assert_equal(new $giper_baza_link('').resolve(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed')), new $giper_baza_link('').resolve(new $giper_baza_link('qwertyui_asdfghjk_qazwsxed_zxcvbnm0')), new $giper_baza_link('qwertyui_asdfghjk_qazwsxed'));
-            },
-            'Hashing'() {
-                $mol_assert_equal($giper_baza_link.hash_bin(new Uint8Array([1, 2, 3])), new $giper_baza_link('cDeAcZjC_Kn0rCAc3'));
-                $mol_assert_equal($giper_baza_link.hash_str('foo bar'), new $giper_baza_link('N3PeplFW_kJg4æmwi'));
-            }
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        async 'str & bin sizes'() {
-            const signer = await $$.$mol_crypto2_signer.generate();
-            const auditor = signer.auditor();
-            $mol_assert_equal(signer.toStringPrivate().length, $mol_crypto2_signer.size_str);
-            $mol_assert_equal(auditor.toString().length, $mol_crypto2_auditor.size_str);
-            $mol_assert_equal(signer.asArrayPrivate().length, $mol_crypto2_signer.size_bin);
-            $mol_assert_equal(auditor.asArray().length, $mol_crypto2_auditor.size_bin);
-            const data = new Uint8Array([1, 2, 3]);
-            const sign = await signer.sign(data);
-            $mol_assert_equal(sign.byteLength, $mol_crypto2_signer.size_sign);
-        },
-        async 'verify self signed with auto generated key'() {
-            const Alice = await $$.$mol_crypto2_signer.generate();
-            const data = new Uint8Array([1, 2, 3]);
-            const sign = await Alice.sign(data);
-            $mol_assert_equal(true, await Alice.auditor().verify(data, sign));
-        },
-        async 'verify signed with str exported auto generated key'() {
-            const Alice = await $$.$mol_crypto2_signer.generate();
-            const data = new Uint8Array([1, 2, 3]);
-            const Bella = $mol_crypto2_signer.from(Alice.toString() + Alice.toStringPrivate());
-            const sign = await Bella.sign(data);
-            const Catie = $mol_crypto2_auditor.from(Alice.auditor().toString());
-            $mol_assert_equal(true, await Catie.verify(data, sign));
-            const Diana = $mol_crypto2_auditor.from(Alice.toString());
-            $mol_assert_equal(true, await Diana.verify(data, sign));
-        },
-        async 'verify signed with bin exported auto generated key'() {
-            const Alice = await $$.$mol_crypto2_signer.generate();
-            const data = new Uint8Array([1, 2, 3]);
-            const Bella = $mol_crypto2_signer.from(new Uint8Array([...Alice.asArray(), ...Alice.asArrayPrivate()]));
-            const sign = await Bella.sign(data);
-            const Catie = $mol_crypto2_auditor.from(Alice.auditor().asArray());
-            $mol_assert_equal(true, await Catie.verify(data, sign));
-            const Diana = $mol_crypto2_auditor.from(Alice.asArray());
-            $mol_assert_equal(true, await Diana.verify(data, sign));
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        async 'Sizes'() {
-            const secret = $mol_crypto_sacred.make();
-            const key = secret.asArray();
-            $mol_assert_equal(key.byteLength, $mol_crypto_sacred.size);
-            const data = new Uint8Array([1, 2, 3]);
-            const salt = $mol_crypto_salt();
-            const closed = await secret.encrypt(data, salt);
-            $mol_assert_equal(closed.byteLength, $mol_crypto_sacred.size);
-            const self_closed = await secret.close(secret, salt);
-            $mol_assert_equal(self_closed.byteLength, $mol_crypto_sacred.size);
-        },
-        async 'Decrypt self encrypted'() {
-            const secret = $mol_crypto_sacred.make();
-            const data = new Uint8Array([1, 2, 3]);
-            const salt = $mol_crypto_salt();
-            const closed = await secret.encrypt(data, salt);
-            const opened = await secret.decrypt(closed, salt);
-            $mol_assert_equal(data, opened);
-        },
-        async 'Decrypt encrypted with exported key'() {
-            const data = new Uint8Array([1, 2, 3]);
-            const salt = $mol_crypto_salt();
-            const Alice = $mol_crypto_sacred.make();
-            const closed = await Alice.encrypt(data, salt);
-            const Bob = $mol_crypto_sacred.from(Alice.asArray());
-            const opened = await Bob.decrypt(closed, salt);
-            $mol_assert_equal(data, opened);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        async 'str & bin sizes'() {
-            const cipher = await $$.$mol_crypto2_cipher.generate();
-            const socket = cipher.socket();
-            $mol_assert_equal(cipher.toStringPrivate().length, $mol_crypto2_cipher.size_str);
-            $mol_assert_equal(socket.toString().length, $mol_crypto2_socket.size_str);
-            $mol_assert_equal(cipher.asArrayPrivate().length, $mol_crypto2_cipher.size_bin);
-            $mol_assert_equal(socket.asArray().length, $mol_crypto2_socket.size_bin);
-            const secret = await cipher.secret(socket);
-            $mol_assert_equal(secret.byteLength, $mol_crypto2_cipher.size_secret);
-        },
-        async 'Shared secret from public & private keys'() {
-            const A = await $mol_crypto2_cipher.generate();
-            const B = await $mol_crypto2_cipher.generate();
-            const SA = await A.secret(B.socket());
-            const SB = await B.secret(A.socket());
-            $mol_assert_equal(SA.asArray(), SB.asArray());
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            async "Signing & encryption"($) {
-                const Alice = await $mol_crypto2_private.generate();
-                const Bella = await $mol_crypto2_private.generate();
-                const secretA = await Alice.cipher().secret(Bella.socket());
-                const secretB = await Bella.cipher().secret(Alice.socket());
-                $mol_assert_equal(secretA, secretB);
-                const data = new Uint8Array([1, 2, 3]);
-                const nonce = $mol_crypto2_nonce();
-                const closed = await secretA.encrypt(data, nonce);
-                const digest = $mol_crypto2_hash(closed);
-                const sign = await Alice.signer().sign(digest);
-                $mol_assert_equal(true, await Alice.auditor().verify(digest, sign));
-                $mol_assert_equal(data, await secretA.decrypt(closed, nonce));
-            },
-            async "Serial & Deserial"($) {
-                const orig = await $mol_crypto2_private.generate();
-                const bin = new Uint8Array([...orig.asArray(), ...orig.asArrayPrivate()]);
-                const str = orig.toString() + orig.toStringPrivate();
-                $mol_assert_equal(orig, $mol_crypto2_private.from(bin), $mol_crypto2_private.from(str));
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
 })($ || ($ = {}));
 
 ;
@@ -47974,6 +46877,9 @@ var $;
 
 ;
 "use strict";
+
+;
+"use strict";
 var $;
 (function ($_1) {
     var $$;
@@ -48056,6 +46962,335 @@ var $;
             },
         });
     })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'escape'() {
+            const specials = $mol_regexp.from('.*+?^${}()|[]\\');
+            $mol_assert_equal(specials.source, '\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\');
+        },
+        'char code'() {
+            const space = $mol_regexp.from(32);
+            $mol_assert_like(' '.match(space), [' ']);
+        },
+        'repeat fixed'() {
+            const { repeat, decimal_only: digit } = $mol_regexp;
+            const year = repeat(digit, 4, 4);
+            $mol_assert_like('#2020#'.match(year), ['2020']);
+        },
+        'greedy repeat'() {
+            const { repeat, repeat_greedy, latin_only: letter } = $mol_regexp;
+            $mol_assert_like('abc'.match(repeat(letter, 1, 2)), ['a', 'b', 'c']);
+            $mol_assert_like('abc'.match(repeat_greedy(letter, 1, 2)), ['ab', 'c']);
+        },
+        'repeat range'() {
+            const { repeat_greedy, decimal_only: digit } = $mol_regexp;
+            const year = repeat_greedy(digit, 2, 4);
+            $mol_assert_like('#2#'.match(year), null);
+            $mol_assert_like('#20#'.match(year), ['20']);
+            $mol_assert_like('#2020#'.match(year), ['2020']);
+            $mol_assert_like('#20201#'.match(year), ['2020']);
+        },
+        'repeat from'() {
+            const { repeat_greedy, latin_only: letter } = $mol_regexp;
+            const name = repeat_greedy(letter, 2);
+            $mol_assert_like('##'.match(name), null);
+            $mol_assert_like('#a#'.match(name), null);
+            $mol_assert_like('#ab#'.match(name), ['ab']);
+            $mol_assert_like('#abc#'.match(name), ['abc']);
+        },
+        'from string'() {
+            const regexp = $mol_regexp.from('[\\d]');
+            $mol_assert_equal(regexp.source, '\\[\\\\d\\]');
+            $mol_assert_equal(regexp.flags, 'gsu');
+        },
+        'from regexp'() {
+            const regexp = $mol_regexp.from(/[\d]/i);
+            $mol_assert_equal(regexp.source, '[\\d]');
+            $mol_assert_equal(regexp.flags, 'i');
+        },
+        'split'() {
+            const regexp = $mol_regexp.from(';');
+            $mol_assert_like('aaa;bbb;ccc'.split(regexp), ['aaa', ';', 'bbb', ';', 'ccc']);
+            $mol_assert_like('aaa;;ccc'.split(regexp), ['aaa', ';', '', ';', 'ccc']);
+            $mol_assert_like('aaa'.split(regexp), ['aaa']);
+            $mol_assert_like(''.split(regexp), ['']);
+        },
+        'test for matching'() {
+            const regexp = $mol_regexp.from('foo');
+            $mol_assert_like(regexp.test(''), false);
+            $mol_assert_like(regexp.test('fo'), false);
+            $mol_assert_like(regexp.test('foo'), true);
+            $mol_assert_like(regexp.test('foobar'), true);
+            $mol_assert_like(regexp.test('barfoo'), true);
+        },
+        'case ignoring'() {
+            const xxx = $mol_regexp.from('x', { ignoreCase: true });
+            $mol_assert_like(xxx.flags, 'gisu');
+            $mol_assert_like(xxx.exec('xx')[0], 'x');
+            $mol_assert_like(xxx.exec('XX')[0], 'X');
+        },
+        'multiline mode'() {
+            const { end, from } = $mol_regexp;
+            const xxx = from(['x', end], { multiline: true });
+            $mol_assert_like(xxx.exec('x\ny')[0], 'x');
+            $mol_assert_like(xxx.flags, 'gmsu');
+        },
+        'flags override'() {
+            const triplet = $mol_regexp.from($mol_regexp.from(/.../, { ignoreCase: true }), { multiline: true });
+            $mol_assert_like(triplet.toString(), '/.../gmsu');
+        },
+        'sequence'() {
+            const { begin, end, decimal_only: digit, repeat, from } = $mol_regexp;
+            const year = repeat(digit, 4, 4);
+            const dash = '-';
+            const month = repeat(digit, 2, 2);
+            const day = repeat(digit, 2, 2);
+            const date = from([begin, year, dash, month, dash, day, end]);
+            $mol_assert_like(date.exec('2020-01-02')[0], '2020-01-02');
+        },
+        'optional'() {
+            const name = $mol_regexp.from(['A', ['4']]);
+            $mol_assert_equal('AB'.match(name)[0], 'A');
+            $mol_assert_equal('A4'.match(name)[0], 'A4');
+        },
+        'anon variants'() {
+            const name = $mol_regexp.from(['A', $mol_regexp.vary(['4', '5'])]);
+            $mol_assert_equal('AB'.match(name), null);
+            $mol_assert_equal('A4'.match(name)[0], 'A4');
+            $mol_assert_equal('A5'.match(name)[0], 'A5');
+        },
+        'only groups'() {
+            const regexp = $mol_regexp.from({ dog: '@' });
+            $mol_assert_like([...'#'.matchAll(regexp)][0].groups, undefined);
+            $mol_assert_like([...'@'.matchAll(regexp)][0].groups, { dog: '@' });
+        },
+        'catch skipped'() {
+            const regexp = $mol_regexp.from(/(@)(\d?)/g);
+            $mol_assert_like([...'[[@]]'.matchAll(regexp)].map(f => [...f]), [
+                ['[['],
+                ['@', '@', ''],
+                [']]'],
+            ]);
+        },
+        'enum variants'() {
+            let Sex;
+            (function (Sex) {
+                Sex["male"] = "male";
+                Sex["female"] = "female";
+            })(Sex || (Sex = {}));
+            const sexism = $mol_regexp.from(Sex);
+            $mol_assert_like([...''.matchAll(sexism)].length, 0);
+            $mol_assert_like([...'trans'.matchAll(sexism)][0].groups, undefined);
+            $mol_assert_like([...'male'.matchAll(sexism)][0].groups, { male: 'male', female: '' });
+            $mol_assert_like([...'female'.matchAll(sexism)][0].groups, { male: '', female: 'female' });
+        },
+        'recursive only groups'() {
+            let Sex;
+            (function (Sex) {
+                Sex["male"] = "male";
+                Sex["female"] = "female";
+            })(Sex || (Sex = {}));
+            const sexism = $mol_regexp.from({ Sex });
+            $mol_assert_like([...''.matchAll(sexism)].length, 0);
+            $mol_assert_like([...'male'.matchAll(sexism)][0].groups, { Sex: 'male', male: 'male', female: '' });
+            $mol_assert_like([...'female'.matchAll(sexism)][0].groups, { Sex: 'female', male: '', female: 'female' });
+        },
+        'sequence with groups'() {
+            const { begin, end, decimal_only: digit, repeat, from } = $mol_regexp;
+            const year = repeat(digit, 4, 4);
+            const dash = '-';
+            const month = repeat(digit, 2, 2);
+            const day = repeat(digit, 2, 2);
+            const regexp = from([begin, { year }, dash, { month }, dash, { day }, end]);
+            const found = [...'2020-01-02'.matchAll(regexp)];
+            $mol_assert_like(found[0].groups, {
+                year: '2020',
+                month: '01',
+                day: '02',
+            });
+        },
+        'sequence with groups of mixed type'() {
+            const prefix = '/';
+            const postfix = '/';
+            const regexp = $mol_regexp.from([{ prefix }, /(\w+)/, { postfix }, /([gumi]*)/]);
+            $mol_assert_like([...'/foo/mi'.matchAll(regexp)], [
+                Object.assign(["/foo/mi", "/", "foo", "/", "mi"], {
+                    groups: {
+                        prefix: '/',
+                        postfix: '/',
+                    },
+                    index: 0,
+                    input: "/",
+                }),
+            ]);
+        },
+        'recursive sequence with groups'() {
+            const { begin, end, decimal_only: digit, repeat, from } = $mol_regexp;
+            const year = repeat(digit, 4, 4);
+            const dash = '-';
+            const month = repeat(digit, 2, 2);
+            const day = repeat(digit, 2, 2);
+            const regexp = from([
+                begin, { date: [{ year }, dash, { month }] }, dash, { day }, end
+            ]);
+            const found = [...'2020-01-02'.matchAll(regexp)];
+            $mol_assert_like(found[0].groups, {
+                date: '2020-01',
+                year: '2020',
+                month: '01',
+                day: '02',
+            });
+        },
+        'parse multiple'() {
+            const { decimal_only: digit, from } = $mol_regexp;
+            const regexp = from({ digit });
+            $mol_assert_like([...'123'.matchAll(regexp)].map(f => f.groups), [
+                { digit: '1' },
+                { digit: '2' },
+                { digit: '3' },
+            ]);
+        },
+        'named variants'() {
+            const { begin, or, end, from } = $mol_regexp;
+            const sexism = from([
+                begin, 'sex = ', { sex: ['male', or, 'female'] }, end
+            ]);
+            $mol_assert_like([...'sex = male'.matchAll(sexism)][0].groups, { sex: 'male' });
+            $mol_assert_like([...'sex = female'.matchAll(sexism)][0].groups, { sex: 'female' });
+            $mol_assert_like([...'sex = malefemale'.matchAll(sexism)][0].groups, undefined);
+        },
+        'force after'() {
+            const { latin_only: letter, force_after, from } = $mol_regexp;
+            const regexp = from([letter, force_after('.')]);
+            $mol_assert_like('x.'.match(regexp), ['x']);
+            $mol_assert_like('x,'.match(regexp), null);
+        },
+        'forbid after'() {
+            const { latin_only: letter, forbid_after, from } = $mol_regexp;
+            const regexp = from([letter, forbid_after('.')]);
+            $mol_assert_like('x.'.match(regexp), null);
+            $mol_assert_like('x,'.match(regexp), ['x']);
+        },
+        'char except'() {
+            const { char_except, latin_only, tab } = $mol_regexp;
+            const name = char_except(latin_only, tab);
+            $mol_assert_like('a'.match(name), null);
+            $mol_assert_like('\t'.match(name), null);
+            $mol_assert_like('('.match(name), ['(']);
+        },
+        'unicode only'() {
+            const { unicode_only, from } = $mol_regexp;
+            const name = from([
+                unicode_only('Script', 'Cyrillic'),
+                unicode_only('Hex_Digit'),
+            ]);
+            $mol_assert_like('FF'.match(name), null);
+            $mol_assert_like('ФG'.match(name), null);
+            $mol_assert_like('ФF'.match(name), ['ФF']);
+        },
+        'generate by optional with inner group'() {
+            const { begin, end, from } = $mol_regexp;
+            const animals = from([begin, '#', ['^', { dog: '@' }], end]);
+            $mol_assert_equal(animals.generate({}), '#');
+            $mol_assert_equal(animals.generate({ dog: false }), '#');
+            $mol_assert_equal(animals.generate({ dog: true }), '#^@');
+            $mol_assert_fail(() => animals.generate({ dog: '$' }), 'Wrong param: dog=$');
+        },
+        'generate by optional with inner group with variants'() {
+            const { begin, end, from } = $mol_regexp;
+            const animals = from([begin, '#', ['^', { animal: { dog: '@', fox: '&' } }], end]);
+            $mol_assert_equal(animals.generate({}), '#');
+            $mol_assert_equal(animals.generate({ dog: true }), '#^@');
+            $mol_assert_equal(animals.generate({ fox: true }), '#^&');
+            $mol_assert_fail(() => animals.generate({ dog: '$' }), 'Wrong param: dog=$');
+        },
+        'complex example'() {
+            const { begin, end, char_only, char_range, latin_only, slash_back, repeat_greedy, from, } = $mol_regexp;
+            const atom_char = char_only(latin_only, "!#$%&'*+/=?^`{|}~-");
+            const atom = repeat_greedy(atom_char, 1);
+            const dot_atom = from([atom, repeat_greedy(['.', atom])]);
+            const name_letter = char_only(char_range(0x01, 0x08), 0x0b, 0x0c, char_range(0x0e, 0x1f), 0x21, char_range(0x23, 0x5b), char_range(0x5d, 0x7f));
+            const quoted_pair = from([
+                slash_back,
+                char_only(char_range(0x01, 0x09), 0x0b, 0x0c, char_range(0x0e, 0x7f))
+            ]);
+            const name = repeat_greedy({ name_letter, quoted_pair });
+            const quoted_name = from(['"', { name }, '"']);
+            const local_part = from({ dot_atom, quoted_name });
+            const domain = dot_atom;
+            const mail = from([begin, local_part, '@', { domain }, end]);
+            $mol_assert_equal('foo..bar@example.org'.match(mail), null);
+            $mol_assert_equal('foo..bar"@example.org'.match(mail), null);
+            $mol_assert_like([...'foo.bar@example.org'.matchAll(mail)][0].groups, {
+                dot_atom: "foo.bar",
+                quoted_name: "",
+                name: "",
+                name_letter: "",
+                quoted_pair: "",
+                domain: "example.org",
+            });
+            $mol_assert_like([...'"foo..bar"@example.org'.matchAll(mail)][0].groups, {
+                dot_atom: "",
+                quoted_name: '"foo..bar"',
+                name: "foo..bar",
+                name_letter: "r",
+                quoted_pair: "",
+                domain: "example.org",
+            });
+            $mol_assert_equal(mail.generate({ dot_atom: 'foo.bar', domain: 'example.org' }), 'foo.bar@example.org');
+            $mol_assert_equal(mail.generate({ name: 'foo..bar', domain: 'example.org' }), '"foo..bar"@example.org');
+            $mol_assert_fail(() => mail.generate({ dot_atom: 'foo..bar', domain: 'example.org' }), 'Wrong param: dot_atom=foo..bar');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'empty string'() {
+            $mol_assert_equal(''.match($giper_baza_text_tokens), null);
+        },
+        'new lines'() {
+            $mol_assert_equal('\n\r\n'.match($giper_baza_text_tokens), ['\n', '\r\n']);
+        },
+        'numbers'() {
+            $mol_assert_equal('123'.match($giper_baza_text_tokens), ['123']);
+        },
+        'emoji'() {
+            $mol_assert_equal('😀😁'.match($giper_baza_text_tokens), ['😀', '😁']);
+        },
+        'emoji with modifier'() {
+            $mol_assert_equal('👩🏿👩🏿'.match($giper_baza_text_tokens), ['👩🏿', '👩🏿']);
+        },
+        'combo emoji with modifier'() {
+            $mol_assert_equal('👩🏿‍🤝‍🧑🏿👩🏿‍🤝‍🧑🏿'.match($giper_baza_text_tokens), ['👩🏿‍🤝‍🧑🏿', '👩🏿‍🤝‍🧑🏿']);
+        },
+        'word with spaces'() {
+            $mol_assert_equal('foo1  bar2'.match($giper_baza_text_tokens), ['foo1', ' ', ' bar2']);
+        },
+        'word with diactric'() {
+            $mol_assert_equal('Е́е́'.match($giper_baza_text_tokens), ['Е́е́']);
+        },
+        'word with punctuation'() {
+            $mol_assert_equal('foo--bar'.match($giper_baza_text_tokens), ['foo', '--', 'bar']);
+        },
+        'CamelCase'() {
+            $mol_assert_equal('Foo1BAR2'.match($giper_baza_text_tokens), ['Foo1', 'BAR2']);
+        },
+    });
 })($ || ($ = {}));
 
 ;
@@ -48728,6 +47963,2013 @@ var $;
             },
         });
     })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test({
+        'Change sequences'($) {
+            const land = $giper_baza_land.make({ $ });
+            const text = land.Data($giper_baza_text);
+            const list = land.Data($giper_baza_list);
+            $mol_assert_equal(text.str(), '');
+            $mol_assert_equal(list.items_vary(), []);
+            text.str('foo');
+            $mol_assert_equal(text.str(), 'foo');
+            $mol_assert_equal(list.items_vary(), ['foo']);
+            text.str('foo bar');
+            $mol_assert_equal(text.str(), 'foo bar');
+            $mol_assert_equal(list.items_vary(), ['foo', ' bar']);
+            text.str('foo lol bar');
+            $mol_assert_equal(text.str(), 'foo lol bar');
+            $mol_assert_equal(list.items_vary(), ['foo', ' lol', ' bar']);
+            text.str('lol bar');
+            $mol_assert_equal(text.str(), 'lol bar');
+            $mol_assert_equal(list.items_vary(), ['lol', ' bar']);
+            text.str('foo bar');
+            $mol_assert_equal(text.str(), 'foo bar');
+            $mol_assert_equal(list.items_vary(), ['foo', ' bar']);
+            text.str('foo  bar');
+            $mol_assert_equal(text.str(), 'foo  bar');
+            $mol_assert_equal(list.items_vary(), ['foo', ' ', ' bar']);
+            text.str('foo  BarBar');
+            $mol_assert_equal(text.str(), 'foo  BarBar');
+            $mol_assert_equal(list.items_vary(), ['foo', ' ', ' Bar', 'Bar']);
+        },
+        async 'str: Offset <=> Point'($) {
+            const land = $giper_baza_land.make({ $ });
+            const text = land.Data($giper_baza_text);
+            text.str('fooBar');
+            const [first, second] = text.units();
+            $mol_assert_equal(text.point_by_offset(0), [first.self().str, 0, 0]);
+            $mol_assert_equal(text.offset_by_point([first.self().str, 0, 0]), [first.self().str, 0]);
+            $mol_assert_equal(text.point_by_offset(3), [first.self().str, 3, 0]);
+            $mol_assert_equal(text.offset_by_point([first.self().str, 3, 0]), [first.self().str, 3]);
+            $mol_assert_equal(text.offset_by_point([first.self().str, 5, 0]), [first.self().str, 5]);
+            $mol_assert_equal(text.point_by_offset(5), [second.self().str, 2, 0]);
+            $mol_assert_equal(text.offset_by_point([second.self().str, 2, 0]), [second.self().str, 5]);
+            $mol_assert_equal(text.point_by_offset(6), [second.self().str, 3, 0]);
+            $mol_assert_equal(text.offset_by_point([second.self().str, 3, 0]), [second.self().str, 6]);
+            $mol_assert_equal(text.point_by_offset(7), ['', 1, 0]);
+            $mol_assert_equal(text.offset_by_point(['', 1, 0]), ['', 7]);
+        },
+        async 'text: Offset <=> Point'($) {
+            const land = $giper_baza_land.make({ $ });
+            const text = land.Data($giper_baza_text);
+            text.text('foo bar\n666 777');
+            const [first, second] = text.pawns($giper_baza_text);
+            $mol_assert_equal(text.point_by_offset(0), [first.units()[0].self().str, 0, 0]);
+            $mol_assert_equal(text.offset_by_point([first.units()[0].self().str, 0, 0]), [first.units()[0].self().str, 0]);
+            $mol_assert_equal(text.point_by_offset(8), [first.units()[2].self().str, 1, 0]);
+            $mol_assert_equal(text.offset_by_point([first.units()[2].self().str, 1, 0]), [first.units()[2].self().str, 8]);
+        },
+        async 'Merge different sequences'($) {
+            const land1 = $giper_baza_land.make({ $ });
+            const land2 = $giper_baza_land.make({ $ });
+            const text1 = land1.Pawn($giper_baza_text).Data();
+            const text2 = land2.Pawn($giper_baza_text).Data();
+            text1.str('foo bar.');
+            land2.faces.stat.time = land1.faces.stat.time;
+            text2.str('xxx yyy.');
+            const delta1 = await $mol_wire_async(land1).diff_units();
+            const delta2 = await $mol_wire_async(land2).diff_units();
+            await $mol_wire_async(land1).diff_apply(delta2);
+            await $mol_wire_async(land2).diff_apply(delta1);
+            $mol_assert_equal(text1.str(), text2.str(), 'xxx yyy.foo bar.');
+        },
+        async 'Merge same insertions with different changes to same place'($) {
+            const base = $giper_baza_land.make({ $ });
+            base.Data($giper_baza_text).str('( )');
+            const left = $giper_baza_land.make({ $ });
+            await $mol_wire_async(left).units_steal(base);
+            left.Data($giper_baza_text).str('( [ f ] )');
+            left.Data($giper_baza_text).str('( [ foo ] )');
+            const right = $giper_baza_land.make({ $ });
+            await $mol_wire_async(right).units_steal(base);
+            right.faces.sync(left.faces);
+            right.Data($giper_baza_text).str('( [ f ] )');
+            right.Data($giper_baza_text).str('( [ fu ] )');
+            const left_delta = await $mol_wire_async(left).diff_units(base.faces);
+            const right_delta = await $mol_wire_async(right).diff_units(base.faces);
+            await $mol_wire_async(left).diff_apply(right_delta);
+            await $mol_wire_async(right).diff_apply(left_delta);
+            $mol_assert_equal(left.Data($giper_baza_text).str(), right.Data($giper_baza_text).str(), '( [ fu ] [ foo ] )');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /** Google Docs: wrapper b with normal weight, styled spans, c1 c2 classes, docs-internal-guid. */
+    const paste_fixture_gdocs = `<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-9f1e2b3c-7fff-aaaa-bbbb-ccccdddd"><h1 dir="ltr" style="line-height:1.38;margin-top:20pt;margin-bottom:6pt;"><span style="font-size:20pt;font-family:Arial;color:#000000;background-color:transparent;font-weight:400;font-style:normal;text-decoration:none;vertical-align:baseline;white-space:pre-wrap;">Планы на квартал</span></h1><p dir="ltr" style="line-height:1.38;"><span class="c1 c5" style="font-size:11pt;font-family:Arial;font-weight:700;text-decoration:none;white-space:pre-wrap;">Важно</span><span class="c1" style="font-size:11pt;font-weight:400;text-decoration:none;white-space:pre-wrap;">:&nbsp;успеть до </span><span class="c3" style="font-size:11pt;font-style:italic;white-space:pre-wrap;">пятницы</span></p><p dir="ltr"><span style="text-decoration:underline;-webkit-text-decoration-skip:none;text-decoration-skip-ink:none;"><a class="c9" href="https://example.com/plan">план</a></span></p><ul style="margin-top:0;padding-inline-start:48px;"><li dir="ltr" style="list-style-type:disc;font-size:11pt;" aria-level="1"><p dir="ltr" style="line-height:1.38;" role="presentation"><span style="font-weight:400;white-space:pre-wrap;">Первый пункт</span></p></li><li dir="ltr" style="list-style-type:disc;" aria-level="1"><p dir="ltr" role="presentation"><span style="font-weight:400;">Второй пункт</span></p></li></ul></b>`;
+    /** Word: o:p and w:sdt tags, mso-* styles, MsoListParagraph items, conditional comments. */
+    const paste_fixture_word = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta name=Generator content="Microsoft Word 15"><style><!-- p.MsoNormal {margin:0cm;font-size:11.0pt;} --></style></head><body lang=RU><p class=MsoNormal><span style='font-size:12.0pt;mso-fareast-language:EN-US'>Обычный абзац с <b style='mso-bidi-font-weight:normal'>жирным</b> словом<o:p></o:p></span></p><p class=MsoListParagraphCxSpFirst style='margin-left:36.0pt;text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol;mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp; </span></span><![endif]><span style='mso-fareast-language:EN-US'>Пункт один<o:p></o:p></span></p><p class=MsoListParagraphCxSpLast style='mso-list:l0 level1 lfo1'><![if !supportLists]><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp; </span></span><![endif]><span>Пункт два<o:p></o:p></span></p><w:sdt><p class=MsoNormal>Служебное<o:p></o:p></p></w:sdt></body></html>`;
+    /** Notion: block ids, data-token-index, nested list, pre code with language, figure with img. */
+    const paste_fixture_notion = `<meta charset='utf-8'><span data-token-index="0" style="caret-color: rgb(55, 53, 47); font-family: ui-sans-serif;"></span><h2 id="1a2b3c4d-0000-8000-8000-000000000001" data-block-id="1a2b" class="notion-heading">Как это работает</h2><p id="1a2b3c4d-0000-8000-8000-000000000002" class="notion-text-block">Просто <strong>берём</strong> и <em>делаем</em>, смотри <a href="https://notion.so/doc">доку</a>.</p><ul class="bulleted-list"><li style="list-style-type:disc">раз<ul class="bulleted-list"><li style="list-style-type:circle">раз-раз</li></ul></li><li style="list-style-type:disc">два</li></ul><pre class="code" style="background:rgb(247,246,243);"><code class="language-TypeScript">const a: number = 1
+console.log( a &lt; 2 )</code></pre><figure><img src="https://notion.so/image/pic.png" alt="скрин" width="700"></figure>`;
+    /** Ordinary web page: article markup, blockquote, hr, table, script, hidden div, unsafe link. */
+    const paste_fixture_web = `<article><h1 class="post-title">Заголовок статьи</h1><p>Текст с <strong>жирным</strong>, <em>курсивом</em>, <s>зачёркнутым</s> и <code>inline_code()</code>.</p><blockquote><p>Первая строка цитаты.</p><p>Вторая строка.</p></blockquote><hr><h4>Мелкий заголовок</h4><ol><li>Раз</li><li>Два</li></ol><pre><code class="language-js">let x = 1 &amp;&amp; 2</code></pre><p><img src="/img/photo.jpg" alt="фото"></p><p><a href="javascript:alert(1)">не ссылка</a> и <a href="https://ok.example/a?b=1&amp;c=2">ссылка</a></p><table><tr><th>Ключ</th><th>Значение</th></tr><tr><td>a</td><td>1</td></tr></table><script>alert(2)</script><div style="display:none">скрытое</div><!-- комментарий --></article>`;
+    const paste_fixture_md = [
+        '# Заголовок',
+        '',
+        'Абзац с **жирным**, *курсивом*, ~~зачёркнутым~~, `кодом` и [ссылкой](https://example.com/a?b=1&c=2).',
+        '',
+        '## Подзаголовок',
+        '',
+        '- раз',
+        '- два',
+        '  - вложенный',
+        '',
+        '1. один',
+        '2. два',
+        '',
+        '> Цитата первая',
+        '> Цитата вторая',
+        '',
+        '```ts',
+        'const a = 1 < 2',
+        '```',
+        '',
+        '---',
+        '',
+        '![картинка](https://example.com/pic.png)',
+        '',
+        '| Ключ | Значение |',
+        '| --- | --- |',
+        '| a | 1 |',
+    ].join('\n');
+    /** Anything an editor leaves behind that must never reach a block. */
+    const paste_dirt = /style=|data-[a-z]|aria-|<span|<div|<o:p|<w:|docs-internal-guid|&nbsp;|\u00A0|<!--|role=/;
+    function paste_dirty(drafts) {
+        return drafts.filter(draft => paste_dirt.test(draft.content)).map(draft => draft.content);
+    }
+    /** class= is junk everywhere except the language marker of a code block. */
+    function paste_classy(drafts) {
+        return drafts.filter(draft => draft.type !== 'code' && draft.content.includes('class=')).map(draft => draft.content);
+    }
+    function paste_types(drafts) {
+        return drafts.map(draft => draft.type);
+    }
+    function paste_clipboard(html, text) {
+        return { getData: (type) => type === 'text/html' ? html : text };
+    }
+    $mol_test({
+        'detect: rich html wins over plain text'() {
+            const kind = $bog_wysiwyg_paste.detect(paste_clipboard(paste_fixture_gdocs, 'Планы на квартал'));
+            $mol_assert_equal(kind, 'html');
+        },
+        'detect: code editor html is only colored spans, so markdown from plain text'() {
+            const html = '<div style="color:#d4d4d4;background:#1e1e1e"><div><span style="color:#569cd6"># Привет</span></div></div>';
+            const kind = $bog_wysiwyg_paste.detect(paste_clipboard(html, '# Привет\n\n- раз\n- два'));
+            $mol_assert_equal(kind, 'markdown');
+        },
+        'detect: markdown from plain text when html is absent'() {
+            $mol_assert_equal($bog_wysiwyg_paste.detect(paste_clipboard('', '# Привет')), 'markdown');
+            $mol_assert_equal($bog_wysiwyg_paste.detect(paste_clipboard('', '- раз\n- два')), 'markdown');
+            $mol_assert_equal($bog_wysiwyg_paste.detect(paste_clipboard('', 'см. [доку](https://x.dev)')), 'markdown');
+            $mol_assert_equal($bog_wysiwyg_paste.detect(paste_clipboard('', '```\ncode\n```')), 'markdown');
+            $mol_assert_equal($bog_wysiwyg_paste.detect(paste_clipboard('', '> цитата')), 'markdown');
+        },
+        'detect: prose without markup is plain text'() {
+            const text = 'Просто две строки обычного текста.\nБез всякой разметки.';
+            $mol_assert_equal($bog_wysiwyg_paste.detect(paste_clipboard('', text)), 'text');
+            $mol_assert_equal($bog_wysiwyg_paste.detect(paste_clipboard('<span style="color:red">' + text + '</span>', text)), 'text');
+        },
+        'detect: bold span in html counts as rich'() {
+            const html = '<span style="font-weight:700">важно</span>';
+            $mol_assert_equal($bog_wysiwyg_paste.detect(paste_clipboard(html, 'важно')), 'html');
+        },
+        'from_html: google docs keeps structure and drops wrappers'() {
+            const drafts = $bog_wysiwyg_paste.from_html(paste_fixture_gdocs);
+            $mol_assert_equal(paste_types(drafts), ['heading', 'paragraph', 'paragraph', 'list', 'list']);
+            $mol_assert_equal(drafts[0], { type: 'heading', level: 1, content: 'Планы на квартал' });
+            $mol_assert_equal(drafts[1].content, '<b>Важно</b>: успеть до <i>пятницы</i>');
+            $mol_assert_equal(drafts[2].content, '<a href="https://example.com/plan">план</a>');
+            $mol_assert_equal(drafts[3].content, 'Первый пункт');
+            $mol_assert_equal(drafts[4].content, 'Второй пункт');
+            $mol_assert_equal(paste_dirty(drafts), []);
+            $mol_assert_equal(paste_classy(drafts), []);
+        },
+        'from_html: word keeps bold and list items, drops office tags'() {
+            const drafts = $bog_wysiwyg_paste.from_html(paste_fixture_word);
+            $mol_assert_equal(paste_types(drafts), ['paragraph', 'list', 'list', 'paragraph']);
+            $mol_assert_equal(drafts[0].content, 'Обычный абзац с <b>жирным</b> словом');
+            $mol_assert_equal(drafts[1].content, 'Пункт один');
+            $mol_assert_equal(drafts[2].content, 'Пункт два');
+            $mol_assert_equal(drafts[3].content, 'Служебное');
+            $mol_assert_equal(paste_dirty(drafts), []);
+            $mol_assert_equal(paste_classy(drafts), []);
+        },
+        'from_html: notion flattens nested list and keeps code language'() {
+            const drafts = $bog_wysiwyg_paste.from_html(paste_fixture_notion);
+            $mol_assert_equal(paste_types(drafts), ['heading', 'paragraph', 'list', 'list', 'list', 'code', 'image']);
+            $mol_assert_equal(drafts[0], { type: 'heading', level: 2, content: 'Как это работает' });
+            $mol_assert_equal(drafts[1].content, 'Просто <b>берём</b> и <i>делаем</i>, смотри <a href="https://notion.so/doc">доку</a>.');
+            $mol_assert_equal([drafts[2].content, drafts[3].content, drafts[4].content], ['раз', 'раз-раз', 'два']);
+            $mol_assert_equal(drafts[5].content, '<code class="language-typescript">const a: number = 1\nconsole.log( a &lt; 2 )</code>');
+            $mol_assert_equal(drafts[6].content, '<img src="https://notion.so/image/pic.png" alt="скрин">');
+            $mol_assert_equal(paste_dirty(drafts), []);
+            $mol_assert_equal(paste_classy(drafts), []);
+        },
+        'from_html: web page keeps every supported block type'() {
+            const drafts = $bog_wysiwyg_paste.from_html(paste_fixture_web);
+            $mol_assert_equal(paste_types(drafts), [
+                'heading', 'paragraph', 'quote', 'divider', 'heading',
+                'list', 'list', 'code', 'image', 'paragraph', 'paragraph', 'paragraph',
+            ]);
+            $mol_assert_equal(drafts[1].content, 'Текст с <b>жирным</b>, <i>курсивом</i>, <s>зачёркнутым</s> и <code>inline_code()</code>.');
+            $mol_assert_equal(drafts[2].content, 'Первая строка цитаты.<br>Вторая строка.');
+            $mol_assert_equal(drafts[4], { type: 'heading', level: 3, content: 'Мелкий заголовок' });
+            $mol_assert_equal(drafts[7].content, '<code class="language-js">let x = 1 &amp;&amp; 2</code>');
+            $mol_assert_equal(drafts[8].content, '<img src="/img/photo.jpg" alt="фото">');
+            $mol_assert_equal(drafts[10].content, 'Ключ | Значение');
+            $mol_assert_equal(drafts[11].content, 'a | 1');
+            $mol_assert_equal(paste_dirty(drafts), []);
+            $mol_assert_equal(paste_classy(drafts), []);
+        },
+        'from_html: unsafe hrefs are unwrapped to plain text'() {
+            const drafts = $bog_wysiwyg_paste.from_html(paste_fixture_web);
+            $mol_assert_equal(drafts[9].content, 'не ссылка и <a href="https://ok.example/a?b=1&amp;c=2">ссылка</a>');
+            $mol_assert_equal(drafts[9].content.includes('javascript:'), false);
+        },
+        'from_html: script and hidden content never reach a block'() {
+            const drafts = $bog_wysiwyg_paste.from_html(paste_fixture_web);
+            const all = drafts.map(draft => draft.content).join(' ');
+            $mol_assert_equal(all.includes('alert'), false);
+            $mol_assert_equal(all.includes('скрытое'), false);
+            $mol_assert_equal(all.includes('комментарий'), false);
+        },
+        'from_html: empty and junk only clipboard gives nothing'() {
+            $mol_assert_equal($bog_wysiwyg_paste.from_html(''), []);
+            $mol_assert_equal($bog_wysiwyg_paste.from_html('   '), []);
+            $mol_assert_equal($bog_wysiwyg_paste.from_html('<meta charset="utf-8"><span style="color:red"></span>'), []);
+            $mol_assert_equal($bog_wysiwyg_paste.from_html('<div><span> </span></div>'), []);
+        },
+        'from_html: nbsp becomes an ordinary space'() {
+            const drafts = $bog_wysiwyg_paste.from_html('<p>раз&nbsp;два&nbsp;&nbsp;три</p>');
+            $mol_assert_equal(drafts[0].content, 'раз два три');
+        },
+        'from_html: data uri image is passed through untouched'() {
+            const src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==';
+            const drafts = $bog_wysiwyg_paste.from_html('<p><img src="' + src + '"></p>');
+            $mol_assert_equal(drafts, [{ type: 'image', content: '<img src="' + src + '">' }]);
+        },
+        'from_html: image inside a paragraph splits it into blocks in order'() {
+            const drafts = $bog_wysiwyg_paste.from_html('<p>до<img src="a.png">после</p>');
+            $mol_assert_equal(drafts, [
+                { type: 'paragraph', content: 'до' },
+                { type: 'image', content: '<img src="a.png">' },
+                { type: 'paragraph', content: 'после' },
+            ]);
+        },
+        'from_html: text in a styled span keeps the spaces around neighbours'() {
+            const html = '<p><span style="color:#111">жирный</span><span> </span><span style="font-weight:700">текст</span></p>';
+            $mol_assert_equal($bog_wysiwyg_paste.from_html(html)[0].content, 'жирный <b>текст</b>');
+        },
+        'from_html: angle brackets in text are escaped'() {
+            const drafts = $bog_wysiwyg_paste.from_html('<p>&lt;b&gt;не жирный&lt;/b&gt; &amp; всё</p>');
+            $mol_assert_equal(drafts[0].content, '&lt;b&gt;не жирный&lt;/b&gt; &amp; всё');
+        },
+        'from_markdown: every block kind is recognised'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown(paste_fixture_md);
+            $mol_assert_equal(paste_types(drafts), [
+                'heading', 'paragraph', 'heading', 'list', 'list', 'list', 'list', 'list',
+                'quote', 'code', 'divider', 'image', 'paragraph', 'paragraph',
+            ]);
+            $mol_assert_equal(drafts[0], { type: 'heading', level: 1, content: 'Заголовок' });
+            $mol_assert_equal(drafts[1].content, 'Абзац с <b>жирным</b>, <i>курсивом</i>, <s>зачёркнутым</s>, <code>кодом</code>'
+                + ' и <a href="https://example.com/a?b=1&amp;c=2">ссылкой</a>.');
+            $mol_assert_equal(drafts[2], { type: 'heading', level: 2, content: 'Подзаголовок' });
+            $mol_assert_equal(drafts.slice(3, 8).map(draft => draft.content), ['раз', 'два', 'вложенный', 'один', 'два']);
+            $mol_assert_equal(drafts[8].content, 'Цитата первая<br>Цитата вторая');
+            $mol_assert_equal(drafts[9].content, '<code class="language-ts">const a = 1 &lt; 2</code>');
+            $mol_assert_equal(drafts[10], { type: 'divider', content: '' });
+            $mol_assert_equal(drafts[11].content, '<img src="https://example.com/pic.png" alt="картинка">');
+            $mol_assert_equal([drafts[12].content, drafts[13].content], ['Ключ | Значение', 'a | 1']);
+            $mol_assert_equal(paste_dirty(drafts), []);
+            $mol_assert_equal(paste_classy(drafts), []);
+        },
+        'from_markdown: heading deeper than three is clamped'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('#### Четвёртый\n\n###### Шестой');
+            $mol_assert_equal(drafts.map(draft => draft.level), [3, 3]);
+        },
+        'from_markdown: fence without language stays plain code'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('```\nplain & <code>\n```');
+            $mol_assert_equal(drafts, [{ type: 'code', content: 'plain &amp; &lt;code&gt;' }]);
+        },
+        'from_markdown: tilde fence works too'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('~~~python\nx = 1\n~~~');
+            $mol_assert_equal(drafts, [{ type: 'code', content: '<code class="language-python">x = 1</code>' }]);
+        },
+        'from_markdown: raw html in the source is escaped, not executed'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('опасно <script>alert(1)</script> тут');
+            $mol_assert_equal(drafts[0].content, 'опасно &lt;script&gt;alert(1)&lt;/script&gt; тут');
+        },
+        'from_markdown: unsafe link becomes plain label'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('[клик](javascript:alert(1))');
+            $mol_assert_equal(drafts, [{ type: 'paragraph', content: 'клик' }]);
+        },
+        'from_markdown: soft line breaks inside a paragraph become br'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('первая\nвторая\n\nтретья');
+            $mol_assert_equal(drafts, [
+                { type: 'paragraph', content: 'первая<br>вторая' },
+                { type: 'paragraph', content: 'третья' },
+            ]);
+        },
+        'from_markdown: dashes are a divider, not a list'() {
+            $mol_assert_equal($bog_wysiwyg_paste.from_markdown('---'), [{ type: 'divider', content: '' }]);
+            $mol_assert_equal($bog_wysiwyg_paste.from_markdown('***'), [{ type: 'divider', content: '' }]);
+            $mol_assert_equal($bog_wysiwyg_paste.from_markdown('- пункт'), [{ type: 'list', content: 'пункт' }]);
+        },
+        'from_markdown: emphasis inside a word is left alone'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('snake_case_name и 2*3*4');
+            $mol_assert_equal(drafts[0].content, 'snake_case_name и 2*3*4');
+        },
+        'from_markdown: parens inside a link url survive'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('см. [вики](https://ru.wikipedia.org/wiki/Мол_(язык))');
+            $mol_assert_equal(drafts[0].content, 'см. <a href="https://ru.wikipedia.org/wiki/Мол_(язык)">вики</a>');
+        },
+        'from_markdown: image with a title keeps only the source'() {
+            const drafts = $bog_wysiwyg_paste.from_markdown('![схема](https://x.dev/a.png "подпись")');
+            $mol_assert_equal(drafts, [{ type: 'image', content: '<img src="https://x.dev/a.png" alt="схема">' }]);
+        },
+        'from_html: underline survives when it is not a link decoration'() {
+            const drafts = $bog_wysiwyg_paste.from_html('<p>вот <u>это</u> и <span style="text-decoration:underline">то</span></p>');
+            $mol_assert_equal(drafts[0].content, 'вот <u>это</u> и <u>то</u>');
+        },
+        'from_markdown: nothing from empty source'() {
+            $mol_assert_equal($bog_wysiwyg_paste.from_markdown(''), []);
+            $mol_assert_equal($bog_wysiwyg_paste.from_markdown('\n\n   \n'), []);
+        },
+        'from_text: blank lines split paragraphs, single breaks stay'() {
+            const drafts = $bog_wysiwyg_paste.from_text('один\nдва\n\nтри & <четыре>');
+            $mol_assert_equal(drafts, [
+                { type: 'paragraph', content: 'один<br>два' },
+                { type: 'paragraph', content: 'три &amp; &lt;четыре&gt;' },
+            ]);
+        },
+        'from_data: routes to the parser matching the clipboard'() {
+            const from_html = $bog_wysiwyg_paste.from_data(paste_clipboard('<h2>Тема</h2>', 'Тема'));
+            $mol_assert_equal(from_html, [{ type: 'heading', level: 2, content: 'Тема' }]);
+            const from_md = $bog_wysiwyg_paste.from_data(paste_clipboard('', '## Тема'));
+            $mol_assert_equal(from_md, [{ type: 'heading', level: 2, content: 'Тема' }]);
+            const from_text = $bog_wysiwyg_paste.from_data(paste_clipboard('', 'просто тема'));
+            $mol_assert_equal(from_text, [{ type: 'paragraph', content: 'просто тема' }]);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test({
+        'id auto generation'($) {
+            class $mol_view_test_item extends $mol_view {
+            }
+            class $mol_view_test_block extends $mol_view {
+                static $ = $;
+                element(id) {
+                    return new $mol_view_test_item();
+                }
+            }
+            __decorate([
+                $mol_mem_key
+            ], $mol_view_test_block.prototype, "element", null);
+            var x = $mol_view_test_block.Root(0);
+            $mol_assert_equal(x.dom_node().id, '$mol_view_test_block.Root(0)');
+            $mol_assert_equal(x.element(0).dom_node().id, '$mol_view_test_block.Root(0).element(0)');
+        },
+        'caching ref to dom node'($) {
+            var x = new class extends $mol_view {
+            };
+            x.$ = $;
+            $mol_assert_equal(x.dom_node(), x.dom_node());
+        },
+        'content render'($) {
+            class $mol_view_test extends $mol_view {
+                sub() {
+                    return ['lol', 5];
+                }
+            }
+            var x = new $mol_view_test();
+            x.$ = $;
+            var node = x.dom_tree();
+            $mol_assert_equal(node.innerHTML, 'lol5');
+        },
+        'bem attributes generation'($) {
+            class $mol_view_test_item extends $mol_view {
+            }
+            class $mol_view_test_block extends $mol_view {
+                Element(id) {
+                    return new $mol_view_test_item();
+                }
+            }
+            __decorate([
+                $mol_mem_key
+            ], $mol_view_test_block.prototype, "Element", null);
+            var x = new $mol_view_test_block();
+            x.$ = $;
+            $mol_assert_equal(x.dom_node().getAttribute('mol_view_test_block'), '');
+            $mol_assert_equal(x.dom_node().getAttribute('mol_view'), '');
+            $mol_assert_equal(x.Element(0).dom_node().getAttribute('mol_view_test_block_element'), '');
+            $mol_assert_equal(x.Element(0).dom_node().getAttribute('mol_view_test_item'), '');
+            $mol_assert_equal(x.Element(0).dom_node().getAttribute('mol_view'), '');
+        },
+        'render custom attributes'($) {
+            class $mol_view_test extends $mol_view {
+                attr() {
+                    return {
+                        'href': '#haha',
+                        'required': true,
+                        'hidden': false,
+                    };
+                }
+            }
+            var x = new $mol_view_test();
+            x.$ = $;
+            var node = x.dom_tree();
+            $mol_assert_equal(node.getAttribute('href'), '#haha');
+            $mol_assert_equal(node.getAttribute('required'), 'true');
+            $mol_assert_equal(node.getAttribute('hidden'), null);
+        },
+        'render custom fields'($) {
+            class $mol_view_test extends $mol_view {
+                field() {
+                    return {
+                        'hidden': true
+                    };
+                }
+            }
+            var x = new $mol_view_test();
+            x.$ = $;
+            var node = x.dom_tree();
+            $mol_assert_equal(node.hidden, true);
+        },
+        'attach event handlers'($) {
+            var clicked = false;
+            class $mol_view_test extends $mol_view {
+                event() {
+                    return {
+                        'click': (next) => this.event_click(next)
+                    };
+                }
+                event_click(next) {
+                    clicked = true;
+                }
+            }
+            var x = new $mol_view_test();
+            x.$ = $;
+            var node = x.dom_node();
+            node.click();
+            $mol_assert_ok(clicked);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test_mocks.push($ => {
+        class $mol_locale_mock extends $mol_locale {
+            lang(next = 'en') { return next; }
+            static source(lang) {
+                return {};
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $mol_locale_mock.prototype, "lang", null);
+        __decorate([
+            $mol_mem_key
+        ], $mol_locale_mock, "source", null);
+        $.$mol_locale = $mol_locale_mock;
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $mol_style_sheet_test1 extends $mol_view {
+        Item() { return new $mol_view; }
+    }
+    $.$mol_style_sheet_test1 = $mol_style_sheet_test1;
+    class $mol_style_sheet_test2 extends $mol_view {
+        List() { return new $mol_style_sheet_test1; }
+    }
+    $.$mol_style_sheet_test2 = $mol_style_sheet_test2;
+    $mol_test({
+        'component block styles'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                display: 'block',
+                zIndex: 1,
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tdisplay: block;\n\tz-index: 1;\n}\n');
+        },
+        'various units'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                width: '50%',
+                height: '50px',
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\twidth: 50%;\n\theight: 50px;\n}\n');
+        },
+        'various functions'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const { calc } = $mol_style_func;
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                width: calc(`100% - 1px`),
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\twidth: calc(100% - 1px);\n}\n');
+        },
+        'property groups'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                flex: {
+                    grow: 5,
+                    shrink: 10,
+                }
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tflex-grow: 5;\n\tflex-shrink: 10;\n}\n');
+        },
+        'custom properties'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                '--isVariable': 'yes',
+                '--is_variable': 'no',
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\t--is-variable: yes;\n\t--is_variable: no;\n}\n');
+        },
+        'custom property groups'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                '--variable': {
+                    test1: '5px',
+                    test2: '10px',
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\t--variable-test1: 5px;\n\t--variable-test2: 10px;\n}\n');
+        },
+        'property shorthand'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                padding: ['5px', 'auto'],
+                margin: ['10px', 'auto'],
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tpadding: 5px auto;\n\tmargin: 10px auto;\n}\n');
+        },
+        'sequenced values'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const { url } = $mol_style_func;
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                background: {
+                    image: [[url('foo')], [url('bar')]],
+                    size: [['cover'], ['contain']],
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tbackground-image: url("foo"),url("bar");\n\tbackground-size: cover,contain;\n}\n');
+        },
+        'sequenced structs'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                box: {
+                    shadow: [
+                        {
+                            inset: true,
+                            x: 0,
+                            y: 0,
+                            blur: '0.5rem',
+                            spread: 0,
+                            color: 'red',
+                        },
+                        {
+                            inset: false,
+                            x: 0,
+                            y: 0,
+                            blur: '0.5rem',
+                            spread: 0,
+                            color: 'blue',
+                        },
+                    ],
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tbox-shadow: inset 0 0 0.5rem 0 red,0 0 0.5rem 0 blue;\n}\n');
+        },
+        'component block styles with pseudo class'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                color: 'red',
+                ':focus': {
+                    display: 'block',
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test]:focus {\n\tdisplay: block;\n}\n');
+        },
+        'component block styles with pseudo element'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                color: 'red',
+                '::first-line': {
+                    display: 'block',
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test]::first-line {\n\tdisplay: block;\n}\n');
+        },
+        'component block styles with media query'() {
+            class $mol_style_sheet_test extends $mol_view {
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                color: 'red',
+                '@media': {
+                    'print': {
+                        display: 'block',
+                    },
+                    '(max-width: 640px)': {
+                        display: 'inline',
+                    },
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n@media print {\n[mol_style_sheet_test] {\n\tdisplay: block;\n}\n}\n@media (max-width: 640px) {\n[mol_style_sheet_test] {\n\tdisplay: inline;\n}\n}\n');
+        },
+        'component block styles with attribute value'() {
+            class $mol_style_sheet_test extends $mol_view {
+                attr() {
+                    return {
+                        mol_theme: '$mol_theme_dark'
+                    };
+                }
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                color: 'red',
+                '@': {
+                    mol_theme: {
+                        '$mol_theme_dark': {
+                            display: 'block',
+                        },
+                    },
+                    disabled: {
+                        'true': {
+                            width: '100%',
+                        },
+                    },
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test]:where([mol_theme="$mol_theme_dark"]) {\n\tdisplay: block;\n}\n[mol_style_sheet_test]:where([disabled="true"]) {\n\twidth: 100%;\n}\n');
+        },
+        'component block styles with attribute value (short syntax)'() {
+            class $mol_style_sheet_test extends $mol_view {
+                attr() {
+                    return {
+                        mol_theme: '$mol_theme_dark'
+                    };
+                }
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                color: 'red',
+                '[mol_theme]': {
+                    '$mol_theme_dark': {
+                        display: 'block',
+                    },
+                },
+                '[disabled]': {
+                    'true': {
+                        width: '100%',
+                    },
+                    'false': {
+                        width: '50%',
+                    },
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test]:where([mol_theme="$mol_theme_dark"]) {\n\tdisplay: block;\n}\n[mol_style_sheet_test]:where([disabled="true"]) {\n\twidth: 100%;\n}\n[mol_style_sheet_test]:where([disabled="false"]) {\n\twidth: 50%;\n}\n');
+        },
+        'component element styles'() {
+            class $mol_style_sheet_test extends $mol_view {
+                Item() { return new $mol_view; }
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                color: 'red',
+                Item: {
+                    display: 'block',
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test] {\n\tcolor: red;\n}\n[mol_style_sheet_test_item] {\n\tdisplay: block;\n}\n');
+        },
+        'component element of element styles'() {
+            const sheet = $mol_style_sheet($mol_style_sheet_test2, {
+                width: '100%',
+                List: {
+                    color: 'red',
+                    Item: {
+                        display: 'block',
+                    },
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test2] {\n\twidth: 100%;\n}\n[mol_style_sheet_test2_list] {\n\tcolor: red;\n}\n[mol_style_sheet_test2_list_item] {\n\tdisplay: block;\n}\n');
+        },
+        'component element styles with block attribute value'() {
+            class $mol_style_sheet_test extends $mol_view {
+                Item() { return new $mol_view; }
+                attr() {
+                    return {
+                        mol_theme: '$mol_theme_dark',
+                        disabled: true,
+                    };
+                }
+            }
+            const sheet = $mol_style_sheet($mol_style_sheet_test, {
+                '@': {
+                    mol_theme: {
+                        '$mol_theme_dark': {
+                            Item: {
+                                color: 'red',
+                            },
+                        },
+                    },
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test]:where([mol_theme="$mol_theme_dark"]) :where([mol_style_sheet_test_item]) {\n\tcolor: red;\n}\n');
+        },
+        'inner component styles by class'() {
+            const sheet = $mol_style_sheet($mol_style_sheet_test2, {
+                color: 'red',
+                $mol_style_sheet_test1: {
+                    display: 'block',
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test2] {\n\tcolor: red;\n}\n[mol_style_sheet_test2] :where([mol_style_sheet_test1]) {\n\tdisplay: block;\n}\n');
+        },
+        'child component styles by class'() {
+            const sheet = $mol_style_sheet($mol_style_sheet_test2, {
+                color: 'red',
+                '>': {
+                    $mol_style_sheet_test1: {
+                        display: 'block',
+                    },
+                    $mol_style_sheet_test2: {
+                        display: 'inline',
+                    },
+                },
+            });
+            $mol_assert_equal(sheet, '[mol_style_sheet_test2] {\n\tcolor: red;\n}\n[mol_style_sheet_test2] > :where([mol_style_sheet_test1]) {\n\tdisplay: block;\n}\n[mol_style_sheet_test2] > :where([mol_style_sheet_test2]) {\n\tdisplay: inline;\n}\n');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        /** Helper: create a contenteditable div with text, place cursor at end, run try_markdown */
+        function apply_markdown(input) {
+            const doc = $mol_dom_context.document;
+            const div = doc.createElement('div');
+            div.contentEditable = 'true';
+            doc.body.appendChild(div);
+            try {
+                div.textContent = input;
+                const text_node = div.firstChild;
+                const sel = doc.defaultView.getSelection();
+                const range = doc.createRange();
+                range.setStart(text_node, input.length);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                const block = new $bog_wysiwyg_block();
+                block.try_markdown(div);
+                return div.innerHTML;
+            }
+            finally {
+                doc.body.removeChild(div);
+            }
+        }
+        function make_block_with_selection(html, select_text) {
+            const doc = $mol_dom_context.document;
+            const div = doc.createElement('div');
+            div.contentEditable = 'true';
+            div.innerHTML = html;
+            doc.body.appendChild(div);
+            div.focus();
+            if (select_text) {
+                const walker = doc.createTreeWalker(div, 4 /* NodeFilter.SHOW_TEXT */);
+                let node;
+                while (node = walker.nextNode()) {
+                    const idx = (node.textContent ?? '').indexOf(select_text);
+                    if (idx >= 0) {
+                        const range = doc.createRange();
+                        range.setStart(node, idx);
+                        range.setEnd(node, idx + select_text.length);
+                        const sel = doc.defaultView.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                        break;
+                    }
+                }
+            }
+            return div;
+        }
+        /** Editable node plus a block view bound to it */
+        function make_block(html) {
+            const doc = $mol_dom_context.document;
+            const node = doc.createElement('div');
+            node.contentEditable = 'true';
+            // jsdom only tracks activeElement for focusable areas
+            node.tabIndex = 0;
+            node.innerHTML = html;
+            doc.body.appendChild(node);
+            const block = new $bog_wysiwyg_block();
+            block.dom_node = () => node;
+            block.html = (next) => next ?? node.innerHTML;
+            const calls = [];
+            for (const name of ['on_enter', 'on_remove', 'on_split', 'on_merge_prev', 'on_merge_next', 'on_nav', 'on_input', 'on_slash', 'on_paste_blocks', 'on_image']) {
+                block[name] = (arg) => {
+                    calls.push({ name, arg });
+                    return arg ?? null;
+                };
+            }
+            return { block, node, calls, drop: () => node.remove() };
+        }
+        function set_caret(node, offset) {
+            const doc = $mol_dom_context.document;
+            const point = $bog_wysiwyg_point_at(node, offset);
+            const range = doc.createRange();
+            range.setStart(point.node, point.offset);
+            range.collapse(true);
+            const sel = doc.defaultView.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        function set_range(node, from, to) {
+            const doc = $mol_dom_context.document;
+            const start = $bog_wysiwyg_point_at(node, from);
+            const end = $bog_wysiwyg_point_at(node, to);
+            const range = doc.createRange();
+            range.setStart(start.node, start.offset);
+            range.setEnd(end.node, end.offset);
+            const sel = doc.defaultView.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        function key(name, mods = {}) {
+            return new KeyboardEvent('keydown', { key: name, cancelable: true, ...mods });
+        }
+        /** Bare clipboard: `paste_data` needs nothing but `getData` */
+        function clipboard(parts) {
+            return {
+                getData: (type) => (type === 'text/html' ? parts.html : parts.text) ?? '',
+            };
+        }
+        $mol_test({
+            // === Text offsets ===
+            'point_at walks through nested inline tags'() {
+                const { node, drop } = make_block('ab<b>cd</b>ef');
+                try {
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 0).offset, 0);
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 3).node.data, 'cd');
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 3).offset, 1);
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 6).node.data, 'ef');
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 6).offset, 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'point_at clamps beyond the end'() {
+                const { node, drop } = make_block('abc');
+                try {
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 100).offset, 3);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'offset_of is inverse of point_at'() {
+                const { node, drop } = make_block('ab<b>cd</b>ef');
+                try {
+                    for (let i = 0; i <= 6; i++) {
+                        const point = $bog_wysiwyg_point_at(node, i);
+                        $mol_assert_equal($bog_wysiwyg_offset_of(node, point.node, point.offset), i);
+                    }
+                }
+                finally {
+                    drop();
+                }
+            },
+            'offset_of rejects a node outside the block'() {
+                const { node, drop } = make_block('abc');
+                const other = $mol_dom_context.document.createElement('div');
+                try {
+                    $mol_assert_equal($bog_wysiwyg_offset_of(node, other, 0), -1);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'html_text strips markup'() {
+                $mol_assert_equal($bog_wysiwyg_html_text($mol_dom_context.document, 'a<b>b</b><i>c</i>'), 'abc');
+            },
+            'escape_html protects angle brackets'() {
+                $mol_assert_equal($bog_wysiwyg_escape_html('<&>'), '&lt;&amp;&gt;');
+            },
+            // === Caret ===
+            'caret_offset counts through inline tags'() {
+                const { block, node, drop } = make_block('ab<b>cd</b>ef');
+                try {
+                    set_caret(node, 5);
+                    $mol_assert_equal(block.caret_offset(), 5);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'caret_offset is -1 when the caret is in another block'() {
+                const one = make_block('first');
+                const two = make_block('second');
+                try {
+                    set_caret(two.node, 2);
+                    $mol_assert_equal(one.block.caret_offset(), -1);
+                }
+                finally {
+                    one.drop();
+                    two.drop();
+                }
+            },
+            'caret survives an innerHTML rewrite'() {
+                const { block, node, drop } = make_block('hello world');
+                try {
+                    set_caret(node, 5);
+                    const offset = block.caret_offset();
+                    // Nodes are recreated, the old Range would be lost
+                    node.innerHTML = 'hello <b>world</b>';
+                    block.caret_place(offset);
+                    $mol_assert_equal(block.caret_offset(), 5);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'auto keeps the caret when the focused block is resynced'() {
+                const { block, node, drop } = make_block('hello world');
+                try {
+                    node.focus();
+                    set_caret(node, 5);
+                    block.html = (next) => next ?? 'hello <b>world</b>';
+                    block.auto();
+                    $mol_assert_equal(node.innerHTML, 'hello <b>world</b>');
+                    $mol_assert_equal(block.caret_offset(), 5);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'auto rewrites an unfocused block without touching the selection'() {
+                const { block, node, drop } = make_block('old');
+                const other = make_block('elsewhere');
+                try {
+                    set_caret(other.node, 3);
+                    block.html = (next) => next ?? 'new';
+                    block.auto();
+                    $mol_assert_equal(node.innerHTML, 'new');
+                    $mol_assert_equal(other.block.caret_offset(), 3);
+                }
+                finally {
+                    drop();
+                    other.drop();
+                }
+            },
+            'focus_at clamps the offset to the text length'() {
+                const { block, node, drop } = make_block('abc');
+                try {
+                    block.focus_at(100);
+                    $mol_assert_equal(block.caret_offset(), 3);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Splitting content ===
+            'html_before and html_after keep markup'() {
+                const { block, drop } = make_block('ab<b>cdef</b>gh');
+                try {
+                    $mol_assert_equal(block.html_before(4), 'ab<b>cd</b>');
+                    $mol_assert_equal(block.html_after(4), '<b>ef</b>gh');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'html_before at zero is empty and html_after at zero is everything'() {
+                const { block, drop } = make_block('a<i>b</i>');
+                try {
+                    $mol_assert_equal(block.html_before(0), '');
+                    $mol_assert_equal(block.html_after(0), 'a<i>b</i>');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter in the middle asks the page to split the block'() {
+                const { block, node, calls, drop } = make_block('hello world');
+                try {
+                    set_caret(node, 5);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls.length, 1);
+                    $mol_assert_equal(calls[0].name, 'on_split');
+                    $mol_assert_equal(calls[0].arg, { head: 'hello', tail: ' world' });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter at the end appends a fresh block'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 5);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls.length, 1);
+                    $mol_assert_equal(calls[0].name, 'on_enter');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter at the start pushes the whole text into a new block'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 0);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls[0].name, 'on_split');
+                    $mol_assert_equal(calls[0].arg, { head: '', tail: 'hello' });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter on an empty block appends a fresh block'() {
+                const { block, node, calls, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls[0].name, 'on_enter');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter over a selection inside the block wipes it and splits there'() {
+                const { block, node, calls, drop } = make_block('hello world');
+                try {
+                    set_range(node, 5, 8);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls[0].name, 'on_split');
+                    $mol_assert_equal(calls[0].arg, { head: 'hello', tail: 'rld' });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'delete_range drops the selected content and keeps the caret'() {
+                const { block, node, drop } = make_block('hello world');
+                try {
+                    set_range(node, 5, 8);
+                    $mol_assert_equal(block.delete_range(), true);
+                    $mol_assert_equal(node.textContent, 'hellorld');
+                    $mol_assert_equal(block.caret_offset(), 5);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'delete_range refuses a selection reaching outside the block'() {
+                const one = make_block('first');
+                const two = make_block('second');
+                try {
+                    const doc = $mol_dom_context.document;
+                    const range = doc.createRange();
+                    range.setStart(one.node.firstChild, 1);
+                    range.setEnd(two.node.firstChild, 1);
+                    const sel = doc.defaultView.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    $mol_assert_equal(one.block.delete_range(), false);
+                    $mol_assert_equal(one.node.textContent, 'first');
+                }
+                finally {
+                    one.drop();
+                    two.drop();
+                }
+            },
+            'Shift+Enter is left to the browser'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 2);
+                    const event = key('Enter', { shiftKey: true });
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls.length, 0);
+                    $mol_assert_equal(event.defaultPrevented, false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Block boundaries ===
+            'Backspace at the start of a filled block asks to merge with the previous'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 0);
+                    const event = key('Backspace');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls[0].name, 'on_merge_prev');
+                    $mol_assert_equal(event.defaultPrevented, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Backspace in the middle is left to the browser'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 3);
+                    const event = key('Backspace');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls.length, 0);
+                    $mol_assert_equal(event.defaultPrevented, false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Backspace on an empty block still removes it'() {
+                const { block, node, calls, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    block.keydown_event(key('Backspace'));
+                    $mol_assert_equal(calls[0].name, 'on_remove');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Backspace over a selection is left to the browser'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_range(node, 0, 3);
+                    block.keydown_event(key('Backspace'));
+                    $mol_assert_equal(calls.length, 0);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Delete at the end asks to pull the next block in'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 5);
+                    const event = key('Delete');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls[0].name, 'on_merge_next');
+                    $mol_assert_equal(event.defaultPrevented, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Delete in the middle is left to the browser'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 2);
+                    const event = key('Delete');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls.length, 0);
+                    $mol_assert_equal(event.defaultPrevented, false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Vertical navigation ===
+            'caret_lines reports both edges without a layout engine'() {
+                const { block, node, drop } = make_block('hello');
+                try {
+                    set_caret(node, 2);
+                    const lines = block.caret_lines();
+                    $mol_assert_equal(lines.first, true);
+                    $mol_assert_equal(lines.last, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'caret_lines reports both edges for an empty block'() {
+                const { block, node, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    $mol_assert_equal(block.caret_lines(), { first: true, last: true });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'ArrowUp on the first line asks to step up'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 3);
+                    const event = key('ArrowUp');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls[0].name, 'on_nav');
+                    $mol_assert_equal(calls[0].arg, { dir: 'up', x: 0, offset: 3 });
+                    $mol_assert_equal(event.defaultPrevented, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'ArrowDown on the last line asks to step down'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 1);
+                    block.keydown_event(key('ArrowDown'));
+                    $mol_assert_equal(calls[0].name, 'on_nav');
+                    $mol_assert_equal(calls[0].arg, { dir: 'down', x: 0, offset: 1 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Shift+ArrowUp extends the selection instead of stepping'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 3);
+                    block.keydown_event(key('ArrowUp', { shiftKey: true }));
+                    $mol_assert_equal(calls.length, 0);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'focus_column falls back to the text offset without a layout engine'() {
+                const { block, node, drop } = make_block('hello world');
+                try {
+                    block.focus_column(0, 4, true);
+                    $mol_assert_equal(block.caret_offset(), 4);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'focus_column clamps the offset to a shorter block'() {
+                const { block, node, drop } = make_block('ab');
+                try {
+                    block.focus_column(0, 9, false);
+                    $mol_assert_equal(block.caret_offset(), 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Clipboard ===
+            'a single unbroken line is pasted into the text, not into a block'() {
+                const { block, node, calls, drop } = make_block('hello world');
+                try {
+                    set_caret(node, 6);
+                    block.paste_data(clipboard({ text: 'dear' }));
+                    const paste = calls[0];
+                    $mol_assert_equal(paste.name, 'on_paste_blocks');
+                    $mol_assert_equal(paste.arg, {
+                        drafts: [{ type: 'paragraph', content: 'dear' }],
+                        head: 'hello ',
+                        tail: 'world',
+                        inline: true,
+                    });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'spaces around a fragment copied mid sentence survive'() {
+                const { block, node, calls, drop } = make_block('словоконец');
+                try {
+                    set_caret(node, 5);
+                    block.paste_data(clipboard({ text: ' и ещё ' }));
+                    const arg = calls[0].arg;
+                    $mol_assert_equal(arg.drafts[0].content, ' и ещё ');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'inline markdown in a single line still goes inline'() {
+                const { block, node, calls, drop } = make_block('a');
+                try {
+                    set_caret(node, 1);
+                    block.paste_data(clipboard({ text: 'очень **важно**' }));
+                    const arg = calls[0].arg;
+                    $mol_assert_equal(arg.inline, true);
+                    $mol_assert_equal(arg.drafts[0].content, 'очень <b>важно</b>');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'several markdown paragraphs become several drafts'() {
+                const { block, node, calls, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    block.paste_data(clipboard({ text: '# Заголовок\n\nАбзац\n\n- пункт' }));
+                    const arg = calls[0].arg;
+                    $mol_assert_equal(arg.inline, false);
+                    $mol_assert_equal(arg.drafts.map(draft => draft.type), ['heading', 'paragraph', 'list']);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'rich html wins over plain text'() {
+                const { block, node, calls, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    block.paste_data(clipboard({
+                        html: '<h2>Тема</h2><p>Тело</p>',
+                        text: 'Тема\nТело',
+                    }));
+                    const arg = calls[0].arg;
+                    $mol_assert_equal(arg.drafts, [
+                        { type: 'heading', level: 2, content: 'Тема' },
+                        { type: 'paragraph', content: 'Тело' },
+                    ]);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a paste in the middle carries both halves of the block'() {
+                const { block, node, calls, drop } = make_block('ab<b>cd</b>ef');
+                try {
+                    set_caret(node, 3);
+                    block.paste_data(clipboard({ text: 'раз\n\nдва' }));
+                    const arg = calls[0].arg;
+                    $mol_assert_equal(arg.inline, false);
+                    $mol_assert_equal(arg.head, 'ab<b>c</b>');
+                    $mol_assert_equal(arg.tail, '<b>d</b>ef');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a paste over a selection replaces exactly that range'() {
+                const { block, node, calls, drop } = make_block('hello world');
+                try {
+                    set_range(node, 6, 11);
+                    block.paste_data(clipboard({ text: 'there' }));
+                    const arg = calls[0].arg;
+                    $mol_assert_equal(arg.head, 'hello ');
+                    $mol_assert_equal(arg.tail, '');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a code block takes the clipboard as plain text'() {
+                const { block, node, calls, drop } = make_block('');
+                try {
+                    block.type = () => 'code';
+                    set_caret(node, 0);
+                    block.paste_data(clipboard({ html: '<h1>x</h1>', text: '<div>\n\tif( a && b ) c\n</div>' }));
+                    const arg = calls[0].arg;
+                    $mol_assert_equal(arg.inline, true);
+                    $mol_assert_equal(arg.drafts, [
+                        { type: 'code', content: '&lt;div&gt;\n\tif( a &amp;&amp; b ) c\n&lt;/div&gt;' },
+                    ]);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'an empty clipboard pastes nothing'() {
+                const { block, node, calls, drop } = make_block('text');
+                try {
+                    set_caret(node, 0);
+                    block.paste_data(clipboard({}));
+                    $mol_assert_equal(calls.length, 0);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a clipboard of markup junk pastes nothing'() {
+                const { block, node, calls, drop } = make_block('text');
+                try {
+                    set_caret(node, 0);
+                    block.paste_data(clipboard({ html: '<meta charset="utf-8"><span style="color:red"></span>', text: '' }));
+                    $mol_assert_equal(calls.length, 0);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a readonly block refuses the clipboard'() {
+                const { block, drop } = make_block('text');
+                try {
+                    block.readonly = () => true;
+                    const event = new ClipboardEvent('paste', { cancelable: true });
+                    block.paste_event(event);
+                    $mol_assert_equal(event.defaultPrevented, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Input notification ===
+            'input_event notifies the page'() {
+                const { block, node, calls, drop } = make_block('hi');
+                try {
+                    const event = new Event('input');
+                    Object.defineProperty(event, 'target', { value: node });
+                    block.input_event(event);
+                    $mol_assert_equal(calls.some(call => call.name === 'on_input'), true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'bold markdown converts to HTML'() {
+                $mol_assert_equal(apply_markdown('hello **world** end'), 'hello <b>world</b> end');
+            },
+            'italic markdown converts to HTML'() {
+                $mol_assert_equal(apply_markdown('hello *world* end'), 'hello <i>world</i> end');
+            },
+            'inline code markdown converts to HTML'() {
+                $mol_assert_equal(apply_markdown('hello `code` end'), 'hello <code>code</code> end');
+            },
+            'strikethrough markdown converts to HTML'() {
+                $mol_assert_equal(apply_markdown('hello ~~strike~~ end'), 'hello <s>strike</s> end');
+            },
+            'link markdown converts to HTML'() {
+                const result = apply_markdown('click [here](https://example.com) now');
+                $mol_assert_equal(result, 'click <a href="https://example.com">here</a> now');
+            },
+            'wiki link [[page_id]] converts to anchor'() {
+                const result = apply_markdown('see [[my_page]] for info');
+                $mol_assert_ok(result.includes('<a '));
+                $mol_assert_ok(result.includes('data-wiki-link="my_page"'));
+                $mol_assert_ok(result.includes('href="#my_page"'));
+                $mol_assert_ok(result.includes('>my_page</a>'));
+            },
+            'wiki link with empty content does not convert'() {
+                $mol_assert_equal(apply_markdown('hello [[]] end'), 'hello [[]] end');
+            },
+            'partially typed wiki link does not convert'() {
+                $mol_assert_equal(apply_markdown('[[not closed'), '[[not closed');
+            },
+            'empty bold content does not convert'() {
+                $mol_assert_equal(apply_markdown('hello **** end'), 'hello **** end');
+            },
+            'single star inside double stars does not break bold'() {
+                const result = apply_markdown('**bold text** end');
+                $mol_assert_equal(result, '<b>bold text</b> end');
+            },
+            'multiple patterns in one block: only first converts per pass'() {
+                // First pass converts the first match
+                const first = apply_markdown('**bold** and *italic*');
+                $mol_assert_equal(first, '<b>bold</b> and *italic*');
+            },
+            'partially typed bold does not convert'() {
+                $mol_assert_equal(apply_markdown('**not closed'), '**not closed');
+            },
+            'partially typed italic does not convert'() {
+                $mol_assert_equal(apply_markdown('*not closed'), '*not closed');
+            },
+            'partially typed strikethrough does not convert'() {
+                $mol_assert_equal(apply_markdown('~~not closed'), '~~not closed');
+            },
+            'partially typed link does not convert'() {
+                $mol_assert_equal(apply_markdown('[text](no-close'), '[text](no-close');
+            },
+            'link with empty url does not convert'() {
+                $mol_assert_equal(apply_markdown('[text]() end'), '[text]() end');
+            },
+            'link with empty text does not convert'() {
+                $mol_assert_equal(apply_markdown('[](https://example.com) end'), '[](https://example.com) end');
+            },
+            'bold at start of text'() {
+                $mol_assert_equal(apply_markdown('**start** rest'), '<b>start</b> rest');
+            },
+            'bold at end of text'() {
+                $mol_assert_equal(apply_markdown('rest **end**'), 'rest <b>end</b>');
+            },
+            'code with special characters inside'() {
+                $mol_assert_equal(apply_markdown('run `npm install` now'), 'run <code>npm install</code> now');
+            },
+            'strike_exec without event returns null'() {
+                const block = new $bog_wysiwyg_block();
+                $mol_assert_equal(block.strike_exec(), null);
+            },
+            'strike_exec wraps selection in strikethrough'() {
+                if (typeof document === 'undefined')
+                    return;
+                const div = make_block_with_selection('hello world end', 'world');
+                try {
+                    const block = new $bog_wysiwyg_block();
+                    block.dom_node = () => div;
+                    block.html = (val) => val ?? div.innerHTML;
+                    const event = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, shiftKey: true });
+                    const result = block.strike_exec(event);
+                    $mol_assert_ok(result);
+                    $mol_assert_ok(div.innerHTML.includes('<strike>') || div.innerHTML.includes('<s>'));
+                    $mol_assert_ok(div.innerHTML.includes('world'));
+                }
+                finally {
+                    div.remove();
+                }
+            },
+            'link_exec without event returns null'() {
+                const block = new $bog_wysiwyg_block();
+                $mol_assert_equal(block.link_exec(), null);
+            },
+            'link_exec with cancelled prompt does nothing'() {
+                if (typeof document === 'undefined')
+                    return;
+                const div = make_block_with_selection('hello world end', 'world');
+                try {
+                    const original_prompt = globalThis.prompt;
+                    globalThis.prompt = () => null;
+                    const block = new $bog_wysiwyg_block();
+                    block.dom_node = () => div;
+                    block.html = (val) => val ?? div.innerHTML;
+                    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
+                    const result = block.link_exec(event);
+                    $mol_assert_ok(result);
+                    $mol_assert_equal(div.innerHTML, 'hello world end');
+                    globalThis.prompt = original_prompt;
+                }
+                finally {
+                    div.remove();
+                }
+            },
+            'link_exec creates link from selected text'() {
+                if (typeof document === 'undefined')
+                    return;
+                const div = make_block_with_selection('click here now', 'here');
+                try {
+                    const original_prompt = globalThis.prompt;
+                    globalThis.prompt = () => 'https://example.com';
+                    const block = new $bog_wysiwyg_block();
+                    block.dom_node = () => div;
+                    block.html = (val) => val ?? div.innerHTML;
+                    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
+                    block.link_exec(event);
+                    $mol_assert_ok(div.innerHTML.includes('<a '));
+                    $mol_assert_ok(div.innerHTML.includes('https://example.com'));
+                    $mol_assert_ok(div.innerHTML.includes('here'));
+                    globalThis.prompt = original_prompt;
+                }
+                finally {
+                    div.remove();
+                }
+            },
+            'link_exec inserts url as text when no selection'() {
+                if (typeof document === 'undefined')
+                    return;
+                const div = make_block_with_selection('hello world');
+                try {
+                    div.focus();
+                    // Place cursor at end without selecting
+                    const sel = $mol_dom_context.document.defaultView.getSelection();
+                    const range = $mol_dom_context.document.createRange();
+                    range.selectNodeContents(div);
+                    range.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    const original_prompt = globalThis.prompt;
+                    globalThis.prompt = () => 'https://example.com';
+                    const block = new $bog_wysiwyg_block();
+                    block.dom_node = () => div;
+                    block.html = (val) => val ?? div.innerHTML;
+                    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
+                    block.link_exec(event);
+                    $mol_assert_ok(div.innerHTML.includes('<a '));
+                    $mol_assert_ok(div.innerHTML.includes('https://example.com'));
+                    globalThis.prompt = original_prompt;
+                }
+                finally {
+                    div.remove();
+                }
+            },
+            // === Image block ===
+            'paste_event without event returns null'() {
+                const block = new $bog_wysiwyg_block();
+                $mol_assert_equal(block.paste_event(), null);
+            },
+            'paste_event with image prevents default'() {
+                if (typeof document === 'undefined')
+                    return;
+                let prevented = false;
+                const block = new $bog_wysiwyg_block();
+                let image_src = '';
+                block.on_image = (src) => {
+                    if (src)
+                        image_src = src;
+                    return image_src || null;
+                };
+                const blob = new Blob([''], { type: 'image/png' });
+                const file = new File([blob], 'test.png', { type: 'image/png' });
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                const event = new ClipboardEvent('paste', { clipboardData: dt });
+                Object.defineProperty(event, 'preventDefault', { value: () => { prevented = true; } });
+                const result = block.paste_event(event);
+                $mol_assert_ok(result);
+                $mol_assert_ok(prevented);
+            },
+            'paste_event takes over plain text too, so no editor junk lands in the DOM'() {
+                if (typeof document === 'undefined')
+                    return;
+                const { block, node, calls, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    const dt = new DataTransfer();
+                    dt.items.add('hello', 'text/plain');
+                    const event = new ClipboardEvent('paste', { clipboardData: dt });
+                    let prevented = false;
+                    Object.defineProperty(event, 'preventDefault', { value: () => { prevented = true; } });
+                    const result = block.paste_event(event);
+                    $mol_assert_ok(result);
+                    $mol_assert_equal(prevented, true);
+                    $mol_assert_equal(calls[0].name, 'on_paste_blocks');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'drop_event without event returns null'() {
+                const block = new $bog_wysiwyg_block();
+                $mol_assert_equal(block.drop_event(), null);
+            },
+            'is_image returns true for image type'() {
+                const block = new $bog_wysiwyg_block();
+                block.type = () => 'image';
+                $mol_assert_equal(block.is_image(), true);
+            },
+            'is_image returns false for paragraph type'() {
+                const block = new $bog_wysiwyg_block();
+                block.type = () => 'paragraph';
+                $mol_assert_equal(block.is_image(), false);
+            },
+            // === parse_markdown ===
+            'parse_markdown: single paragraph'() {
+                const blocks = $bog_wysiwyg_parse_markdown('hello world');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].type, 'paragraph');
+                $mol_assert_equal(blocks[0].content, 'hello world');
+            },
+            'parse_markdown: two paragraphs separated by empty line'() {
+                const blocks = $bog_wysiwyg_parse_markdown('first\n\nsecond');
+                $mol_assert_equal(blocks.length, 2);
+                $mol_assert_equal(blocks[0].content, 'first');
+                $mol_assert_equal(blocks[1].content, 'second');
+            },
+            'parse_markdown: heading levels 1-3'() {
+                const blocks = $bog_wysiwyg_parse_markdown('# H1\n\n## H2\n\n### H3');
+                $mol_assert_equal(blocks.length, 3);
+                $mol_assert_equal(blocks[0].type, 'heading');
+                $mol_assert_equal(blocks[0].level, 1);
+                $mol_assert_equal(blocks[0].content, 'H1');
+                $mol_assert_equal(blocks[1].level, 2);
+                $mol_assert_equal(blocks[2].level, 3);
+            },
+            'parse_markdown: code block'() {
+                const blocks = $bog_wysiwyg_parse_markdown('```\nconst x = 1\nconst y = 2\n```');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].type, 'code');
+                $mol_assert_equal(blocks[0].content, 'const x = 1\nconst y = 2');
+            },
+            'parse_markdown: code block escapes HTML'() {
+                const blocks = $bog_wysiwyg_parse_markdown('```\n<div>&</div>\n```');
+                $mol_assert_equal(blocks[0].content, '&lt;div&gt;&amp;&lt;/div&gt;');
+            },
+            'parse_markdown: blockquote'() {
+                const blocks = $bog_wysiwyg_parse_markdown('> line one\n> line two');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].type, 'quote');
+                $mol_assert_equal(blocks[0].content, 'line one<br>line two');
+            },
+            'parse_markdown: divider ---'() {
+                const blocks = $bog_wysiwyg_parse_markdown('above\n\n---\n\nbelow');
+                $mol_assert_equal(blocks.length, 3);
+                $mol_assert_equal(blocks[1].type, 'divider');
+                $mol_assert_equal(blocks[1].content, '');
+            },
+            'parse_markdown: divider ***'() {
+                const blocks = $bog_wysiwyg_parse_markdown('***');
+                $mol_assert_equal(blocks[0].type, 'divider');
+            },
+            'parse_markdown: inline bold'() {
+                const blocks = $bog_wysiwyg_parse_markdown('hello **world**');
+                $mol_assert_equal(blocks[0].content, 'hello <b>world</b>');
+            },
+            'parse_markdown: inline italic'() {
+                const blocks = $bog_wysiwyg_parse_markdown('hello *world*');
+                $mol_assert_equal(blocks[0].content, 'hello <i>world</i>');
+            },
+            'parse_markdown: inline code'() {
+                const blocks = $bog_wysiwyg_parse_markdown('run `npm install`');
+                $mol_assert_equal(blocks[0].content, 'run <code>npm install</code>');
+            },
+            'parse_markdown: inline strike'() {
+                const blocks = $bog_wysiwyg_parse_markdown('hello ~~world~~');
+                $mol_assert_equal(blocks[0].content, 'hello <s>world</s>');
+            },
+            'parse_markdown: inline link'() {
+                const blocks = $bog_wysiwyg_parse_markdown('click [here](https://example.com)');
+                $mol_assert_equal(blocks[0].content, 'click <a href="https://example.com">here</a>');
+            },
+            'parse_markdown: multi-line paragraph joins with br'() {
+                const blocks = $bog_wysiwyg_parse_markdown('line one\nline two\nline three');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].content, 'line one<br>line two<br>line three');
+            },
+            'parse_markdown: mixed content article'() {
+                const md = '# Title\n\nSome text **bold**.\n\n```\ncode here\n```\n\n> quote\n\n---\n\nEnd.';
+                const blocks = $bog_wysiwyg_parse_markdown(md);
+                $mol_assert_equal(blocks.length, 6);
+                $mol_assert_equal(blocks[0].type, 'heading');
+                $mol_assert_equal(blocks[1].type, 'paragraph');
+                $mol_assert_equal(blocks[2].type, 'code');
+                $mol_assert_equal(blocks[3].type, 'quote');
+                $mol_assert_equal(blocks[4].type, 'divider');
+                $mol_assert_equal(blocks[5].type, 'paragraph');
+            },
+            'parse_markdown: empty input returns empty array'() {
+                $mol_assert_equal($bog_wysiwyg_parse_markdown('').length, 0);
+            },
+            'parse_markdown: only empty lines returns empty array'() {
+                $mol_assert_equal($bog_wysiwyg_parse_markdown('\n\n\n').length, 0);
+            },
+            'parse_markdown: unclosed code block collects to end'() {
+                const blocks = $bog_wysiwyg_parse_markdown('```\ncode without closing');
+                $mol_assert_equal(blocks.length, 1);
+                $mol_assert_equal(blocks[0].type, 'code');
+                $mol_assert_equal(blocks[0].content, 'code without closing');
+            },
+        });
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            'handle clicks by default'($) {
+                let clicked = false;
+                const clicker = $mol_button.make({
+                    $,
+                    click: (event) => { clicked = true; },
+                });
+                const element = clicker.dom_tree();
+                const event = $mol_dom_context.document.createEvent('mouseevent');
+                event.initEvent('click', true, true);
+                element.dispatchEvent(event);
+                $mol_assert_ok(clicked);
+            },
+            'no handle clicks if disabled'($) {
+                let clicked = false;
+                const clicker = $mol_button.make({
+                    $,
+                    click: (event) => { clicked = true; },
+                    enabled: () => false,
+                });
+                const element = clicker.dom_tree();
+                const event = $mol_dom_context.document.createEvent('mouseevent');
+                event.initEvent('click', true, true);
+                element.dispatchEvent(event);
+                $mol_assert_not(clicked);
+            },
+            async 'Store error'($) {
+                const clicker = $mol_button.make({
+                    $,
+                    click: (event) => $.$mol_fail(new Error('Test error')),
+                });
+                const event = $mol_dom_context.document.createEvent('mouseevent');
+                $mol_assert_fail(() => clicker.event_activate(event), 'Test error');
+                await Promise.resolve();
+                $mol_assert_equal(clicker.status()[0].message, 'Test error');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        const locale_en = {
+            '$bog_wysiwyg_menu_command_paragraph': 'Text',
+            '$bog_wysiwyg_menu_command_heading1': 'Heading 1',
+            '$bog_wysiwyg_menu_command_heading2': 'Heading 2',
+            '$bog_wysiwyg_menu_command_heading3': 'Heading 3',
+            '$bog_wysiwyg_menu_command_code': 'Code',
+            '$bog_wysiwyg_menu_command_quote': 'Quote',
+            '$bog_wysiwyg_menu_command_list': 'List',
+            '$bog_wysiwyg_menu_command_divider': 'Divider',
+            '$bog_wysiwyg_menu_command_image': 'Image',
+        };
+        function menu_make() {
+            $mol_locale.texts('en', locale_en);
+            return new $bog_wysiwyg_menu();
+        }
+        $mol_test({
+            'Menu commands returns builtin commands'() {
+                const menu = menu_make();
+                const cmds = menu.commands();
+                $mol_assert_ok(cmds.length >= 9);
+                $mol_assert_equal(cmds[0].id, 'paragraph');
+                $mol_assert_equal(cmds[1].id, 'heading1');
+                $mol_assert_equal(cmds[2].id, 'heading2');
+                $mol_assert_equal(cmds[3].id, 'heading3');
+                $mol_assert_equal(cmds[4].id, 'code');
+                $mol_assert_equal(cmds[5].id, 'quote');
+                $mol_assert_equal(cmds[6].id, 'list');
+                $mol_assert_equal(cmds[7].id, 'divider');
+                $mol_assert_equal(cmds[8].id, 'image');
+            },
+            'Menu option_rows returns views matching commands length'() {
+                const menu = menu_make();
+                const rows = menu.option_rows();
+                $mol_assert_equal(rows.length, menu.commands().length);
+            },
+            'Menu option_title returns title for known command id'() {
+                const menu = menu_make();
+                const title = menu.option_title('paragraph');
+                $mol_assert_ok(title.length > 0);
+            },
+            'Menu option_title returns empty string for unknown id'() {
+                const menu = menu_make();
+                const title = menu.option_title('nonexistent');
+                $mol_assert_equal(title, '');
+            },
+            'Menu option_active returns true when index matches'() {
+                const menu = menu_make();
+                menu.index(0);
+                const first_id = menu.commands()[0].id;
+                $mol_assert_equal(menu.option_active(first_id), true);
+            },
+            'Menu option_active returns false for non-matching id'() {
+                const menu = menu_make();
+                menu.index(0);
+                $mol_assert_equal(menu.option_active('nonexistent'), false);
+            },
+            'Menu option_active tracks index changes'() {
+                const menu = menu_make();
+                menu.index(2);
+                const cmd = menu.commands()[2];
+                $mol_assert_equal(menu.option_active(cmd.id), true);
+                $mol_assert_equal(menu.option_active(menu.commands()[0].id), false);
+            },
+            'Menu option_click calls picked and hides menu'() {
+                const menu = menu_make();
+                menu.showed(true);
+                let picked_val = '';
+                menu.picked = (next) => {
+                    if (next !== undefined)
+                        picked_val = next;
+                    return picked_val;
+                };
+                const event = { type: 'click' };
+                menu.option_click('heading1', event);
+                $mol_assert_equal(picked_val, 'heading1');
+                $mol_assert_equal(menu.showed(), false);
+            },
+            'Menu option_click without event returns null'() {
+                const menu = menu_make();
+                $mol_assert_equal(menu.option_click('paragraph'), null);
+            },
+            'Menu pos_y_str returns pixel string'() {
+                const menu = menu_make();
+                menu.pos_y(200);
+                $mol_assert_equal(menu.pos_y_str(), '200px');
+            },
+            'Menu pos_x_str returns pixel string'() {
+                const menu = menu_make();
+                menu.pos_x(350);
+                $mol_assert_equal(menu.pos_x_str(), '350px');
+            },
+        });
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            'Empty needle'() {
+                const app = new $mol_dimmer;
+                app.needle = () => '  ';
+                app.haystack = () => 'foo  bar';
+                $mol_assert_like(app.strings(), ['foo  bar']);
+            },
+            'Empty haystack'() {
+                const app = new $mol_dimmer;
+                app.needle = () => 'foo  bar';
+                app.haystack = () => '';
+                $mol_assert_like(app.strings(), ['']);
+            },
+            'Not found'() {
+                const app = new $mol_dimmer;
+                app.needle = () => 'foo';
+                app.haystack = () => ' bar ';
+                $mol_assert_like(app.strings(), [' bar ']);
+            },
+            'One found'() {
+                const app = new $mol_dimmer;
+                app.needle = () => 'foo';
+                app.haystack = () => ' barfoo ';
+                $mol_assert_like(app.strings(), [' bar', 'foo', ' ']);
+            },
+            'Multiple found'() {
+                const app = new $mol_dimmer;
+                app.needle = () => 'foo';
+                app.haystack = () => ' foobarfoo foo';
+                $mol_assert_like(app.strings(), [' ', 'foo', 'bar', 'foo', ' ', 'foo']);
+            },
+            'Fuzzy search'() {
+                const app = new $mol_dimmer;
+                app.needle = () => 'foo bar';
+                app.haystack = () => ' barfoo ';
+                $mol_assert_like(app.strings(), [' ', 'bar', '', 'foo', ' ']);
+            },
+        });
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        '$mol_syntax2_md_flow'() {
+            const check = (input, right) => {
+                const tokens = [];
+                $mol_syntax2_md_flow.tokenize(input, (...token) => tokens.push(token));
+                $mol_assert_equal(tokens, right);
+            };
+            check('Hello,\nWorld..\r\n\r\n\nof Love!', [
+                ['block', 'Hello,\n', ['Hello,', '\n'], 0],
+                ['block', 'World..\r\n\r\n\n', ['World..', '\r\n\r\n\n'], 7],
+                ['block', 'of Love!', ['of Love!', ''], 19],
+            ]);
+            check('# Header1\n\nHello!\n\n## Header2', [
+                ['header', '# Header1\n\n', ['#', ' ', 'Header1', '\n\n'], 0],
+                ['block', 'Hello!\n\n', ['Hello!', '\n\n'], 11],
+                ['header', '## Header2', ['##', ' ', 'Header2', ''], 19],
+            ]);
+            check('```\nstart()\n```\n\n```jam.js\nrestart()\n```\n\nHello!\n\n```\nstop()\n```', [
+                ['code', '```\nstart()\n```\n\n', ['```', '', 'start()\n', '```', '\n\n'], 0],
+                ['code', '```jam.js\nrestart()\n```\n\n', ['```', 'jam.js', 'restart()\n', '```', '\n\n'], 17],
+                ['block', 'Hello!\n\n', ['Hello!', '\n\n'], 42],
+                ['code', '```\nstop()\n```', ['```', '', 'stop()\n', '```', ''], 50],
+            ]);
+            check('| header1 | header2\n|----|----\n| Cell11 | Cell12\n| Cell21 | Cell22\n\n| Cell11 | Cell12\n| Cell21 | Cell22\n', [
+                ['table', '| header1 | header2\n|----|----\n| Cell11 | Cell12\n| Cell21 | Cell22\n\n', ['| header1 | header2\n|----|----\n| Cell11 | Cell12\n| Cell21 | Cell22\n', '\n'], 0],
+                ['table', '| Cell11 | Cell12\n| Cell21 | Cell22\n', ['| Cell11 | Cell12\n| Cell21 | Cell22\n', ''], 68],
+            ]);
+        },
+    });
 })($ || ($ = {}));
 
 ;
@@ -49456,139 +50698,6 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    $mol_test({
-        'empty string'() {
-            $mol_assert_equal(''.match($giper_baza_text_tokens), null);
-        },
-        'new lines'() {
-            $mol_assert_equal('\n\r\n'.match($giper_baza_text_tokens), ['\n', '\r\n']);
-        },
-        'numbers'() {
-            $mol_assert_equal('123'.match($giper_baza_text_tokens), ['123']);
-        },
-        'emoji'() {
-            $mol_assert_equal('😀😁'.match($giper_baza_text_tokens), ['😀', '😁']);
-        },
-        'emoji with modifier'() {
-            $mol_assert_equal('👩🏿👩🏿'.match($giper_baza_text_tokens), ['👩🏿', '👩🏿']);
-        },
-        'combo emoji with modifier'() {
-            $mol_assert_equal('👩🏿‍🤝‍🧑🏿👩🏿‍🤝‍🧑🏿'.match($giper_baza_text_tokens), ['👩🏿‍🤝‍🧑🏿', '👩🏿‍🤝‍🧑🏿']);
-        },
-        'word with spaces'() {
-            $mol_assert_equal('foo1  bar2'.match($giper_baza_text_tokens), ['foo1', ' ', ' bar2']);
-        },
-        'word with diactric'() {
-            $mol_assert_equal('Е́е́'.match($giper_baza_text_tokens), ['Е́е́']);
-        },
-        'word with punctuation'() {
-            $mol_assert_equal('foo--bar'.match($giper_baza_text_tokens), ['foo', '--', 'bar']);
-        },
-        'CamelCase'() {
-            $mol_assert_equal('Foo1BAR2'.match($giper_baza_text_tokens), ['Foo1', 'BAR2']);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    $mol_test({
-        'Change sequences'($) {
-            const land = $giper_baza_land.make({ $ });
-            const text = land.Data($giper_baza_text);
-            const list = land.Data($giper_baza_list);
-            $mol_assert_equal(text.str(), '');
-            $mol_assert_equal(list.items_vary(), []);
-            text.str('foo');
-            $mol_assert_equal(text.str(), 'foo');
-            $mol_assert_equal(list.items_vary(), ['foo']);
-            text.str('foo bar');
-            $mol_assert_equal(text.str(), 'foo bar');
-            $mol_assert_equal(list.items_vary(), ['foo', ' bar']);
-            text.str('foo lol bar');
-            $mol_assert_equal(text.str(), 'foo lol bar');
-            $mol_assert_equal(list.items_vary(), ['foo', ' lol', ' bar']);
-            text.str('lol bar');
-            $mol_assert_equal(text.str(), 'lol bar');
-            $mol_assert_equal(list.items_vary(), ['lol', ' bar']);
-            text.str('foo bar');
-            $mol_assert_equal(text.str(), 'foo bar');
-            $mol_assert_equal(list.items_vary(), ['foo', ' bar']);
-            text.str('foo  bar');
-            $mol_assert_equal(text.str(), 'foo  bar');
-            $mol_assert_equal(list.items_vary(), ['foo', ' ', ' bar']);
-            text.str('foo  BarBar');
-            $mol_assert_equal(text.str(), 'foo  BarBar');
-            $mol_assert_equal(list.items_vary(), ['foo', ' ', ' Bar', 'Bar']);
-        },
-        async 'str: Offset <=> Point'($) {
-            const land = $giper_baza_land.make({ $ });
-            const text = land.Data($giper_baza_text);
-            text.str('fooBar');
-            const [first, second] = text.units();
-            $mol_assert_equal(text.point_by_offset(0), [first.self().str, 0, 0]);
-            $mol_assert_equal(text.offset_by_point([first.self().str, 0, 0]), [first.self().str, 0]);
-            $mol_assert_equal(text.point_by_offset(3), [first.self().str, 3, 0]);
-            $mol_assert_equal(text.offset_by_point([first.self().str, 3, 0]), [first.self().str, 3]);
-            $mol_assert_equal(text.offset_by_point([first.self().str, 5, 0]), [first.self().str, 5]);
-            $mol_assert_equal(text.point_by_offset(5), [second.self().str, 2, 0]);
-            $mol_assert_equal(text.offset_by_point([second.self().str, 2, 0]), [second.self().str, 5]);
-            $mol_assert_equal(text.point_by_offset(6), [second.self().str, 3, 0]);
-            $mol_assert_equal(text.offset_by_point([second.self().str, 3, 0]), [second.self().str, 6]);
-            $mol_assert_equal(text.point_by_offset(7), ['', 1, 0]);
-            $mol_assert_equal(text.offset_by_point(['', 1, 0]), ['', 7]);
-        },
-        async 'text: Offset <=> Point'($) {
-            const land = $giper_baza_land.make({ $ });
-            const text = land.Data($giper_baza_text);
-            text.text('foo bar\n666 777');
-            const [first, second] = text.pawns($giper_baza_text);
-            $mol_assert_equal(text.point_by_offset(0), [first.units()[0].self().str, 0, 0]);
-            $mol_assert_equal(text.offset_by_point([first.units()[0].self().str, 0, 0]), [first.units()[0].self().str, 0]);
-            $mol_assert_equal(text.point_by_offset(8), [first.units()[2].self().str, 1, 0]);
-            $mol_assert_equal(text.offset_by_point([first.units()[2].self().str, 1, 0]), [first.units()[2].self().str, 8]);
-        },
-        async 'Merge different sequences'($) {
-            const land1 = $giper_baza_land.make({ $ });
-            const land2 = $giper_baza_land.make({ $ });
-            const text1 = land1.Pawn($giper_baza_text).Data();
-            const text2 = land2.Pawn($giper_baza_text).Data();
-            text1.str('foo bar.');
-            land2.faces.stat.time = land1.faces.stat.time;
-            text2.str('xxx yyy.');
-            const delta1 = await $mol_wire_async(land1).diff_units();
-            const delta2 = await $mol_wire_async(land2).diff_units();
-            await $mol_wire_async(land1).diff_apply(delta2);
-            await $mol_wire_async(land2).diff_apply(delta1);
-            $mol_assert_equal(text1.str(), text2.str(), 'xxx yyy.foo bar.');
-        },
-        async 'Merge same insertions with different changes to same place'($) {
-            const base = $giper_baza_land.make({ $ });
-            base.Data($giper_baza_text).str('( )');
-            const left = $giper_baza_land.make({ $ });
-            await $mol_wire_async(left).units_steal(base);
-            left.Data($giper_baza_text).str('( [ f ] )');
-            left.Data($giper_baza_text).str('( [ foo ] )');
-            const right = $giper_baza_land.make({ $ });
-            await $mol_wire_async(right).units_steal(base);
-            right.faces.sync(left.faces);
-            right.Data($giper_baza_text).str('( [ f ] )');
-            right.Data($giper_baza_text).str('( [ fu ] )');
-            const left_delta = await $mol_wire_async(left).diff_units(base.faces);
-            const right_delta = await $mol_wire_async(right).diff_units(base.faces);
-            await $mol_wire_async(left).diff_apply(right_delta);
-            await $mol_wire_async(right).diff_apply(left_delta);
-            $mol_assert_equal(left.Data($giper_baza_text).str(), right.Data($giper_baza_text).str(), '( [ fu ] [ foo ] )');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
     var $$;
     (function ($$) {
         $mol_test({
@@ -49655,6 +50764,14 @@ var $;
                 root.appendChild(node);
                 view.dom_node = () => node;
                 view.html = (next) => editor.block_html(id, next);
+                view.type = (next) => editor.block_type(id, next);
+                view.level = (next) => editor.block_level(id, next);
+                // The same wiring view.tree does for the keyed Block
+                view.on_paste_blocks = (val) => editor.block_paste_blocks(id, val);
+                view.on_split = (parts) => editor.block_split(id, parts);
+                view.on_merge_prev = (event) => editor.block_merge_prev(id, event);
+                view.on_merge_next = (event) => editor.block_merge_next(id, event);
+                view.on_nav = (nav) => editor.block_nav(id, nav);
                 views.set(id, view);
                 return view;
             };
@@ -50937,48 +52054,225 @@ var $;
                 $mol_assert_equal($bog_wysiwyg_html_to_md('just text'), 'just text');
             },
             // === block_paste_blocks ===
-            'block_paste_blocks replaces current and inserts new blocks'() {
-                const editor = new $bog_wysiwyg();
-                editor.block_ids(['a', 'b']);
-                editor.focus_block = () => { };
-                editor.block_paste_blocks('a', [
-                    { type: 'heading', content: 'Title', level: 1 },
-                    { type: 'paragraph', content: 'text' },
-                    { type: 'code', content: 'x = 1' },
+            'block_paste_blocks fills an untouched block and adds the rest after it'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: '' },
+                    { id: 'b', html: 'next' },
                 ]);
-                const ids = editor.block_ids();
-                $mol_assert_equal(ids.length, 4);
-                $mol_assert_equal(ids[0], 'a');
-                $mol_assert_equal(ids[3], 'b');
-                $mol_assert_equal(editor.block_type('a'), 'heading');
-                $mol_assert_equal(editor.block_html('a'), 'Title');
-                $mol_assert_equal(editor.block_level('a'), 1);
-                $mol_assert_equal(editor.block_type(ids[1]), 'paragraph');
-                $mol_assert_equal(editor.block_html(ids[1]), 'text');
-                $mol_assert_equal(editor.block_type(ids[2]), 'code');
-                $mol_assert_equal(editor.block_html(ids[2]), 'x = 1');
+                try {
+                    editor.block_paste_blocks('a', { drafts: [
+                            { type: 'heading', content: 'Title', level: 1 },
+                            { type: 'paragraph', content: 'text' },
+                            { type: 'code', content: 'x = 1' },
+                        ] });
+                    const ids = editor.block_ids();
+                    $mol_assert_equal(ids.length, 4);
+                    $mol_assert_equal(ids[0], 'a');
+                    $mol_assert_equal(ids[3], 'b');
+                    $mol_assert_equal(editor.block_type('a'), 'heading');
+                    $mol_assert_equal(editor.block_html('a'), 'Title');
+                    $mol_assert_equal(editor.block_level('a'), 1);
+                    $mol_assert_equal(editor.block_type(ids[1]), 'paragraph');
+                    $mol_assert_equal(editor.block_html(ids[1]), 'text');
+                    $mol_assert_equal(editor.block_type(ids[2]), 'code');
+                    $mol_assert_equal(editor.block_html(ids[2]), 'x = 1');
+                }
+                finally {
+                    drop();
+                }
             },
-            'block_paste_blocks with single block replaces current only'() {
-                const editor = new $bog_wysiwyg();
-                editor.block_ids(['a', 'b']);
-                editor.focus_block = () => { };
-                editor.block_paste_blocks('a', [
-                    { type: 'quote', content: 'quoted' },
+            'block_paste_blocks with a single draft keeps the block count'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: '' },
+                    { id: 'b', html: 'next' },
                 ]);
-                $mol_assert_equal(editor.block_ids().length, 2);
-                $mol_assert_equal(editor.block_type('a'), 'quote');
-                $mol_assert_equal(editor.block_html('a'), 'quoted');
+                try {
+                    editor.block_paste_blocks('a', { drafts: [{ type: 'quote', content: 'quoted' }] });
+                    $mol_assert_equal(editor.block_ids().length, 2);
+                    $mol_assert_equal(editor.block_type('a'), 'quote');
+                    $mol_assert_equal(editor.block_html('a'), 'quoted');
+                }
+                finally {
+                    drop();
+                }
             },
-            'block_paste_blocks with empty array returns null'() {
-                const editor = new $bog_wysiwyg();
-                editor.block_ids(['a']);
-                $mol_assert_equal(editor.block_paste_blocks('a', []), null);
-                $mol_assert_equal(editor.block_ids().length, 1);
+            'block_paste_blocks splits the block around the caret'() {
+                const { editor, focused, drop } = make_editor([{ id: 'a', html: 'headtail' }]);
+                try {
+                    editor.block_paste_blocks('a', {
+                        drafts: [
+                            { type: 'paragraph', content: 'one' },
+                            { type: 'paragraph', content: 'two' },
+                        ],
+                        head: 'head',
+                        tail: 'tail',
+                    });
+                    const ids = editor.block_ids();
+                    $mol_assert_equal(ids.length, 2);
+                    $mol_assert_equal(editor.block_html('a'), 'headone');
+                    $mol_assert_equal(editor.block_html(ids[1]), 'twotail');
+                    // caret lands after the pasted text, in front of the old tail
+                    $mol_assert_equal(focused.at(-1), { id: ids[1], offset: 3 });
+                }
+                finally {
+                    drop();
+                }
             },
-            'block_paste_blocks without val returns null'() {
-                const editor = new $bog_wysiwyg();
-                editor.block_ids(['a']);
-                $mol_assert_equal(editor.block_paste_blocks('a'), null);
+            'block_paste_blocks keeps the kind of the block it was pasted into'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'ab', type: 'quote' }]);
+                try {
+                    editor.block_paste_blocks('a', {
+                        drafts: [{ type: 'heading', content: 'H', level: 1 }],
+                        head: 'a',
+                        tail: 'b',
+                    });
+                    $mol_assert_equal(editor.block_type('a'), 'quote');
+                    $mol_assert_equal(editor.block_html('a'), 'aHb');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_paste_blocks gives the tail its own block after a picture'() {
+                const { editor, focused, drop } = make_editor([{ id: 'a', html: 'headtail' }]);
+                try {
+                    editor.block_paste_blocks('a', {
+                        drafts: [{ type: 'image', content: '<img src="x.png">' }],
+                        head: 'head',
+                        tail: 'tail',
+                    });
+                    const ids = editor.block_ids();
+                    $mol_assert_equal(ids.length, 3);
+                    $mol_assert_equal(editor.block_html('a'), 'head');
+                    $mol_assert_equal(editor.block_type(ids[1]), 'image');
+                    $mol_assert_equal(editor.block_html(ids[2]), 'tail');
+                    $mol_assert_equal(focused.at(-1), { id: ids[2], offset: 0 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_paste_blocks inline puts the draft straight into the text'() {
+                const { editor, focused, drop } = make_editor([{ id: 'a', html: 'ab' }]);
+                try {
+                    editor.block_paste_blocks('a', {
+                        drafts: [{ type: 'paragraph', content: '<b>X</b>' }],
+                        head: 'a',
+                        tail: 'b',
+                        inline: true,
+                    });
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'a<b>X</b>b');
+                    $mol_assert_equal(focused.at(-1), { id: 'a', offset: 2 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a whole paste is undone in one step'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'headtail' }]);
+                try {
+                    editor.block_paste_blocks('a', {
+                        drafts: [
+                            { type: 'paragraph', content: 'one' },
+                            { type: 'paragraph', content: 'two' },
+                            { type: 'paragraph', content: 'three' },
+                        ],
+                        head: 'head',
+                        tail: 'tail',
+                    });
+                    $mol_assert_equal(editor.block_ids().length, 3);
+                    $mol_assert_equal(editor.history_undo(), true);
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'headtail');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_paste_blocks with no drafts returns null'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'text' }]);
+                try {
+                    $mol_assert_equal(editor.block_paste_blocks('a', { drafts: [] }), null);
+                    $mol_assert_equal(editor.block_paste_blocks('a'), null);
+                    $mol_assert_equal(editor.block_ids().length, 1);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Clipboard end to end ===
+            'pasting markdown in the middle of a block splits the article'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'началоконец' },
+                    { id: 'b', html: 'следом' },
+                ]);
+                try {
+                    const { editor } = helper;
+                    const block = editor.block_view('a');
+                    select_across(helper.node('a'), 6, helper.node('a'), 6);
+                    block.paste_data({
+                        getData: (type) => type === 'text/html' ? '' : '## Тема\n\nАбзац\n\n- пункт',
+                    });
+                    const ids = editor.block_ids();
+                    $mol_assert_equal(ids.length, 4);
+                    $mol_assert_equal(ids[0], 'a');
+                    $mol_assert_equal(ids[3], 'b');
+                    // the head keeps the kind of the block it was pasted into, the tail rides the last draft
+                    $mol_assert_equal(editor.block_html('a'), 'началоТема');
+                    $mol_assert_equal(editor.block_type('a'), 'paragraph');
+                    $mol_assert_equal(editor.block_html(ids[1]), 'Абзац');
+                    $mol_assert_equal(editor.block_type(ids[2]), 'list');
+                    $mol_assert_equal(editor.block_html(ids[2]), 'пунктконец');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'pasting a plain line does not add blocks'() {
+                const helper = make_editor([{ id: 'a', html: 'началоконец' }]);
+                try {
+                    const { editor } = helper;
+                    select_across(helper.node('a'), 6, helper.node('a'), 6);
+                    editor.block_view('a').paste_data({
+                        getData: (type) => type === 'text/html' ? '' : 'вставка',
+                    });
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'началовставкаконец');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'a pasted article is undone by a single step'() {
+                const helper = make_editor([{ id: 'a', html: '' }]);
+                try {
+                    const { editor } = helper;
+                    select_across(helper.node('a'), 0, helper.node('a'), 0);
+                    editor.block_view('a').paste_data({
+                        getData: (type) => type === 'text/html' ? '' : '# Раз\n\nДва\n\nТри\n\nЧетыре',
+                    });
+                    $mol_assert_equal(editor.block_ids().length, 4);
+                    $mol_assert_equal(editor.history_undo(), true);
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), '');
+                    $mol_assert_equal(editor.history_redo(), true);
+                    $mol_assert_equal(editor.block_ids().length, 4);
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'block_paste_blocks is refused in readonly mode'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'text' }]);
+                try {
+                    editor.readonly = () => true;
+                    $mol_assert_equal(editor.block_paste_blocks('a', { drafts: [{ type: 'paragraph', content: 'x' }] }), null);
+                    $mol_assert_equal(editor.block_html('a'), 'text');
+                }
+                finally {
+                    drop();
+                }
             },
         });
     })($$ = $.$$ || ($.$$ = {}));

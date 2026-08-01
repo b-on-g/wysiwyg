@@ -42108,12 +42108,14 @@ var $;
             block_view(id) {
                 return this.Block(id);
             }
-            /** Blocks that hold no editable text and can not be glued with neighbours */
-            block_is_static(id) {
-                const type = this.block_type(id);
+            /** Kinds of block that hold no editable text and can not be glued with neighbours */
+            type_is_static(type) {
                 if (type === 'image' || type === 'embed' || type === 'divider')
                     return true;
                 return !!$bog_wysiwyg_plugin_registry.get(type)?.render;
+            }
+            block_is_static(id) {
+                return this.type_is_static(this.block_type(id));
             }
             /** Allocate an id for a new block, creating the Baza pawn when connected */
             make_block_id() {
@@ -42379,58 +42381,76 @@ var $;
                 this.block_html(id, '');
                 this.focus_block(id);
             }
+            /** Plain text length of an html fragment */
+            html_text_length(html) {
+                return $bog_wysiwyg_html_text(this.$.$mol_dom_context.document, html).length;
+            }
+            /**
+             * Clipboard drafts into the page around the caret. The whole paste is one
+             * undo step: the head of the target block keeps the pasted content, the
+             * tail moves behind everything that was pasted.
+             */
             block_paste_blocks(id, val) {
-                if (!val || !val.length)
+                const drafts = val?.drafts ?? [];
+                if (!drafts.length)
                     return null;
+                if (this.readonly())
+                    return null;
+                const head = val?.head ?? '';
+                const tail = val?.tail ?? '';
                 this.history_record();
-                // First block replaces the current one
-                this.block_type(id, val[0].type);
-                this.block_html(id, val[0].content);
-                if (val[0].level)
-                    this.block_level(id, val[0].level);
-                // Remaining blocks are inserted after
-                const ids = [...this.block_ids()];
-                const index = ids.indexOf(id);
-                let last_id = id;
-                for (let i = 1; i < val.length; i++) {
-                    const block = val[i];
-                    let new_id;
-                    if (this.has_baza()) {
-                        const data = this.page_data();
-                        const blocks_list = data?.Blocks('auto');
-                        if (blocks_list) {
-                            const pawn = blocks_list.make(null);
-                            $.$bog_wysiwyg_pawn_text(pawn.Type('auto'), block.type);
-                            pawn.Content('auto')?.val(block.content);
-                            if (block.level)
-                                pawn.Level('auto')?.val(block.level);
-                            new_id = pawn.link().str;
-                        }
-                        else {
-                            new_id = this.generate_id();
-                        }
+                if (val?.inline) {
+                    const content = head + drafts[0].content;
+                    this.block_html(id, content + tail);
+                    this.focus_block(id, this.html_text_length(content));
+                    this.history_record();
+                    return val;
+                }
+                const own_type = this.block_type(id);
+                const own_level = this.block_level(id);
+                const slots = [];
+                const first = drafts[0];
+                if (!head && !tail) {
+                    // An untouched block takes the kind of the first pasted one
+                    slots.push({ type: first.type, level: first.level ?? own_level, content: first.content });
+                }
+                else if (this.type_is_static(first.type)) {
+                    // A picture or a divider can not swallow the text before the caret
+                    slots.push({ type: own_type, level: own_level, content: head });
+                    slots.push({ type: first.type, level: first.level ?? 1, content: first.content });
+                }
+                else {
+                    slots.push({ type: own_type, level: own_level, content: head + first.content });
+                }
+                for (const draft of drafts.slice(1)) {
+                    slots.push({ type: draft.type, level: draft.level ?? 1, content: draft.content });
+                }
+                // The caret ends up right after everything pasted, before the old tail
+                let caret_slot = slots.length - 1;
+                let caret_offset = this.html_text_length(slots[caret_slot].content);
+                if (tail) {
+                    const last = slots[slots.length - 1];
+                    if (this.type_is_static(last.type)) {
+                        slots.push({ type: own_type, level: own_level, content: tail });
+                        caret_slot = slots.length - 1;
+                        caret_offset = 0;
                     }
                     else {
-                        new_id = this.generate_id();
+                        last.content += tail;
                     }
-                    const insert_at = ids.indexOf(last_id) + 1;
-                    ids.splice(insert_at, 0, new_id);
-                    last_id = new_id;
                 }
+                const slot_ids = [id];
+                while (slot_ids.length < slots.length)
+                    slot_ids.push(this.make_block_id());
+                const ids = [...this.block_ids()];
+                ids.splice(ids.indexOf(id) + 1, 0, ...slot_ids.slice(1));
                 this.block_ids(ids);
-                // Set data for non-baza blocks
-                if (!this.has_baza()) {
-                    let pos = index + 1;
-                    for (let i = 1; i < val.length; i++) {
-                        const new_id = ids[pos];
-                        this.block_type(new_id, val[i].type);
-                        this.block_html(new_id, val[i].content);
-                        if (val[i].level)
-                            this.block_level(new_id, val[i].level);
-                        pos++;
-                    }
+                for (let i = 0; i < slots.length; i++) {
+                    this.block_type(slot_ids[i], slots[i].type);
+                    this.block_level(slot_ids[i], slots[i].level);
+                    this.block_html(slot_ids[i], slots[i].content);
                 }
-                this.focus_block(last_id);
+                this.focus_block(slot_ids[caret_slot], caret_offset);
                 this.history_record();
                 return val;
             }
@@ -45809,6 +45829,621 @@ var $;
 
 ;
 "use strict";
+var $;
+(function ($) {
+    /**
+     * Clipboard to blocks. Pure functions, no DOM editor and no storage.
+     * Inline markup in `content` is limited to what the block renderer understands:
+     * b, i, u, s, code, a[href], br, img[src].
+     */
+    class $bog_wysiwyg_paste {
+        /** Sniffs the clipboard format. Markdown is guessed from plain text when html is missing or has no semantics. */
+        static detect(data) {
+            const html = paste_get(data, 'text/html');
+            if (html.trim() && paste_rich(html))
+                return 'html';
+            const text = paste_get(data, 'text/plain');
+            return paste_markdownish(text) ? 'markdown' : 'text';
+        }
+        /** Sniffs the format and parses with the matching parser. */
+        static from_data(data) {
+            switch (this.detect(data)) {
+                case 'html': return this.from_html(paste_get(data, 'text/html'));
+                case 'markdown': return this.from_markdown(paste_get(data, 'text/plain'));
+                default: return this.from_text(paste_get(data, 'text/plain'));
+            }
+        }
+        /** Parses clipboard html into block drafts, dropping editor junk. */
+        static from_html(html) {
+            if (!html.trim())
+                return [];
+            const doc = $mol_dom_parse(html, 'text/html');
+            const drafts = [];
+            paste_walk(doc.body, drafts);
+            return drafts;
+        }
+        /** Parses markdown source into block drafts. */
+        static from_markdown(md) {
+            const drafts = [];
+            const lines = md.replace(/\r\n?/g, '\n').split('\n');
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i];
+                const trimmed = line.trim();
+                if (!trimmed) {
+                    i++;
+                    continue;
+                }
+                const fence = /^(`{3,}|~{3,})\s*([\w+#.-]*)/.exec(trimmed);
+                if (fence) {
+                    const marker = fence[1][0];
+                    const lang = paste_lang_clean(fence[2]);
+                    const body = [];
+                    i++;
+                    while (i < lines.length && !new RegExp('^\\s*\\' + marker + '{3,}\\s*$').test(lines[i])) {
+                        body.push(lines[i]);
+                        i++;
+                    }
+                    if (i < lines.length)
+                        i++;
+                    drafts.push(paste_code(body.join('\n'), lang));
+                    continue;
+                }
+                const heading = /^(#{1,6})\s+(.*)$/.exec(trimmed);
+                if (heading) {
+                    const content = paste_md_inline(heading[2].replace(/\s+#+\s*$/, ''));
+                    if (content)
+                        drafts.push({ type: 'heading', level: Math.min(3, heading[1].length), content });
+                    i++;
+                    continue;
+                }
+                if (/^(?:\*\s*){3,}$|^(?:-\s*){3,}$|^(?:_\s*){3,}$/.test(trimmed)) {
+                    drafts.push({ type: 'divider', content: '' });
+                    i++;
+                    continue;
+                }
+                if (trimmed.startsWith('>')) {
+                    const quote = [];
+                    while (i < lines.length && lines[i].trim().startsWith('>')) {
+                        quote.push(lines[i].trim().replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    const content = paste_md_inline(quote.join('\n'));
+                    if (content)
+                        drafts.push({ type: 'quote', content });
+                    continue;
+                }
+                if (paste_md_item.test(line)) {
+                    const items = [];
+                    while (i < lines.length) {
+                        const item = paste_md_item.exec(lines[i]);
+                        if (item) {
+                            items.push(item[1]);
+                            i++;
+                            continue;
+                        }
+                        if (items.length && /^\s+\S/.test(lines[i])) {
+                            items[items.length - 1] += ' ' + lines[i].trim();
+                            i++;
+                            continue;
+                        }
+                        break;
+                    }
+                    for (const item of items) {
+                        const content = paste_md_inline(item);
+                        if (content)
+                            drafts.push({ type: 'list', content });
+                    }
+                    continue;
+                }
+                if (/^\|.*\|$/.test(trimmed)) {
+                    while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+                        const cells = lines[i].trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(cell => cell.trim());
+                        const ruler = cells.length > 0 && cells.every(cell => /^:?-{2,}:?$/.test(cell));
+                        if (!ruler) {
+                            const content = cells.map(cell => paste_md_inline(cell)).filter(Boolean).join(' | ');
+                            if (content)
+                                drafts.push({ type: 'paragraph', content });
+                        }
+                        i++;
+                    }
+                    continue;
+                }
+                const image = paste_md_image.exec(trimmed);
+                if (image) {
+                    const draft = paste_image_draft(paste_md_url(image[2]), image[1]);
+                    if (draft)
+                        drafts.push(draft);
+                    i++;
+                    continue;
+                }
+                const para = [];
+                while (i < lines.length && lines[i].trim() && !paste_md_break(lines[i])) {
+                    para.push(lines[i]);
+                    i++;
+                }
+                if (!para.length) {
+                    i++;
+                    continue;
+                }
+                const content = paste_md_inline(para.join('\n'));
+                if (content)
+                    drafts.push({ type: 'paragraph', content });
+            }
+            return drafts;
+        }
+        /** Splits plain text into paragraphs by blank lines, keeping line breaks. */
+        static from_text(text) {
+            return text
+                .replace(/\r\n?/g, '\n')
+                .split(/\n[ \t]*\n+/)
+                .map(chunk => paste_escape(chunk.replace(/\u00A0/g, ' ')).trim().replace(/\n/g, '<br>'))
+                .filter(Boolean)
+                .map(content => ({ type: 'paragraph', content }));
+        }
+    }
+    $.$bog_wysiwyg_paste = $bog_wysiwyg_paste;
+    const paste_md_item = /^\s{0,8}(?:[-*+]|\d+[.)])\s+(.*)$/;
+    /** Url part of a markdown link. Allows one level of nested parens, as in wiki links. */
+    const paste_md_link_url = '((?:[^\\s()]|\\([^()]*\\))+)(?:\\s+["\'][^"\']*["\'])?\\s*';
+    const paste_md_image = new RegExp('^!\\[([^\\]]*)\\]\\(\\s*' + paste_md_link_url + '\\)$');
+    function paste_md_break(line) {
+        const trimmed = line.trim();
+        if (/^(`{3,}|~{3,})/.test(trimmed))
+            return true;
+        if (/^#{1,6}\s/.test(trimmed))
+            return true;
+        if (/^(?:\*\s*){3,}$|^(?:-\s*){3,}$|^(?:_\s*){3,}$/.test(trimmed))
+            return true;
+        if (trimmed.startsWith('>'))
+            return true;
+        if (paste_md_item.test(line))
+            return true;
+        if (/^\|.*\|$/.test(trimmed))
+            return true;
+        if (paste_md_image.test(trimmed))
+            return true;
+        return false;
+    }
+    function paste_get(data, type) {
+        return data.getData(type) ?? '';
+    }
+    /** Elements that on their own prove the html is worth parsing as html. */
+    const paste_rich_query = 'h1,h2,h3,h4,h5,h6,p,ul,ol,li,blockquote,pre,table,img,hr,a,code';
+    /** True when html carries structure or emphasis worth keeping. */
+    function paste_rich(html) {
+        const doc = $mol_dom_parse(html, 'text/html');
+        if (doc.body.querySelector(paste_rich_query))
+            return true;
+        for (const el of Array.from(doc.body.querySelectorAll('b,strong,i,em,u,s,strike,del,span,font'))) {
+            if (paste_marks(el, el.tagName.toLowerCase()).length)
+                return true;
+        }
+        return false;
+    }
+    const paste_md_signs = [
+        /^\s{0,3}#{1,6}\s+\S/m,
+        /^\s{0,3}(?:[-*+]|\d+[.)])\s+\S/m,
+        /^\s{0,3}(?:`{3,}|~{3,})/m,
+        /^\s{0,3}>\s?\S/m,
+        /^\s{0,3}(?:\*\s*){3,}$|^\s{0,3}(?:-\s*){3,}$|^\s{0,3}(?:_\s*){3,}$/m,
+        /!?\[[^\]\n]+\]\([^)\s]+\)/,
+        /\*\*[^*\n]+\*\*/,
+        /~~[^~\n]+~~/,
+        /(?:^|[^`])`[^`\n]+`/,
+        /^\s*\|.+\|\s*$/m,
+    ];
+    function paste_markdownish(text) {
+        if (!text.trim())
+            return false;
+        return paste_md_signs.some(sign => sign.test(text));
+    }
+    const paste_blocks = new Set([
+        'address', 'article', 'aside', 'blockquote', 'body', 'dd', 'div', 'dl', 'dt',
+        'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4',
+        'h5', 'h6', 'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section',
+        'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul',
+    ]);
+    const paste_drops = new Set([
+        'audio', 'base', 'button', 'canvas', 'col', 'colgroup', 'embed', 'head',
+        'iframe', 'input', 'link', 'math', 'meta', 'noscript', 'object', 'option',
+        'script', 'select', 'source', 'style', 'svg', 'template', 'textarea',
+        'title', 'track', 'video', 'xml',
+    ]);
+    const paste_block_query = 'h1,h2,h3,h4,h5,h6,p,div,ul,ol,li,blockquote,pre,hr,table,tr,td,th,img,'
+        + 'section,article,figure,dl,dd,dt,header,footer,main,nav,aside';
+    /**
+     * Namespaced office tags are not listed here on purpose: `o:p` is empty filler that
+     * unwraps to nothing, while `w:sdt` wraps real text that must survive.
+     */
+    function paste_skip(el) {
+        const tag = el.tagName.toLowerCase();
+        if (paste_drops.has(tag))
+            return true;
+        const style = (el.getAttribute('style') ?? '').toLowerCase();
+        if (style.includes('mso-list:ignore'))
+            return true;
+        if (/display\s*:\s*none/.test(style))
+            return true;
+        return false;
+    }
+    function paste_walk(parent, out) {
+        let buf = '';
+        const flush = () => {
+            const content = paste_tidy(buf);
+            buf = '';
+            if (content)
+                out.push({ type: 'paragraph', content });
+        };
+        for (const node of Array.from(parent.childNodes)) {
+            if (node.nodeType === 3) {
+                buf += paste_escape(paste_plain_text(node.textContent ?? ''));
+                continue;
+            }
+            if (node.nodeType !== 1)
+                continue;
+            const el = node;
+            if (paste_skip(el))
+                continue;
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'br') {
+                buf += '<br>';
+                continue;
+            }
+            if (tag === 'img') {
+                flush();
+                const draft = paste_image_draft(el.getAttribute('src') ?? '', el.getAttribute('alt') ?? '');
+                if (draft)
+                    out.push(draft);
+                continue;
+            }
+            if (!paste_blocks.has(tag)) {
+                if (paste_has_block(el)) {
+                    flush();
+                    paste_walk(el, out);
+                    continue;
+                }
+                buf += paste_inline_el(el);
+                continue;
+            }
+            flush();
+            paste_emit(el, tag, out);
+        }
+        flush();
+    }
+    function paste_has_block(el) {
+        return !!el.querySelector(paste_block_query);
+    }
+    function paste_emit(el, tag, out) {
+        if (/^h[1-6]$/.test(tag)) {
+            const content = paste_tidy(paste_inline_nodes(el));
+            if (content)
+                out.push({ type: 'heading', level: Math.min(3, Number(tag[1])), content });
+            paste_images(el, out);
+            return;
+        }
+        if (tag === 'hr') {
+            out.push({ type: 'divider', content: '' });
+            return;
+        }
+        if (tag === 'pre') {
+            const inner = el.querySelector('code');
+            const lang = paste_lang(el) ?? (inner ? paste_lang(inner) : null);
+            out.push(paste_code((el.textContent ?? '').replace(/\u00A0/g, ' ').replace(/\r\n?/g, '\n'), lang));
+            return;
+        }
+        if (tag === 'ul' || tag === 'ol') {
+            paste_list(el, out);
+            return;
+        }
+        if (tag === 'blockquote') {
+            const parts = [];
+            paste_quote_parts(el, parts);
+            const content = parts.join('<br>');
+            if (content)
+                out.push({ type: 'quote', content });
+            paste_images(el, out);
+            return;
+        }
+        if (tag === 'table') {
+            paste_table(el, out);
+            return;
+        }
+        if (tag === 'p' && paste_word_item(el)) {
+            const content = paste_tidy(paste_inline_nodes(el)).replace(/^(?:[•·▪◦‣§*]|\d+[.)]|[a-z][.)])\s*/i, '');
+            if (content)
+                out.push({ type: 'list', content });
+            paste_images(el, out);
+            return;
+        }
+        paste_walk(el, out);
+    }
+    /** Word marks list items with a MsoListParagraph class or an mso-list style. */
+    function paste_word_item(el) {
+        const cls = el.getAttribute('class') ?? '';
+        if (/mso-?list/i.test(cls))
+            return true;
+        return /mso-list\s*:/i.test(el.getAttribute('style') ?? '');
+    }
+    function paste_list(el, out) {
+        for (const node of Array.from(el.children)) {
+            const tag = node.tagName.toLowerCase();
+            if (tag === 'ul' || tag === 'ol') {
+                paste_list(node, out);
+                continue;
+            }
+            if (tag !== 'li')
+                continue;
+            if (paste_skip(node))
+                continue;
+            const nested = [];
+            const images = [];
+            let buf = '';
+            const gather = (parent) => {
+                for (const child of Array.from(parent.childNodes)) {
+                    if (child.nodeType === 3) {
+                        buf += paste_escape(paste_plain_text(child.textContent ?? ''));
+                        continue;
+                    }
+                    if (child.nodeType !== 1)
+                        continue;
+                    const sub = child;
+                    if (paste_skip(sub))
+                        continue;
+                    const sub_tag = sub.tagName.toLowerCase();
+                    if (sub_tag === 'ul' || sub_tag === 'ol') {
+                        nested.push(sub);
+                        continue;
+                    }
+                    if (sub_tag === 'img') {
+                        images.push(sub);
+                        continue;
+                    }
+                    if (sub_tag === 'br') {
+                        buf += '<br>';
+                        continue;
+                    }
+                    if (paste_blocks.has(sub_tag)) {
+                        if (buf.trim())
+                            buf += '<br>';
+                        gather(sub);
+                        continue;
+                    }
+                    if (paste_has_block(sub)) {
+                        gather(sub);
+                        continue;
+                    }
+                    buf += paste_inline_el(sub);
+                }
+            };
+            gather(node);
+            const content = paste_tidy(buf);
+            if (content)
+                out.push({ type: 'list', content });
+            for (const image of images) {
+                const draft = paste_image_draft(image.getAttribute('src') ?? '', image.getAttribute('alt') ?? '');
+                if (draft)
+                    out.push(draft);
+            }
+            for (const sub of nested)
+                paste_list(sub, out);
+        }
+    }
+    function paste_quote_parts(parent, parts) {
+        let buf = '';
+        const flush = () => {
+            const content = paste_tidy(buf);
+            buf = '';
+            if (content)
+                parts.push(content);
+        };
+        for (const node of Array.from(parent.childNodes)) {
+            if (node.nodeType === 3) {
+                buf += paste_escape(paste_plain_text(node.textContent ?? ''));
+                continue;
+            }
+            if (node.nodeType !== 1)
+                continue;
+            const el = node;
+            if (paste_skip(el))
+                continue;
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'img')
+                continue;
+            if (tag === 'br') {
+                buf += '<br>';
+                continue;
+            }
+            if (paste_blocks.has(tag) || paste_has_block(el)) {
+                flush();
+                paste_quote_parts(el, parts);
+                continue;
+            }
+            buf += paste_inline_el(el);
+        }
+        flush();
+    }
+    function paste_table(el, out) {
+        for (const row of Array.from(el.querySelectorAll('tr'))) {
+            const cells = [];
+            for (const cell of Array.from(row.children)) {
+                const tag = cell.tagName.toLowerCase();
+                if (tag !== 'td' && tag !== 'th')
+                    continue;
+                cells.push(paste_tidy(paste_inline_nodes(cell)));
+            }
+            const content = cells.filter(Boolean).join(' | ');
+            if (content)
+                out.push({ type: 'paragraph', content });
+        }
+        paste_images(el, out);
+    }
+    function paste_images(el, out) {
+        for (const image of Array.from(el.querySelectorAll('img'))) {
+            const draft = paste_image_draft(image.getAttribute('src') ?? '', image.getAttribute('alt') ?? '');
+            if (draft)
+                out.push(draft);
+        }
+    }
+    function paste_inline_nodes(parent) {
+        let out = '';
+        for (const node of Array.from(parent.childNodes)) {
+            if (node.nodeType === 3) {
+                out += paste_escape(paste_plain_text(node.textContent ?? ''));
+                continue;
+            }
+            if (node.nodeType !== 1)
+                continue;
+            const el = node;
+            if (paste_skip(el))
+                continue;
+            out += paste_inline_el(el);
+        }
+        return out;
+    }
+    function paste_inline_el(el) {
+        const tag = el.tagName.toLowerCase();
+        if (tag === 'br')
+            return '<br>';
+        if (tag === 'img')
+            return '';
+        const inner = paste_inline_nodes(el);
+        if (inner === '')
+            return '';
+        if (!inner.trim())
+            return inner;
+        if (tag === 'a') {
+            const href = paste_href(el.getAttribute('href') ?? '');
+            return href ? '<a href="' + paste_attr(href) + '">' + inner + '</a>' : inner;
+        }
+        let out = inner;
+        const marks = paste_marks(el, tag).filter(mark => mark !== 'u' || !paste_wraps_link(inner));
+        for (let i = marks.length - 1; i >= 0; i--)
+            out = '<' + marks[i] + '>' + out + '</' + marks[i] + '>';
+        return out;
+    }
+    /** Editors underline every link with a wrapper span. The underline is already implied by the link. */
+    function paste_wraps_link(inner) {
+        return /^<a\b[^>]*>[\s\S]*<\/a>$/.test(inner);
+    }
+    /**
+     * Which of b/i/u/s/code an element stands for, by tag name and by inline style.
+     * Declarations are anchored at a semicolon so that vendor properties like
+     * `mso-bidi-font-weight` do not pass for `font-weight`.
+     */
+    function paste_marks(el, tag) {
+        const marks = [];
+        const style = (el.getAttribute('style') ?? '').toLowerCase();
+        const weight = /(?:^|;)\s*font-weight\s*:\s*([^;]+)/.exec(style)?.[1]?.trim();
+        const bold_style = weight === 'bold' || weight === 'bolder' || (!!weight && Number(weight) >= 600);
+        const guid = /^docs-internal-guid/.test(el.getAttribute('id') ?? '');
+        const bold_tag = (tag === 'b' || tag === 'strong') && !guid && !(!!weight && !bold_style);
+        if (bold_tag || bold_style)
+            marks.push('b');
+        const slant = /(?:^|;)\s*font-style\s*:\s*([^;]+)/.exec(style)?.[1]?.trim();
+        const italic_tag = (tag === 'i' || tag === 'em') && slant !== 'normal';
+        if (italic_tag || slant === 'italic' || slant === 'oblique')
+            marks.push('i');
+        const deco = /(?:^|;)\s*text-decoration(?:-line)?\s*:\s*([^;]+)/.exec(style)?.[1] ?? '';
+        if ((tag === 'u' && !/none/.test(deco)) || /underline/.test(deco))
+            marks.push('u');
+        const strike_tag = tag === 's' || tag === 'strike' || tag === 'del';
+        if ((strike_tag && !/none/.test(deco)) || /line-through/.test(deco))
+            marks.push('s');
+        if (tag === 'code' || tag === 'tt' || tag === 'kbd' || tag === 'samp' || tag === 'var')
+            marks.push('code');
+        return marks;
+    }
+    function paste_code(text, lang) {
+        const body = paste_escape(text.replace(/\n+$/, ''));
+        return {
+            type: 'code',
+            content: lang ? '<code class="language-' + lang + '">' + body + '</code>' : body,
+        };
+    }
+    function paste_lang(el) {
+        const found = /(?:^|\s)(?:language|lang)-([\w+#.-]+)/.exec(el.getAttribute('class') ?? '');
+        return found ? paste_lang_clean(found[1]) : null;
+    }
+    function paste_lang_clean(lang) {
+        const clean = lang.toLowerCase().replace(/[^a-z0-9+#._-]/g, '');
+        return clean || null;
+    }
+    function paste_image_draft(src, alt) {
+        const clean = src.trim();
+        if (!clean)
+            return null;
+        if (/^(?:javascript|vbscript|file):/i.test(clean))
+            return null;
+        const label = alt.trim();
+        return {
+            type: 'image',
+            content: '<img src="' + paste_attr(clean) + '"' + (label ? ' alt="' + paste_attr(label) + '"' : '') + '>',
+        };
+    }
+    function paste_href(href) {
+        const clean = href.trim().replace(/\s+/g, ' ');
+        if (!clean)
+            return null;
+        if (/^(?:javascript|vbscript|data|file):/i.test(clean))
+            return null;
+        return clean;
+    }
+    function paste_plain_text(text) {
+        return text.replace(/\u00A0/g, ' ').replace(/[\t\n\r ]+/g, ' ');
+    }
+    function paste_escape(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function paste_attr(text) {
+        return paste_escape(text).replace(/"/g, '&quot;');
+    }
+    function paste_tidy(html) {
+        return html
+            .replace(/[\t\n\r ]+/g, ' ')
+            .replace(/^(?:\s|<br>)+/, '')
+            .replace(/(?:\s|<br>)+$/, '');
+    }
+    /** Markdown inline markup to the subset of html the block renderer understands. */
+    function paste_md_inline(src) {
+        const codes = [];
+        let text = paste_escape(src.replace(/\u00A0/g, ' '));
+        text = text.replace(/`([^`\n]+)`/g, (all, body) => {
+            codes.push(body.trim());
+            return '\u0000' + (codes.length - 1) + '\u0000';
+        });
+        text = text.replace(new RegExp('!\\[([^\\]]*)\\]\\(\\s*' + paste_md_link_url + '\\)', 'g'), (all, alt, url) => {
+            const href = paste_href(paste_md_url(url));
+            if (!href)
+                return alt;
+            return '<a href="' + paste_attr_escaped(href) + '">' + (alt || href) + '</a>';
+        });
+        text = text.replace(new RegExp('\\[([^\\]]+)\\]\\(\\s*' + paste_md_link_url + '\\)', 'g'), (all, label, url) => {
+            const href = paste_href(paste_md_url(url));
+            if (!href)
+                return label;
+            return '<a href="' + paste_attr_escaped(href) + '">' + label + '</a>';
+        });
+        text = text.replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<b>$1</b>');
+        text = text.replace(/(?<![\w_])__(?=\S)([\s\S]*?\S)__(?![\w_])/g, '<b>$1</b>');
+        text = text.replace(/~~(?=\S)([\s\S]*?\S)~~/g, '<s>$1</s>');
+        text = text.replace(/(?<![*\w])\*(?=\S)([^*\n]*?\S)\*(?!\*)/g, '<i>$1</i>');
+        text = text.replace(/(?<![\w_])_(?=\S)([^_\n]*?\S)_(?![\w_])/g, '<i>$1</i>');
+        text = text.replace(/\u0000(\d+)\u0000/g, (all, index) => '<code>' + codes[Number(index)] + '</code>');
+        return text.trim().replace(/\n/g, '<br>');
+    }
+    /** Strips angle brackets markdown allows around a url. Runs on already escaped text. */
+    function paste_md_url(url) {
+        return url.replace(/^&lt;/, '').replace(/&gt;$/, '');
+    }
+    /** Quotes a value that went through paste_escape already. */
+    function paste_attr_escaped(text) {
+        return text.replace(/"/g, '&quot;');
+    }
+})($ || ($ = {}));
+
+;
+"use strict";
 
 
 ;
@@ -46346,10 +46981,10 @@ var $;
                     event.preventDefault();
                     return event;
                 }
-                const items = event.clipboardData?.items;
-                if (!items)
+                const data = event.clipboardData;
+                if (!data)
                     return event;
-                for (const item of items) {
+                for (const item of data.items) {
                     if (item.type.startsWith('image/')) {
                         event.preventDefault();
                         const file = item.getAsFile();
@@ -46358,16 +46993,62 @@ var $;
                         return event;
                     }
                 }
-                const text = event.clipboardData?.getData('text/plain') ?? '';
-                if (text.includes('\n')) {
-                    event.preventDefault();
-                    const blocks = $.$bog_wysiwyg_parse_markdown(text);
-                    if (blocks.length > 0) {
-                        this.on_paste_blocks(blocks);
-                    }
-                    return event;
-                }
+                // Nothing from the clipboard reaches the DOM as is: the editor rebuilds it from drafts
+                event.preventDefault();
+                this.paste_data(data);
                 return event;
+            }
+            /**
+             * Clipboard content to editor content. Split off `paste_event` so it can be
+             * driven with a bare `getData` and without a DataTransfer.
+             */
+            paste_data(data) {
+                // A code block takes the clipboard as plain text, markup and all
+                if (this.type() === 'code') {
+                    const text = data.getData('text/plain') ?? '';
+                    if (!text)
+                        return;
+                    this.paste_at_caret([{ type: 'code', content: $.$bog_wysiwyg_escape_html(text) }], true);
+                    return;
+                }
+                const drafts = $bog_wysiwyg_paste.from_data(data);
+                if (!drafts.length)
+                    return;
+                // A single unbroken paragraph belongs in the current text, not in a block of its own
+                const inline = drafts.length === 1
+                    && drafts[0].type === 'paragraph'
+                    && !drafts[0].content.includes('<br>');
+                if (!inline) {
+                    this.paste_at_caret(drafts, false);
+                    return;
+                }
+                // Every draft comes trimmed, but a fragment copied mid sentence needs its spaces back
+                const text = data.getData('text/plain') ?? '';
+                const lead = /^\s/.test(text) ? ' ' : '';
+                const trail = /\s$/.test(text) ? ' ' : '';
+                this.paste_at_caret([{ type: 'paragraph', content: lead + drafts[0].content + trail }], true);
+            }
+            /** Hands the drafts to the page together with the two halves of the block around the caret */
+            paste_at_caret(drafts, inline) {
+                const node = this.node_el();
+                const caret = Math.max(0, this.caret_offset());
+                let from = caret;
+                let to = caret;
+                const sel = this.selection();
+                if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
+                    // A selection running into other blocks is none of this block's business
+                    if (node.contains(range.startContainer) && node.contains(range.endContainer)) {
+                        from = $.$bog_wysiwyg_offset_of(node, range.startContainer, range.startOffset);
+                        to = $.$bog_wysiwyg_offset_of(node, range.endContainer, range.endOffset);
+                    }
+                }
+                this.on_paste_blocks({
+                    drafts,
+                    head: this.html_before(from),
+                    tail: this.html_after(to),
+                    inline,
+                });
             }
             drop_event(event) {
                 if (!event)

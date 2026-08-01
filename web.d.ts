@@ -117,7 +117,7 @@ declare namespace $ {
         static calc<Value>(value: Value): $mol_style_func<"calc", Value>;
         static vary<Name extends string, Value extends string>(name: Name, defaultValue?: Value): $mol_style_func<"var", Name | (Name | Value)[]>;
         static url<Href extends string>(href: Href): $mol_style_func<"url", string>;
-        static hsla(hue: number | $mol_style_func<'var'>, saturation: number, lightness: number, alpha: number): $mol_style_func<"hsla", (number | `${number}%` | $mol_style_func<"var", unknown>)[]>;
+        static hsla(hue: number | $mol_style_func<'var'>, saturation: number, lightness: number, alpha: number): $mol_style_func<"hsla", (number | $mol_style_func<"var", unknown> | `${number}%`)[]>;
         static clamp(min: $mol_style_unit_str<any>, mid: $mol_style_unit_str<any>, max: $mol_style_unit_str<any>): $mol_style_func<"clamp", `${number}${any}`[]>;
         static rgba(red: number | $mol_style_func<'var'>, green: number | $mol_style_func<'var'>, blue: number | $mol_style_func<'var'>, alpha: number | $mol_style_func<'var'>): $mol_style_func<"rgba", (number | $mol_style_func<"var", unknown>)[]>;
         static scale(zoom: number): $mol_style_func<"scale", number[]>;
@@ -628,7 +628,7 @@ declare namespace $ {
      * Theme css variables
      * @see https://mol.hyoo.ru/#!section=demos/demo=mol_textarea_demo
      */
-    const $mol_theme: Record<"image" | "line" | "text" | "field" | "current" | "hover" | "focus" | "hue" | "back" | "card" | "special" | "control" | "shade" | "spirit" | "hue_spread", $mol_style_func<"var", unknown>>;
+    const $mol_theme: Record<"image" | "line" | "text" | "field" | "current" | "hover" | "focus" | "back" | "card" | "special" | "control" | "shade" | "spirit" | "hue" | "hue_spread", $mol_style_func<"var", unknown>>;
 }
 
 declare namespace $ {
@@ -639,7 +639,7 @@ declare namespace $ {
      * Gap in CSS
      * @see https://page.hyoo.ru/#!=msdb74_bm7nsq
      */
-    let $mol_gap: Record<"space" | "text" | "block" | "page" | "blur" | "round" | "emoji", $mol_style_func<"var", unknown>>;
+    let $mol_gap: Record<"text" | "space" | "block" | "page" | "blur" | "emoji" | "round", $mol_style_func<"var", unknown>>;
 }
 
 declare namespace $ {
@@ -5095,7 +5095,7 @@ declare namespace $ {
         code(): Uint8Array<ArrayBuffer>;
         code_exists(): boolean;
         dump(): {
-            kind: "sand" | "gift" | "seal";
+            kind: "seal" | "sand" | "gift";
             lord: $giper_baza_link;
             mate: $giper_baza_link;
             tier: string;
@@ -5183,7 +5183,7 @@ declare namespace $ {
         hash(): $giper_baza_link;
         idea_seed(): number;
         dump(): {
-            kind: "sand" | "gift" | "seal";
+            kind: "seal" | "sand" | "gift";
             lord: $giper_baza_link;
             lead: $giper_baza_link;
             head: $giper_baza_link;
@@ -34118,10 +34118,10 @@ declare namespace $.$$ {
      * @see https://mol.hyoo.ru/#!section=demos/demo=mol_search_demo
      */
     class $mol_search extends $.$mol_search {
-        anchor_content(): ($mol_button_minor | $.$mol_string)[];
+        anchor_content(): ($.$mol_string | $mol_button_minor)[];
         suggests_showed(next?: boolean): boolean;
         suggest_selected(next?: string): void;
-        nav_components(): ($mol_button_minor | $.$mol_string)[];
+        nav_components(): ($.$mol_string | $mol_button_minor)[];
         nav_focused(component?: $mol_view): $mol_view | $.$mol_string | null;
         suggest_label(key: string): string;
         menu_items(): $mol_button_minor[];
@@ -34722,7 +34722,7 @@ declare namespace $.$$ {
         option_rows(): $mol_button_minor[];
         option_focused(component?: $mol_view): $mol_view | $.$mol_search | null;
         event_select(id: string, event?: MouseEvent): void;
-        nav_components(): ($mol_button_minor | $.$mol_search)[];
+        nav_components(): ($.$mol_search | $mol_button_minor)[];
         trigger_content(): readonly $mol_view_content[];
         menu_content(): $mol_view[];
     }
@@ -36039,9 +36039,9 @@ declare namespace $ {
         [x: string]: string;
         readonly token: string;
         readonly link: string;
-        readonly emoji: string;
         readonly 'line-break': string;
         readonly indents: string;
+        readonly emoji: string;
         readonly Word: string;
         readonly word: string;
         readonly spaces: string;
@@ -36439,7 +36439,7 @@ declare namespace $ {
 declare namespace $.$$ {
     class $giper_baza_flex_field extends $.$giper_baza_flex_field {
         dict_pawn(): $giper_baza_dict;
-        Sub(): $.$mol_textarea | $.$mol_select | $.$mol_expander | $.$mol_drop | $.$mol_number | $.$mol_date | $mol_check_box | $mol_bar;
+        Sub(): $.$mol_select | $.$mol_expander | $.$mol_drop | $.$mol_number | $.$mol_textarea | $.$mol_date | $mol_check_box | $mol_bar;
         enum(next?: $giper_baza_vary_type): string | number | bigint | boolean | Element | $giper_baza_link | Uint8Array<ArrayBuffer> | Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer> | BigUint64Array<ArrayBuffer> | Int8Array<ArrayBuffer> | Int16Array<ArrayBuffer> | Int32Array<ArrayBuffer> | BigInt64Array<ArrayBuffer> | Float64Array<ArrayBuffer> | Float32Array<ArrayBuffer> | $mol_time_moment | $mol_time_duration | $mol_time_interval | $mol_tree2 | readonly $giper_baza_vary_type[] | Readonly<{
             [x: string]: $giper_baza_vary_type;
         }> | null;
@@ -42117,10 +42117,10 @@ declare namespace $ {
                 _sum?: Readonly<{}> | undefined;
             };
         }> | undefined;
-        BAZA: {
+        file: {
             '+'?: boolean | undefined;
-            '='?: readonly (readonly number[])[] | undefined;
-            '!='?: readonly (readonly number[])[] | undefined;
+            '='?: readonly (readonly string[])[] | undefined;
+            '!='?: readonly (readonly string[])[] | undefined;
             _num?: {
                 '=': readonly (readonly (string | number)[])[];
             } | undefined;
@@ -42129,10 +42129,10 @@ declare namespace $ {
             _min?: Readonly<{}> | undefined;
             _sum?: Readonly<{}> | undefined;
         };
-        file: {
+        BAZA: {
             '+'?: boolean | undefined;
-            '='?: readonly (readonly string[])[] | undefined;
-            '!='?: readonly (readonly string[])[] | undefined;
+            '='?: readonly (readonly number[])[] | undefined;
+            '!='?: readonly (readonly number[])[] | undefined;
             _num?: {
                 '=': readonly (readonly (string | number)[])[];
             } | undefined;
@@ -42252,10 +42252,10 @@ declare namespace $ {
                 _sum?: Readonly<{}> | undefined;
             }>;
         }> | undefined;
-        BAZA: Readonly<{
+        file: Readonly<{
             '+'?: boolean | undefined;
-            '='?: readonly (readonly number[])[] | undefined;
-            '!='?: readonly (readonly number[])[] | undefined;
+            '='?: readonly (readonly string[])[] | undefined;
+            '!='?: readonly (readonly string[])[] | undefined;
             _num?: Readonly<{
                 '=': readonly (readonly number[])[];
             }> | undefined;
@@ -42264,10 +42264,10 @@ declare namespace $ {
             _min?: Readonly<{}> | undefined;
             _sum?: Readonly<{}> | undefined;
         }>;
-        file: Readonly<{
+        BAZA: Readonly<{
             '+'?: boolean | undefined;
-            '='?: readonly (readonly string[])[] | undefined;
-            '!='?: readonly (readonly string[])[] | undefined;
+            '='?: readonly (readonly number[])[] | undefined;
+            '!='?: readonly (readonly number[])[] | undefined;
             _num?: Readonly<{
                 '=': readonly (readonly number[])[];
             }> | undefined;
@@ -42948,10 +42948,10 @@ declare namespace $ {
                     _sum?: Readonly<{}> | undefined;
                 }>;
             }> | undefined;
-            BAZA: Readonly<{
+            file: Readonly<{
                 '+'?: boolean | undefined;
-                '='?: readonly (readonly number[])[] | undefined;
-                '!='?: readonly (readonly number[])[] | undefined;
+                '='?: readonly (readonly string[])[] | undefined;
+                '!='?: readonly (readonly string[])[] | undefined;
                 _num?: Readonly<{
                     '=': readonly (readonly number[])[];
                 }> | undefined;
@@ -42960,10 +42960,10 @@ declare namespace $ {
                 _min?: Readonly<{}> | undefined;
                 _sum?: Readonly<{}> | undefined;
             }>;
-            file: Readonly<{
+            BAZA: Readonly<{
                 '+'?: boolean | undefined;
-                '='?: readonly (readonly string[])[] | undefined;
-                '!='?: readonly (readonly string[])[] | undefined;
+                '='?: readonly (readonly number[])[] | undefined;
+                '!='?: readonly (readonly number[])[] | undefined;
                 _num?: Readonly<{
                     '=': readonly (readonly number[])[];
                 }> | undefined;
@@ -43085,10 +43085,10 @@ declare namespace $ {
                     _sum?: Readonly<{}> | undefined;
                 }>;
             }> | undefined;
-            BAZA: Readonly<{
+            file: Readonly<{
                 '+'?: boolean | undefined;
-                '='?: readonly (readonly number[])[] | undefined;
-                '!='?: readonly (readonly number[])[] | undefined;
+                '='?: readonly (readonly string[])[] | undefined;
+                '!='?: readonly (readonly string[])[] | undefined;
                 _num?: Readonly<{
                     '=': readonly (readonly number[])[];
                 }> | undefined;
@@ -43097,10 +43097,10 @@ declare namespace $ {
                 _min?: Readonly<{}> | undefined;
                 _sum?: Readonly<{}> | undefined;
             }>;
-            file: Readonly<{
+            BAZA: Readonly<{
                 '+'?: boolean | undefined;
-                '='?: readonly (readonly string[])[] | undefined;
-                '!='?: readonly (readonly string[])[] | undefined;
+                '='?: readonly (readonly number[])[] | undefined;
+                '!='?: readonly (readonly number[])[] | undefined;
                 _num?: Readonly<{
                     '=': readonly (readonly number[])[];
                 }> | undefined;
@@ -43221,10 +43221,10 @@ declare namespace $ {
                     _sum?: Readonly<{}> | undefined;
                 };
             }> | undefined;
-            BAZA: {
+            file: {
                 '+'?: boolean | undefined;
-                '='?: readonly (readonly number[])[] | undefined;
-                '!='?: readonly (readonly number[])[] | undefined;
+                '='?: readonly (readonly string[])[] | undefined;
+                '!='?: readonly (readonly string[])[] | undefined;
                 _num?: {
                     '=': readonly (readonly (string | number)[])[];
                 } | undefined;
@@ -43233,10 +43233,10 @@ declare namespace $ {
                 _min?: Readonly<{}> | undefined;
                 _sum?: Readonly<{}> | undefined;
             };
-            file: {
+            BAZA: {
                 '+'?: boolean | undefined;
-                '='?: readonly (readonly string[])[] | undefined;
-                '!='?: readonly (readonly string[])[] | undefined;
+                '='?: readonly (readonly number[])[] | undefined;
+                '!='?: readonly (readonly number[])[] | undefined;
                 _num?: {
                     '=': readonly (readonly (string | number)[])[];
                 } | undefined;
@@ -49563,7 +49563,7 @@ declare namespace $.$$ {
         has_multiple_correct(): boolean;
         submit_enabled(): boolean;
         submit_answer(next?: Event): void;
-        answer_views(): ($.$mol_paragraph | $.$mol_string)[] | $mol_button_major[];
+        answer_views(): ($.$mol_string | $.$mol_paragraph)[] | $mol_button_major[];
         text_submit(next?: Event): void;
         text_input_enabled(): boolean;
         option_keys(): string[];
@@ -60295,7 +60295,8 @@ declare namespace $.$$ {
         active_block_id(next?: string): string;
         /** Block view with its caret API */
         block_view(id: string): $bog_wysiwyg_block;
-        /** Blocks that hold no editable text and can not be glued with neighbours */
+        /** Kinds of block that hold no editable text and can not be glued with neighbours */
+        type_is_static(type: string): boolean;
         block_is_static(id: string): boolean;
         /** Allocate an id for a new block, creating the Baza pawn when connected */
         make_block_id(): string;
@@ -60338,15 +60339,32 @@ declare namespace $.$$ {
         block_menu_key(id: string, event?: KeyboardEvent): KeyboardEvent | null;
         apply_menu_command(cmd: string): void;
         apply_menu_command_run(cmd: string, id: string): void;
+        /** Plain text length of an html fragment */
+        html_text_length(html: string): number;
+        /**
+         * Clipboard drafts into the page around the caret. The whole paste is one
+         * undo step: the head of the target block keeps the pasted content, the
+         * tail moves behind everything that was pasted.
+         */
         block_paste_blocks(id: string, val?: {
-            type: string;
-            content: string;
-            level?: number;
-        }[]): {
-            type: string;
-            content: string;
-            level?: number;
-        }[] | null;
+            drafts: readonly {
+                type: string;
+                content: string;
+                level?: number;
+            }[];
+            head?: string;
+            tail?: string;
+            inline?: boolean;
+        }): {
+            drafts: readonly {
+                type: string;
+                content: string;
+                level?: number;
+            }[];
+            head?: string;
+            tail?: string;
+            inline?: boolean;
+        } | null | undefined;
         block_image(id: string, src?: string): string | null;
         menu_picked(next?: string): string;
         block_ai(id: string, event?: Event): Event | null;
@@ -61009,6 +61027,39 @@ declare namespace $.$$ {
 }
 
 declare namespace $ {
+    /**
+     * Draft of a block produced from clipboard content.
+     * Fields map one to one onto $bog_wysiwyg_model_block: Type, Level, Content.
+     */
+    type $bog_wysiwyg_paste_draft = {
+        type: string;
+        level?: number;
+        content: string;
+    };
+    /** Minimal clipboard surface needed to sniff the format. A real DataTransfer satisfies it. */
+    type $bog_wysiwyg_paste_data = Pick<DataTransfer, 'getData'>;
+    /** What the clipboard holds. */
+    type $bog_wysiwyg_paste_kind = 'html' | 'markdown' | 'text';
+    /**
+     * Clipboard to blocks. Pure functions, no DOM editor and no storage.
+     * Inline markup in `content` is limited to what the block renderer understands:
+     * b, i, u, s, code, a[href], br, img[src].
+     */
+    class $bog_wysiwyg_paste {
+        /** Sniffs the clipboard format. Markdown is guessed from plain text when html is missing or has no semantics. */
+        static detect(data: $bog_wysiwyg_paste_data): $bog_wysiwyg_paste_kind;
+        /** Sniffs the format and parses with the matching parser. */
+        static from_data(data: $bog_wysiwyg_paste_data): $bog_wysiwyg_paste_draft[];
+        /** Parses clipboard html into block drafts, dropping editor junk. */
+        static from_html(html: string): $bog_wysiwyg_paste_draft[];
+        /** Parses markdown source into block drafts. */
+        static from_markdown(md: string): $bog_wysiwyg_paste_draft[];
+        /** Splits plain text into paragraphs by blank lines, keeping line breaks. */
+        static from_text(text: string): $bog_wysiwyg_paste_draft[];
+    }
+}
+
+declare namespace $ {
 
 	type $mol_hotkey__mod_ctrl_bog_wysiwyg_block_1 = $mol_type_enforce<
 		boolean
@@ -61167,6 +61218,13 @@ declare namespace $.$$ {
         strike_exec(event?: KeyboardEvent): KeyboardEvent | null;
         link_exec(event?: KeyboardEvent): KeyboardEvent | null;
         paste_event(event?: ClipboardEvent): ClipboardEvent | null;
+        /**
+         * Clipboard content to editor content. Split off `paste_event` so it can be
+         * driven with a bare `getData` and without a DataTransfer.
+         */
+        paste_data(data: $bog_wysiwyg_paste_data): void;
+        /** Hands the drafts to the page together with the two halves of the block around the caret */
+        paste_at_caret(drafts: readonly $bog_wysiwyg_paste_draft[], inline: boolean): void;
         drop_event(event?: DragEvent): DragEvent | null;
         dragover_event(event?: DragEvent): DragEvent | null;
         insert_image_file(file: File): void;
@@ -61778,7 +61836,7 @@ declare namespace $.$$ {
         /** Add a user to the current page land */
         permissions_add_click(event?: Event): Event | null;
         /** Hide add-member controls for non-owners */
-        permissions_add_content(): ($mol_button_minor | $.$mol_string | $.$mol_select)[];
+        permissions_add_content(): ($.$mol_string | $mol_button_minor | $.$mol_select)[];
         sidebar_head_content(): any[];
         page_item_can_edit(index: number): boolean;
         /** Registry rows for panel */
@@ -61818,7 +61876,7 @@ declare namespace $.$$ {
         }[];
     }
     class $bog_wysiwyg_app_page extends $.$bog_wysiwyg_app_page {
-        page_content(): ($mol_button_minor | $.$mol_string)[];
+        page_content(): ($.$mol_string | $mol_button_minor)[];
         start_rename(event?: Event): Event | null;
         confirm_rename(event?: Event): Event | null;
     }
