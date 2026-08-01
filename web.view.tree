@@ -55,7 +55,7 @@ $mol_scroll $mol_view
 		tabindex <= tabindex -1
 	event *
 		^
-		scroll?event <=> event_scroll?event null
+		scroll? <=> event_scroll? null
 
 $mol_svg $mol_view
 	dom_name \svg
@@ -97,14 +97,14 @@ $mol_speck $mol_view
 
 $mol_button $mol_view
 	enabled true
-	click?event null
-	event_click?event null
+	click? null
+	event_click? null
 	status? /
 	event *
 		^
-		click?event <=> activate?event <=> event_activate?event null
-		dblclick?event <=> clicks?event null
-		keydown?event <=> key_press?event <=> event_key_press?event null
+		click? <=> activate? <=> event_activate? null
+		dblclick? <=> clicks? null
+		keydown? <=> key_press? <=> event_key_press? null
 	attr *
 		^
 		disabled <= disabled false
@@ -235,7 +235,7 @@ $mol_text_code $mol_stack
 $mol_hotkey $mol_plugin
 	event *
 		^
-		keydown?event <=> keydown?event null
+		keydown? <=> keydown? null
 	key *
 	mod_ctrl false
 	mod_alt false
@@ -269,11 +269,11 @@ $mol_string $mol_view
 		type <= type? \text
 	event *
 		^
-		input?event <=> event_change?event null
+		input? <=> event_change? null
 	plugins /
 		<= Submit $mol_hotkey
 			mod_ctrl <= submit_with_ctrl false
-			key * enter?event <=> submit?event null
+			key * enter? <=> submit? null
 
 $mol_textarea $mol_stack
 	attr *
@@ -281,8 +281,8 @@ $mol_textarea $mol_stack
 		mol_textarea_clickable <= clickable? false
 		mol_textarea_sidebar_showed <= sidebar_showed false
 	event *
-		keydown?event <=> press?event null
-		pointermove?event <=> hover?event null
+		keydown? <=> press? null
+		pointermove? <=> hover? null
 	sub /
 		<= Edit $mol_textarea_edit
 			value? <=> value? \
@@ -402,13 +402,13 @@ $mol_nav $mol_plugin
 	current_x? null
 	current_y? null
 	-
-	event_up?event null
-	event_down?event null
-	event_left?event null
-	event_right?event null
+	event_up? null
+	event_down? null
+	event_left? null
+	event_right? null
 	event *
 		^
-		keydown?event <=> event_key?event null
+		keydown? <=> event_key? null
 
 $mol_search $mol_pop
 	query? \
@@ -419,7 +419,7 @@ $mol_search $mol_pop
 			key * escape? <=> clear? null
 		<= Nav $mol_nav
 			keys_y <= nav_components /$mol_view
-			current_y?component <=> nav_focused?component null
+			current_y? <=> nav_focused? null
 	showed? <=> suggests_showed? false
 	align_hor \right
 	Anchor $mol_view
@@ -427,7 +427,7 @@ $mol_search $mol_pop
 			<= Query $mol_string
 				value? <=> query? \
 				hint <= hint @ \Search...
-				submit?event <=> submit?event null
+				submit? <=> submit? null
 				enabled <= enabled true
 				keyboard <= keyboard \search
 				enter <= enter \search
@@ -435,7 +435,7 @@ $mol_search $mol_pop
 			<= Clear $mol_button_minor
 				hint @ \Clear
 				enabled <= enabled true
-				click?event <=> clear?event null
+				click? <=> clear? null
 				sub /
 					<= Clear_icon $mol_icon_close
 	bubble_content /$mol_view_content
@@ -444,7 +444,7 @@ $mol_search $mol_pop
 				<= Menu $mol_list
 					rows <= menu_items /$mol_view
 	Suggest* $mol_button_minor
-		click?event <=> suggest_select*?event null
+		click? <=> suggest_select*? null
 		sub <= suggest_content* /$mol_view_content
 			<= Suggest_label* $mol_dimmer
 				haystack <= suggest_label* \
@@ -469,7 +469,7 @@ $mol_link $mol_view
 	arg *
 	event *
 		^
-		click?event <=> click?event <=> event_click?event null
+		click? <=> click? <=> event_click? null
 
 $mol_page $mol_view
 	dom_name \article
@@ -567,7 +567,7 @@ $mol_check $mol_button_minor
 $mol_pick $mol_pop
 	event *
 		^
-		keydown?event <=> keydown?event null
+		keydown? <=> keydown? null
 	Anchor <= Trigger $mol_check
 		minimal_width 40
 		minimal_height 40
@@ -587,7 +587,7 @@ $mol_select $mol_pick
 	option_label_default \
 	Option_row* $mol_button_minor
 		enabled <= enabled true
-		event_click?event <=> event_select*?event null
+		event_click? <=> event_select*? null
 		sub <= option_content* /
 			<= Option_label* $mol_dimmer
 				haystack <= option_label* \
@@ -599,7 +599,7 @@ $mol_select $mol_pick
 		^
 		<= Nav $mol_nav
 			keys_y <= nav_components /$mol_view
-			current_y?component <=> option_focused?component null
+			current_y? <=> option_focused? null
 			cycle? <=> nav_cycle? true
 	hint @ \Pick..
 	bubble_content /
@@ -611,7 +611,7 @@ $mol_select $mol_pick
 	Filter $mol_search
 		query? <=> filter_pattern? \
 		hint <= filter_hint @ \Filter..
-		submit?event <=> submit?event null
+		submit? <=> submit? null
 		enabled <= enabled true
 	Trigger_icon $mol_icon_dots_vertical
 	trigger_enabled <= enabled
@@ -749,9 +749,9 @@ $mol_icon_plus $mol_icon path \M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z
 
 $mol_drag $mol_ghost
 	event *
-		dragstart?event <=> drag_start?event <=> start?event null
-		drag?event <=> drag_move?event <=> move?event null
-		dragend?event <=> drag_end?event <=> end?event null
+		dragstart? <=> drag_start? <=> start? null
+		drag? <=> drag_move? <=> move? null
+		dragend? <=> drag_end? <=> end? null
 	attr *
 		draggable true
 		mol_drag_status <= status? \ready
@@ -767,13 +767,13 @@ $mol_drag $mol_ghost
 $mol_drop $mol_ghost
 	enabled? true
 	event *
-		dragenter?event <=> enter?event null
-		dragover?event <=> move?event null
-		dragleave?event <=> leave?event null
-		drop?event <=> drop?event null
+		dragenter? <=> enter? null
+		dragover? <=> move? null
+		dragleave? <=> leave? null
+		drop? <=> drop? null
 	attr * mol_drop_status <= status? \ready
-	adopt?transfer *
-	receive?transfer null
+	adopt? *
+	receive? null
 	allow /
 		\copy
 		\move
@@ -837,6 +837,10 @@ $mol_icon_trash_can $mol_icon path \M9,3V4H4V6H5V19A2,2 0 0,0 7,21H17A2,2 0 0,0 
 
 $mol_icon_trash_can_outline $mol_icon path \M9,3V4H4V6H5V19A2,2 0 0,0 7,21H17A2,2 0 0,0 19,19V6H20V4H15V3H9M7,6H17V19H7V6M9,8V17H11V8H9M13,8V17H15V8H13Z
 
+$mol_icon_chevron_double_left $mol_icon path \M18.41,7.41L17,6L11,12L17,18L18.41,16.59L13.83,12L18.41,7.41M12.41,7.41L11,6L5,12L11,18L12.41,16.59L7.83,12L12.41,7.41Z
+
+$mol_icon_chevron_double_right $mol_icon path \M5.59,7.41L7,6L13,12L7,18L5.59,16.59L10.17,12L5.59,7.41M11.59,7.41L13,6L19,12L13,18L11.59,16.59L16.17,12L11.59,7.41Z
+
 $mol_hor $mol_view
 
 $mol_calendar $mol_list
@@ -890,7 +894,7 @@ $mol_date $mol_pick
 			<= Today $mol_button_minor
 				hint @ \Today
 				enabled <= enabled true
-				click?event <=> today_click?event null
+				click? <=> today_click? null
 				sub /
 					<= Today_icon $mol_icon_calendar_today
 			<= Input $mol_format
@@ -901,29 +905,39 @@ $mol_date $mol_pick
 			<= Clear $mol_button_minor
 				hint @ \Clear
 				enabled <= enabled true
-				click?event <=> clear?event null
+				click? <=> clear? null
 				sub /
 					<= Clear_icon $mol_icon_trash_can_outline
 		<= Calendar $mol_date_calendar
 			enabled <= enabled true
 			month_moment <= month_moment <= value_moment
 			day_selected* <= day_selected* false
-			day_click*?event <=> day_click*?event null
+			day_click*? <=> day_click*? null
 			Title => Calendar_title
 			head /
 				<= Calendar_tools $mol_view
 					sub /
-						<= Prev $mol_button_minor
-							hint <= prev_hint @ \Previous month
-							click?event <=> prev?event null
+						<= Year_prev $mol_button_minor
+							hint <= year_prev_hint @ \Previous year
+							click? <=> year_prev? null
 							sub /
-								<= Prev_icon $mol_icon_chevron_left
+								<= Year_prev_icon $mol_icon_chevron_double_left
+						<= Prev <= Month_prev $mol_button_minor
+							hint <= prev_hint <= month_prev_hint @ \Previous month
+							click? <=> prev? <=> month_prev? null
+							sub /
+								<= Prev_icon <= Month_prev_icon $mol_icon_chevron_left
 						<= Calendar_title
-						<= Next $mol_button_minor
-							hint <= next_hint @ \Next month
-							click?event <=> next?event null
+						<= Next <= Month_next $mol_button_minor
+							hint <= next_hint <= month_next_hint @ \Next month
+							click? <=> next? <=> month_next? null
 							sub /
-								<= Next_icon $mol_icon_chevron_right
+								<= Next_icon <= Month_next_icon $mol_icon_chevron_right
+						<= Year_next $mol_button_minor
+							hint <= year_next_hint @ \Next year
+							click? <=> year_next? null
+							sub /
+								<= Year_next_icon $mol_icon_chevron_double_right
 	-
 	value_number? +NaN
 	value_moment? $mol_time_moment
@@ -932,7 +946,7 @@ $mol_date_calendar $mol_calendar
 	day_content* /
 		<= Day_button* $mol_button_minor
 			title <= day_text*
-			event_click?event <=> day_click*?event null
+			event_click? <=> day_click*? null
 			minimal_height 24
 			enabled <= enabled true
 
@@ -1035,6 +1049,9 @@ $mol_labeler $mol_list
 			sub <= content /
 
 $mol_form_field $mol_labeler
+	attr *
+		^
+		mol_form_field_state <= state null string
 	bids /string
 	label /
 		<= name \
@@ -1059,8 +1076,8 @@ $mol_form $mol_list
 	submit_blocked false
 	event *
 		^
-		keydown?event <=> keydown?event null
-	save?event null
+		keydown? <=> keydown? null
+	save? null
 	message_done @ \Saved
 	errors *string
 		\Form invalid
@@ -1245,7 +1262,7 @@ $mol_button_open_native $mol_view
 		accept <= accept \
 		multiple <= multiple true
 	event *
-		change?next <=> picked?next null
+		change? <=> picked? null
 
 $giper_baza_land_rights $mol_list
 	land $giper_baza_land
@@ -2662,7 +2679,7 @@ $mol_attach $mol_view
 	items? /string
 	sub <= content /$mol_view
 		<= Item*0 $mol_button_minor
-			click?event <=> item_drop*?event null
+			click? <=> item_drop*? null
 			sub /
 				<= Image* $mol_image
 					title \
@@ -2678,12 +2695,12 @@ $mol_paginator $mol_bar
 	sub /
 		<= Backward $mol_button_minor
 			hint <= backward_hint @ \Backward
-			click?event <=> backward?event null
+			click? <=> backward? null
 			sub / <= Backward_icon $mol_icon_chevron_left
 		<= Value $mol_view sub / <= value? 0
 		<= Forward $mol_button_minor
 			hint <= forward_hint @ \Forward
-			click?event <=> forward?event null
+			click? <=> forward? null
 			sub / <= Forward_icon $mol_icon_chevron_right
 
 $mol_text_list $mol_text
@@ -2993,55 +3010,7 @@ $bog_blitz_admin $mol_page
 		option_rows <= option_rows* /
 		add_option? <=> add_option*? null
 
-$mol_section $mol_list
-	level 1
-	rows /
-		<= Head $mol_view
-			sub <= head /
-				<= Title $mol_view
-					dom_name <= title_dom_name \h1
-					sub / <= title
-				<= Tools $mol_view sub <= tools /
-		<= Content $mol_list
-			rows <= content /
-
-$bog_feedback2_form $mol_page
-	Head null
-	feedback_id \
-	registry_link \4o4ds4yH_SXDxOCPR
-	title @ \Feedback ( one per user )
-	tools /
-		<= Close null
-	body /
-		<= Prompt $mol_text
-			text <= prompt \
-		<= Entry_my $mol_textarea
-			hint @ \Your feedback
-			value? <=> draft_text? \
-		<= Contact_field $mol_string
-			hint @ \Contact (optional)
-			value? <=> draft_contact? \
-		<= Submit $mol_button_major
-			title <= submit_title \
-			click? <=> submit? null
-		<= Entries $mol_section
-			title @ \All feedback
-			content <= entry_rows /
-				<= Entry_row*0 $mol_section
-					title <= entry_row_contact* \
-					content /
-						<= Entry_row_text* $mol_text
-							text <= entry_row_text* \
-	Not_configured $mol_status
-		message @ \Form not yet configured
-	Waiting $mol_paragraph
-		title <= waiting_title @ \Waiting…
-
 $mol_icon_menu $mol_icon path \M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z
-
-$mol_icon_message $mol_icon path \M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4C22,2.89 21.1,2 20,2Z
-
-$mol_icon_message_draw $mol_icon path \M18,14H10.5L12.5,12H18M6,14V11.5L12.88,4.64C13.07,4.45 13.39,4.45 13.59,4.64L15.35,6.41C15.55,6.61 15.55,6.92 15.35,7.12L8.47,14M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4C22,2.89 21.1,2 20,2Z
 
 $mol_icon_cog $mol_icon path \M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z
 
@@ -3054,6 +3023,7 @@ $bog_theme_auto $mol_plugin
 	theme_next? null
 	theme_prev? null
 	theme_set? null
+	is_light_now false
 	attr * mol_theme <= theme \
 
 $bog_theme_picker_row $mol_button_minor
@@ -3170,7 +3140,7 @@ $bog_blitz $mol_page
 		lobby <= Lobby $bog_blitz_lobby
 		admin <= Admin $bog_blitz_admin
 		profile <= Profile $bog_blitz_profile_page
-		feedback <= Feedback $bog_feedback2_form
+		- feedback <= Feedback $bog_feedback2_form
 			feedback_id \blitz
 	nav_options *
 		lobby \Лобби
@@ -3191,7 +3161,7 @@ $bog_blitz $mol_page
 		bubble_content /
 			<= Mobile_nav 
 	tools /
-		<= Feedback_link $mol_link
+		- <= Feedback_link $mol_link
 			arg *
 				screen \feedback
 			sub /
@@ -3215,6 +3185,8 @@ $bog_blitz $mol_page
 		<= Tools
 		<= Mobile_menu
 	plugins /
+		- <= Metrics $bog_metrics
+			app \blitz
 		<= Theme $bog_theme_auto
 			theme_light \$mol_theme_calm_light
 			theme_dark \$mol_theme_calm_dark
@@ -3412,6 +3384,11 @@ $bog_wysiwyg $mol_view
 		ai_open <= ai_showed? false
 		on_enter?event <=> block_enter*?event null
 		on_remove?event <=> block_remove*?event null
+		on_split?parts <=> block_split*?parts null
+		on_merge_prev?event <=> block_merge_prev*?event null
+		on_merge_next?event <=> block_merge_next*?event null
+		on_nav?nav <=> block_nav*?nav null
+		on_input?event <=> block_input*?event null
 		on_slash?event <=> block_slash*?event null
 		on_menu_key?event <=> block_menu_key*?event null
 		on_image?src <=> block_image*?src null
@@ -3486,6 +3463,59 @@ $mol_icon_graph_outline $mol_icon path \M19.5 17C19.36 17 19.24 17 19.11 17.04L1
 $mol_icon_shield $mol_icon path \M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z
 
 $mol_icon_shield_lock $mol_icon path \M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.1 14.8,9.5V11C15.4,11 16,11.6 16,12.3V15.8C16,16.4 15.4,17 14.7,17H9.2C8.6,17 8,16.4 8,15.7V12.2C8,11.6 8.6,11 9.2,11V9.5C9.2,8.1 10.6,7 12,7M12,8.2C11.2,8.2 10.5,8.7 10.5,9.5V11H13.5V9.5C13.5,8.7 12.8,8.2 12,8.2Z
+
+$mol_icon_export $mol_icon path \M23,12L19,8V11H10V13H19V16M1,18V6C1,4.89 1.9,4 3,4H15A2,2 0 0,1 17,6V9H15V6H3V18H15V15H17V18A2,2 0 0,1 15,20H3A2,2 0 0,1 1,18Z
+
+$bog_wysiwyg_export $mol_pick
+	blocks /$bog_wysiwyg_export_block
+	page_title \
+	tags /string
+	cover \
+	base_uri \https://baza.87.120.36.150.ip.giper.dev/
+	dialect? \common
+	images_apart? false
+	part? \0
+	part_current? \0
+	markdown \
+	markdown_shown \
+	note \
+	label_image @ \Image
+	label_images @ \Images
+	note_length @ \Length
+	note_parts @ \Messages
+	hint @ \Export to Markdown
+	trigger_content /
+		<= Trigger_icon $mol_icon_export
+	bubble_content /
+		<= Head $mol_view
+			sub /
+				<= Dialect $mol_select
+					value? <=> dialect?
+					hint @ \Target
+					dictionary <= dialect_options *
+						common @ \Markdown (GFM)
+						habr @ \Habr
+						devto @ \dev.to
+						telegram @ \Telegram
+				<= Images_apart $mol_check_box
+					title @ \Images apart
+					hint @ \List every image at the end instead of inlining it
+					checked? <=> images_apart?
+				<= Copy $mol_button_copy
+					title @ \Copy
+					hint @ \Copy markdown to clipboard
+					text <= markdown_shown
+		<= Note $mol_paragraph
+			title <= note
+		<= Parts $mol_select
+			value? <=> part_current?
+			hint @ \Message
+			dictionary <= part_options *
+		<= Body $mol_scroll
+			sub /
+				<= Output $mol_text_code
+					text <= markdown_shown
+					sidebar_showed false
 
 $bog_ui_sidebar $mol_view
 	mode? \dock
@@ -3569,6 +3599,9 @@ $bog_wysiwyg_app $mol_page
 			Icon <= Profile_icon $mol_icon_account
 			hint @ \Profile
 			checked? <=> profile_showed? false
+		<= Export $bog_wysiwyg_export
+			blocks <= export_blocks /
+			page_title <= export_page_title \
 		<= Lights $mol_lights_toggle
 	sub /
 		<= Head
@@ -3702,6 +3735,11 @@ $bog_wysiwyg_block $mol_view
 	placeholder \
 	on_enter?event null
 	on_remove?event null
+	on_split?parts null
+	on_merge_prev?event null
+	on_merge_next?event null
+	on_nav?nav null
+	on_input?event null
 	on_slash?event null
 	on_menu_key?event null
 	on_image?src null

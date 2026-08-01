@@ -41,7 +41,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    const mod = require('module');
+    const mod = require /****/('module');
     const internals = mod.builtinModules;
     function $node_internal_check(name) {
         if (name.startsWith('node:'))
@@ -81,7 +81,7 @@ var $;
 var $;
 (function ($) {
     function $mol_fail_hidden(error) {
-        throw error;
+        throw error; /// Use 'Never Pause Here' breakpoint in DevTools or simply blackbox this script
     }
     $.$mol_fail_hidden = $mol_fail_hidden;
 })($ || ($ = {}));
@@ -139,8 +139,8 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    const path = require('path');
-    const mod = require('module');
+    const path = require /****/('path');
+    const mod = require /****/('module');
     const localRequire = mod.createRequire(path.join(process.cwd(), 'package.json'));
     function $node_autoinstall(name) {
         try {
@@ -247,6 +247,7 @@ var $;
                     ])
                 ].map(frame_normalize).join('\n')
             });
+            // в nodejs, что б не дублировалось cause в консоли
             Object.defineProperty(this, 'cause', {
                 get: () => cause
             });
@@ -280,6 +281,11 @@ var $;
 var $;
 (function ($) {
     const instances = new WeakSet();
+    /**
+     * Proxy that delegates all to lazy returned target.
+     *
+     * 	$mol_delegate( Array.prototype , ()=> fetch_array() )
+     */
     function $mol_delegate(proto, target) {
         const proxy = new Proxy(proto, {
             get: (_, field) => {
@@ -423,6 +429,9 @@ var $;
         [Symbol.dispose]() {
             this.destructor();
         }
+        //[ Symbol.toPrimitive ]( hint: string ) {
+        //	return hint === 'number' ? this.valueOf() : this.toString()
+        //}
         toString() {
             return this[Symbol.toStringTag] || this.constructor.name + '<>';
         }
@@ -473,6 +482,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Generates unique identifier. */
     function $mol_guid(length = 8, exists = () => false) {
         for (;;) {
             let id = Math.random().toString(36).substring(2, length + 2).toUpperCase();
@@ -488,11 +498,16 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Special status statuses. */
     let $mol_wire_cursor;
     (function ($mol_wire_cursor) {
+        /** Update required. */
         $mol_wire_cursor[$mol_wire_cursor["stale"] = -1] = "stale";
+        /** Some of (transitive) pub update required. */
         $mol_wire_cursor[$mol_wire_cursor["doubt"] = -2] = "doubt";
+        /** Actual state but may be dropped. */
         $mol_wire_cursor[$mol_wire_cursor["fresh"] = -3] = "fresh";
+        /** State will never be changed. */
         $mol_wire_cursor[$mol_wire_cursor["final"] = -4] = "final";
     })($mol_wire_cursor = $.$mol_wire_cursor || ($.$mol_wire_cursor = {}));
 })($ || ($ = {}));
@@ -501,6 +516,9 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Collects subscribers in compact array. 28B
+     */
     class $mol_wire_pub extends Object {
         constructor(id = `$mol_wire_pub:${$mol_guid()}`) {
             super();
@@ -508,10 +526,17 @@ var $;
         }
         [Symbol.toStringTag];
         data = [];
+        // Derived objects should be Arrays.
         static get [Symbol.species]() {
             return Array;
         }
-        sub_from = 0;
+        /**
+         * Index of first subscriber.
+         */
+        sub_from = 0; // 4B
+        /**
+         * All current subscribers.
+         */
         get sub_list() {
             const res = [];
             for (let i = this.sub_from; i < this.data.length; i += 2) {
@@ -519,14 +544,23 @@ var $;
             }
             return res;
         }
+        /**
+         * Has any subscribers or not.
+         */
         get sub_empty() {
             return this.sub_from === this.data.length;
         }
+        /**
+         * Subscribe subscriber to this publisher events and return position of subscriber that required to unsubscribe.
+         */
         sub_on(sub, pub_pos) {
             const pos = this.data.length;
             this.data.push(sub, pub_pos);
             return pos;
         }
+        /**
+         * Unsubscribe subscriber from this publisher events by subscriber position provided by `on(pub)`.
+         */
         sub_off(sub_pos) {
             if (!(sub_pos < this.data.length)) {
                 $mol_fail(new Error(`Wrong pos ${sub_pos}`));
@@ -539,21 +573,39 @@ var $;
             if (end === this.sub_from)
                 this.reap();
         }
+        /**
+         * Called when last sub was unsubscribed.
+         **/
         reap() { }
+        /**
+         * Autowire this publisher with current subscriber.
+         **/
         promote() {
             $mol_wire_auto()?.track_next(this);
         }
+        /**
+         * Enforce actualization. Should not throw errors.
+         */
         fresh() { }
+        /**
+         * Allow to put data to caches in the subtree.
+         */
         complete() { }
         get incompleted() {
             return false;
         }
+        /**
+         * Notify subscribers about self changes.
+         */
         emit(quant = $mol_wire_cursor.stale) {
             for (let i = this.sub_from; i < this.data.length; i += 2) {
                 ;
                 this.data[i].absorb(quant, this.data[i + 1]);
             }
         }
+        /**
+         * Moves peer from one position to another. Doesn't clear data at old position!
+         */
         peer_move(from_pos, to_pos) {
             const peer = this.data[from_pos];
             const self_pos = this.data[from_pos + 1];
@@ -561,6 +613,9 @@ var $;
             this.data[to_pos + 1] = self_pos;
             peer.peer_repos(self_pos, to_pos);
         }
+        /**
+         * Updates self position in the peer.
+         */
         peer_repos(peer_pos, self_pos) {
             this.data[peer_pos + 1] = self_pos;
         }
@@ -576,10 +631,16 @@ var $;
 var $;
 (function ($) {
     $.$mol_wire_auto_sub = null;
+    /**
+     * When fulfilled, all publishers are promoted to this subscriber on access to its.
+     */
     function $mol_wire_auto(next = $.$mol_wire_auto_sub) {
         return $.$mol_wire_auto_sub = next;
     }
     $.$mol_wire_auto = $mol_wire_auto;
+    /**
+     * Affection queue. Used to prevent accidental stack overflow on emit.
+     */
     $.$mol_wire_affected = [];
 })($ || ($ = {}));
 
@@ -587,6 +648,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    // https://docs.google.com/document/d/1FTascZXT9cxfetuPRT2eXPQKXui4nWFivUnS_335T3U/preview#
     $['devtoolsFormatters'] ||= [];
     function $mol_dev_format_register(config) {
         $['devtoolsFormatters'].push(config);
@@ -638,6 +700,7 @@ var $;
                 return false;
             if (!val)
                 return false;
+            // if( Error.isError( val ) ) true
             if (val[$.$mol_dev_format_body])
                 return true;
             return false;
@@ -655,12 +718,16 @@ var $;
                     return $.$mol_dev_format_accent($mol_dev_format_native(val), '💨', $mol_dev_format_native(error), '');
                 }
             }
+            // if( Error.isError( val ) ) {
+            // 	return $mol_dev_format_native( val )
+            // }
             return null;
         },
     });
     function $mol_dev_format_native(obj) {
         if (typeof obj === 'undefined')
             return $.$mol_dev_format_shade('undefined');
+        // if( ![ 'object', 'function', 'symbol' ].includes( typeof obj )  ) return obj
         return [
             'object',
             {
@@ -718,6 +785,15 @@ var $;
         'margin-left': '13px'
     });
     class Stack extends Array {
+        // [ Symbol.toPrimitive ]() {
+        // 	return this.toString()
+        // }
+        match(...args) {
+            return this.toString().match(...args);
+        }
+        split(...args) {
+            return this.toString().split(...args);
+        }
         toString() {
             return this.join('\n');
         }
@@ -740,6 +816,7 @@ var $;
             this.method = call.getMethodName() ?? '';
             if (this.method === this.function)
                 this.method = '';
+            // const func = c.getFunction()
             this.pos = [call.getEnclosingLineNumber() ?? 0, call.getEnclosingColumnNumber() ?? 0];
             this.eval = call.getEvalOrigin() ?? '';
             this.source = call.getScriptNameOrSourceURL() ?? '';
@@ -786,9 +863,16 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Publisher that can auto collect other publishers. 32B
+     *
+     * 	P1 P2 P3 P4 S1 S2 S3
+     * 	^           ^
+     * 	pubs_from   subs_from
+     */
     class $mol_wire_pub_sub extends $mol_wire_pub {
-        pub_from = 0;
-        cursor = $mol_wire_cursor.stale;
+        pub_from = 0; // 4B
+        cursor = $mol_wire_cursor.stale; // 4B
         get temp() {
             return false;
         }
@@ -906,10 +990,27 @@ var $;
                 return;
             this.cursor = quant;
             this.emit($mol_wire_cursor.doubt);
+            // if( pos >= 0 && pos < this.sub_from - 2 ) {
+            // 	const pub = this.data[ pos ] as $mol_wire_pub
+            // 	if( pub instanceof $mol_wire_task ) return
+            // 	for(
+            // 		let cursor = this.pub_from;
+            // 		cursor < this.sub_from;
+            // 		cursor += 2
+            // 	) {
+            // 		const pub = this.data[ cursor ] as $mol_wire_pub
+            // 		if( pub instanceof $mol_wire_task ) {
+            // 			pub.destructor()
+            // 		}
+            // 	}
+            // }
         }
         [$mol_dev_format_head]() {
             return $mol_dev_format_native(this);
         }
+        /**
+         * Is subscribed to any publisher or not.
+         */
         get pub_empty() {
             return this.sub_from === this.pub_from;
         }
@@ -950,6 +1051,13 @@ var $;
 var $;
 (function ($) {
     const wrappers = new WeakMap();
+    /**
+     * Suspendable task with support both sync/async api.
+     *
+     * 	A1 A2 A3 A4 P1 P2 P3 P4 S1 S2 S3
+     * 	^           ^           ^
+     * 	args_from   pubs_from   subs_from
+     **/
     class $mol_wire_fiber extends $mol_wire_pub_sub {
         task;
         host;
@@ -970,6 +1078,7 @@ var $;
             });
         }
         static sync() {
+            // Sync whole fiber graph
             while (this.planning.size) {
                 for (const fiber of this.planning) {
                     this.planning.delete(fiber);
@@ -980,6 +1089,7 @@ var $;
                     fiber.fresh();
                 }
             }
+            // Collect garbage
             while (this.reaping.size) {
                 const fibers = this.reaping;
                 this.reaping = new Set;
@@ -1131,6 +1241,10 @@ var $;
             this.cursor = $mol_wire_cursor.stale;
             this.fresh();
         }
+        /**
+         * Synchronous execution. Throws Promise when waits async task (SuspenseAPI provider).
+         * Should be called inside SuspenseAPI consumer (ie fiber).
+         */
         sync() {
             if (!$mol_wire_fiber.warm) {
                 return this.result();
@@ -1145,6 +1259,10 @@ var $;
             }
             return this.cache;
         }
+        /**
+         * Asynchronous execution.
+         * It's SuspenseAPI consumer. So SuspenseAPI providers can be called inside.
+         */
         async async_raw() {
             while (true) {
                 this.fresh();
@@ -1157,6 +1275,7 @@ var $;
                 if (!$mol_promise_like(this.cache))
                     return this.cache;
                 if (this.cursor === $mol_wire_cursor.final) {
+                    // never ends on destructed fiber
                     await new Promise(() => { });
                 }
             }
@@ -1204,6 +1323,10 @@ var $;
 var $;
 (function ($) {
     $.$mol_compare_deep_cache = new WeakMap();
+    /**
+     * Deeply compares two values. Returns true if equal.
+     * Define `Symbol.toPrimitive` to customize.
+     */
     function $mol_compare_deep(left, right) {
         if (Object.is(left, right))
             return true;
@@ -1343,6 +1466,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Log begin of collapsed group only when some logged inside, returns func to close group */
     function $mol_log3_area_lazy(event) {
         const self = this.$;
         const stack = self.$mol_log3_stack;
@@ -1367,6 +1491,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Position in any resource. */
     class $mol_span extends $mol_object2 {
         uri;
         source;
@@ -1382,13 +1507,17 @@ var $;
             this.length = length;
             this[Symbol.toStringTag] = this.uri + ('#' + this.row + ':' + this.col + '/' + this.length);
         }
+        /** Span for begin of unknown resource */
         static unknown = $mol_span.begin('?');
+        /** Makes new span for begin of resource. */
         static begin(uri, source = '') {
             return new $mol_span(uri, source, 1, 1, 0);
         }
+        /** Makes new span for end of resource. */
         static end(uri, source) {
             return new $mol_span(uri, source, 1, source.length + 1, 0);
         }
+        /** Makes new span for entire resource. */
         static entire(uri, source) {
             return new $mol_span(uri, source, 1, 1, source.length);
         }
@@ -1403,15 +1532,19 @@ var $;
                 length: this.length
             };
         }
+        /** Makes new error for this span. */
         error(message, Class = Error) {
             return new Class(`${message} (${this})`);
         }
+        /** Makes new span for same uri. */
         span(row, col, length) {
             return new $mol_span(this.uri, this.source, row, col, length);
         }
+        /** Makes new span after end of this. */
         after(length = 0) {
             return new $mol_span(this.uri, this.source, this.row, this.col + this.length, length);
         }
+        /** Makes new span between begin and end. */
         slice(begin, end = -1) {
             let len = this.length;
             if (begin < 0)
@@ -1434,6 +1567,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Serializes tree to string in tree format. */
     function $mol_tree2_to_string(tree) {
         let output = [];
         function dump(tree, prefix = '') {
@@ -1477,12 +1611,25 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Abstract Syntax Tree with human readable serialization.
+     * Avoid direct instantiation. Use static factories instead.
+     * @see https://github.com/nin-jin/tree.d
+     */
     class $mol_tree2 extends Object {
         type;
         value;
         kids;
         span;
-        constructor(type, value, kids, span) {
+        constructor(
+        /** Type of structural node, `value` should be empty */
+        type, 
+        /** Content of data node, `type` should be empty */
+        value, 
+        /** Child nodes */
+        kids, 
+        /** Position in most far source resource */
+        span) {
             super();
             this.type = type;
             this.value = value;
@@ -1490,12 +1637,15 @@ var $;
             this.span = span;
             this[Symbol.toStringTag] = type || '\\' + value;
         }
+        /** Makes collection node. */
         static list(kids, span = $mol_span.unknown) {
             return new $mol_tree2('', '', kids, span);
         }
+        /** Makes new derived collection node. */
         list(kids) {
             return $mol_tree2.list(kids, this.span);
         }
+        /** Makes data node for any string. */
         static data(value, kids = [], span = $mol_span.unknown) {
             const chunks = value.split('\n');
             if (chunks.length > 1) {
@@ -1509,21 +1659,26 @@ var $;
             }
             return new $mol_tree2('', value, kids, span);
         }
+        /** Makes new derived data node. */
         data(value, kids = []) {
             return $mol_tree2.data(value, kids, this.span);
         }
+        /** Makes struct node. */
         static struct(type, kids = [], span = $mol_span.unknown) {
             if (/[ \n\t\\]/.test(type)) {
                 $$.$mol_fail(span.error(`Wrong type ${JSON.stringify(type)}`));
             }
             return new $mol_tree2(type, '', kids, span);
         }
+        /** Makes new derived structural node. */
         struct(type, kids = []) {
             return $mol_tree2.struct(type, kids, this.span);
         }
+        /** Makes new derived node with different kids id defined. */
         clone(kids, span = this.span) {
             return new $mol_tree2(this.type, this.value, kids, span);
         }
+        /** Returns multiline text content. */
         text() {
             var values = [];
             for (var kid of this.kids) {
@@ -1533,15 +1688,20 @@ var $;
             }
             return this.value + values.join('\n');
         }
+        /** Parses tree format. */
+        /** @deprecated Use $mol_tree2_from_string */
         static fromString(str, uri = 'unknown') {
             return $$.$mol_tree2_from_string(str, uri);
         }
+        /** Serializes to tree format. */
         toString() {
             return $$.$mol_tree2_to_string(this);
         }
+        /** Makes new tree with node overrided by path. */
         insert(value, ...path) {
             return this.update($mol_maybe(value), ...path)[0];
         }
+        /** Makes new tree with node overrided by path. */
         update(value, ...path) {
             if (path.length === 0)
                 return value;
@@ -1574,6 +1734,7 @@ var $;
                 return [this.clone(kids)];
             }
         }
+        /** Query nodes by path. */
         select(...path) {
             let next = [this];
             for (const type of path) {
@@ -1600,6 +1761,7 @@ var $;
             }
             return this.list(next);
         }
+        /** Filter kids by path or value. */
         filter(path, value) {
             const sub = this.kids.filter(item => {
                 var found = item.select(...path);
@@ -1627,9 +1789,11 @@ var $;
                 $mol_fail_hidden(error);
             }
         }
+        /** Transform tree through context with transformers */
         hack(belt, context = {}) {
             return [].concat(...this.kids.map(child => child.hack_self(belt, context)));
         }
+        /** Makes Error with node coordinates. */
         error(message, Class = Error) {
             return this.span.error(`${message}\n${this.clone([])}`, Class);
         }
@@ -1647,6 +1811,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Syntax error with cordinates and source line snippet. */
     class $mol_error_syntax extends SyntaxError {
         reason;
         line;
@@ -1665,6 +1830,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Parses tree format from string. */
     function $mol_tree2_from_string(str, uri = '?') {
         const span = $mol_span.entire(uri, str);
         var root = $mol_tree2.list([], span);
@@ -1674,6 +1840,7 @@ var $;
             var indent = 0;
             var line_start = pos;
             row++;
+            // read indent
             while (str.length > pos && str[pos] == '\t') {
                 indent++;
                 pos++;
@@ -1682,8 +1849,10 @@ var $;
                 min_indent = indent;
             }
             indent -= min_indent;
+            // invalid tab size
             if (indent < 0 || indent >= stack.length) {
                 const sp = span.span(row, 1, pos - line_start);
+                // skip error line
                 while (str.length > pos && str[pos] != '\n') {
                     pos++;
                 }
@@ -1698,7 +1867,9 @@ var $;
             }
             stack.length = indent + 1;
             var parent = stack[indent];
+            // parse types
             while (str.length > pos && str[pos] != '\\' && str[pos] != '\n') {
+                // type can not contain space and tab
                 var error_start = pos;
                 while (str.length > pos && (str[pos] == ' ' || str[pos] == '\t')) {
                     pos++;
@@ -1710,6 +1881,7 @@ var $;
                     const sp = span.span(row, error_start - line_start + 1, pos - error_start);
                     this.$mol_fail(new this.$mol_error_syntax(`Wrong nodes separator`, str.substring(line_start, line_end), sp));
                 }
+                // read type
                 var type_start = pos;
                 while (str.length > pos &&
                     str[pos] != '\\' &&
@@ -1724,10 +1896,12 @@ var $;
                     parent_kids.push(next);
                     parent = next;
                 }
+                // read one space if exists
                 if (str.length > pos && str[pos] == ' ') {
                     pos++;
                 }
             }
+            // read data
             if (str.length > pos && str[pos] == '\\') {
                 var data_start = pos;
                 while (str.length > pos && str[pos] != '\n') {
@@ -1738,6 +1912,7 @@ var $;
                 parent_kids.push(next);
                 parent = next;
             }
+            // now must be end of text
             if (str.length === pos && stack.length > 0) {
                 const sp = span.span(row, pos - line_start + 1, 1);
                 this.$mol_fail(new this.$mol_error_syntax(`Unexpected EOF, LF required`, str.substring(line_start, str.length), sp));
@@ -1830,6 +2005,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Module for working with terminal. Text coloring when output in terminal */
     class $mol_term_color {
         static reset = this.ansi(0, 0);
         static bold = this.ansi(1, 22);
@@ -1901,6 +2077,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** One-shot fiber */
     class $mol_wire_task extends $mol_wire_fiber {
         static getter(task) {
             return function $mol_wire_task_get(host, args) {
@@ -1926,6 +2103,7 @@ var $;
                 }
                 const key = (host?.[Symbol.toStringTag] ?? host) + ('.' + task.name + '<#>');
                 const next = new $mol_wire_task(key, task, host, args);
+                // Disabled because non-idempotency is required for try-catch
                 if (existen?.temp) {
                     $$.$mol_log3_warn({
                         place: '$mol_wire_task',
@@ -1958,7 +2136,7 @@ var $;
                     try {
                         next[Symbol.toStringTag] = this[Symbol.toStringTag];
                     }
-                    catch {
+                    catch { // Promises throw in strict mode
                         Object.defineProperty(next, Symbol.toStringTag, { value: this[Symbol.toStringTag] });
                     }
                 }
@@ -2011,6 +2189,10 @@ var $;
         props[field] = get_val;
         return get_val;
     }
+    /**
+     * Convert asynchronous (promise-based) API to synchronous by wrapping function and method calls in a fiber.
+     * @see https://mol.hyoo.ru/#!section=docs/=1fcpsq_1wh0h2
+     */
     function $mol_wire_sync(obj) {
         return new Proxy(obj, {
             get(obj, field) {
@@ -2252,6 +2434,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * CSS Units
+     * @see https://mol.hyoo.ru/#!section=docs/=xwq9q5_f966fg
+     */
     class $mol_style_unit extends $mol_decor {
         literal;
         constructor(value, literal) {
@@ -2298,6 +2484,10 @@ var $;
 var $;
 (function ($) {
     const { per } = $mol_style_unit;
+    /**
+     * CSS Functions
+     * @see https://mol.hyoo.ru/#!section=docs/=xwq9q5_f966fg
+     */
     class $mol_style_func extends $mol_decor {
         name;
         constructor(name, value) {
@@ -2392,6 +2582,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Create record of CSS variables. */
     function $mol_style_prop(prefix, keys) {
         const record = keys.reduce((rec, key) => {
             rec[key] = $mol_style_func.vary(`--${prefix}_${key}`);
@@ -2406,6 +2597,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Theme css variables
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_textarea_demo
+     */
     $.$mol_theme = $mol_style_prop('mol_theme', [
         'back',
         'hover',
@@ -2420,6 +2615,8 @@ var $;
         'field',
         'image',
         'spirit',
+        'hue',
+        'hue_spread',
     ]);
 })($ || ($ = {}));
 
@@ -2432,11 +2629,18 @@ var $;
 
 ;
 "use strict";
+// namespace $ {
+// 	$mol_style_attach( '$mol_theme_lights', `:root { --mol_theme_back: oklch( ${ $$.$mol_lights() ? 92 : 20 }% .01 var(--mol_theme_hue) ) }` )
+// }
 
 ;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Gap in CSS
+     * @see https://page.hyoo.ru/#!=msdb74_bm7nsq
+     */
     $.$mol_gap = $mol_style_prop('mol_gap', [
         'page',
         'block',
@@ -2526,6 +2730,12 @@ var $;
         createDocumentFragment: () => $mol_dom_context.document.createDocumentFragment(),
     };
     $.$mol_jsx_frag = '';
+    /**
+     * JSX adapter that makes DOM tree.
+     * Generates global unique ids for every DOM-element by components tree with ids.
+     * Ensures all local ids are unique.
+     * Can reuse an existing nodes by GUIDs when used inside [`mol_jsx_attach`](https://github.com/hyoo-ru/mam_mol/tree/master/jsx/attach).
+     */
     function $mol_jsx(Elem, props, ...childNodes) {
         const id = props && props.id || '';
         const guid = id ? $.$mol_jsx_prefix ? $.$mol_jsx_prefix + '/' + id : id : $.$mol_jsx_prefix;
@@ -2654,6 +2864,7 @@ var $;
 var $;
 (function ($) {
     const TypedArray = Object.getPrototypeOf(Uint8Array);
+    /** Returns string key for any value. */
     function $mol_key(value) {
         primitives: {
             if (typeof value === 'bigint')
@@ -2661,9 +2872,9 @@ var $;
             if (typeof value === 'symbol')
                 return `Symbol(${value.description})`;
             if (!value)
-                return JSON.stringify(value);
+                return JSON.stringify(value); // 0, null, ""
             if (typeof value !== 'object' && typeof value !== 'function')
-                return JSON.stringify(value);
+                return JSON.stringify(value); // boolean, number, string
         }
         caching: {
             let key = $mol_key_store.get(value);
@@ -2740,6 +2951,9 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Decorates method to fiber to ensure it is executed only once inside other fiber.
+     */
     function $mol_wire_method(host, field, descr) {
         if (!descr)
             descr = Reflect.getOwnPropertyDescriptor(host, field);
@@ -2772,6 +2986,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Long-living fiber. */
     class $mol_wire_atom extends $mol_wire_fiber {
         static solo(host, task) {
             const field = task.name + '()';
@@ -2822,7 +3037,11 @@ var $;
             }
             $mol_wire_atom.watching.add(this);
         }
+        /**
+         * Update atom value through another temp fiber.
+         */
         resync(args) {
+            // enforce pulling tasks abort
             for (let cursor = this.pub_from; cursor < this.sub_from; cursor += 2) {
                 const pub = this.data[cursor];
                 if (pub && pub instanceof $mol_wire_task) {
@@ -2883,7 +3102,7 @@ var $;
                     try {
                         next[Symbol.toStringTag] = this[Symbol.toStringTag];
                     }
-                    catch {
+                    catch { // Promises throw in strict mode
                         Object.defineProperty(next, Symbol.toStringTag, { value: this[Symbol.toStringTag] });
                     }
                 }
@@ -2911,6 +3130,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Decorates solo object channel to [mol_wire_atom](../atom/atom.ts). */
     function $mol_wire_solo(host, field, descr) {
         if (!descr)
             descr = Reflect.getOwnPropertyDescriptor(host, field);
@@ -2949,6 +3169,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Reactive memoizing multiplexed property decorator. */
     function $mol_wire_plex(host, field, descr) {
         if (!descr)
             descr = Reflect.getOwnPropertyDescriptor(host, field);
@@ -2987,7 +3208,25 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Reactive memoizing solo property decorator from [mol_wire](../wire/README.md)
+     * @example
+     * '@' $mol_mem
+     * name(next?: string) {
+     * 	return next ?? 'default'
+     * }
+     * @see https://mol.hyoo.ru/#!section=docs/=qxmh6t_sinbmb
+     */
     $.$mol_mem = $mol_wire_solo;
+    /**
+     * Reactive memoizing multiplexed property decorator [mol_wire](../wire/README.md)
+     * @example
+     * '@' $mol_mem_key
+     * name(id: number, next?: string) {
+     *  return next ?? 'default'
+     * }
+     * @see https://mol.hyoo.ru/#!section=docs/=qxmh6t_sinbmb
+     */
     $.$mol_mem_key = $mol_wire_plex;
 })($ || ($ = {}));
 
@@ -3084,10 +3323,10 @@ var $;
         static wrap(task) {
             const store = new WeakMap();
             const fun = function (next) {
-                if (next === undefined && store.has(this))
-                    return store.get(this);
+                if (next === undefined && store.has(this ?? fun))
+                    return store.get(this ?? fun);
                 const val = task.call(this, next) ?? next;
-                store.set(this, val);
+                store.set(this ?? fun, val);
                 return val;
             };
             Reflect.defineProperty(fun, 'name', { value: task.name + ' ' });
@@ -3111,6 +3350,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Run code without state changes */
     function $mol_wire_probe(task, def) {
         const warm = $mol_wire_fiber.warm;
         try {
@@ -3131,6 +3371,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Real-time refresh current atom.
+     * Don't use if possible. May reduce performance.
+     */
     function $mol_wire_watch() {
         const atom = $mol_wire_auto();
         if (atom instanceof $mol_wire_atom) {
@@ -3147,6 +3391,11 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Returns closure that returns constant value.
+     * @example
+     * const rnd = $mol_const( Math.random() )
+     */
     function $mol_const(value) {
         const getter = (() => value);
         getter['()'] = value;
@@ -3161,6 +3410,9 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Disable reaping of current subscriber
+     */
     function $mol_wire_solid() {
         let current = $mol_wire_auto();
         if (current.temp)
@@ -3264,6 +3516,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Convert a pseudo-synchronous (Suspense API) API to an explicit asynchronous one (for integrating with external systems). */
     function $mol_wire_async(obj) {
         let fiber;
         const temp = $mol_wire_task.getter(obj);
@@ -3300,11 +3553,12 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    $mol_style_attach("mol/view/view/view.css", "@view-transition {\n\tnavigation: auto;\n}\n\n[mol_view] {\n\ttransition-property: height, width, min-height, min-width, max-width, max-height, transform, scale, translate, rotate;\n\ttransition-duration: .2s;\n\ttransition-timing-function: ease-out;\n\t-webkit-appearance: none;\n\tbox-sizing: border-box;\n\tdisplay: flex;\n\tflex-shrink: 0;\n\tcontain: style;\n\tscrollbar-color: var(--mol_theme_line) transparent;\n\tscrollbar-width: thin;\n}\t\n\n[mol_view]::selection {\n\tbackground: var(--mol_theme_line);\n}\t\n\n[mol_view]::-webkit-scrollbar {\n\twidth: .25rem;\n\theight: .25rem;\n}\n\n[mol_view]::-webkit-scrollbar-corner {\n\tbackground-color: var(--mol_theme_line);\n}\n\n[mol_view]::-webkit-scrollbar-track {\n\tbackground-color: transparent;\n}\n\n[mol_view]::-webkit-scrollbar-thumb {\n\tbackground-color: var(--mol_theme_line);\n\tborder-radius: var(--mol_gap_round);\n}\n\n[mol_view] > * {\n\tword-break: inherit;\n}\n\n[mol_view_root] {\n\tmargin: 0;\n\tpadding: 0;\n\twidth: 100%;\n\theight: 100%;\n\tbox-sizing: border-box;\n\tfont-family: system-ui, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n\tfont-size: 1rem;\n\tline-height: 1.5rem;\n\t/* background: var(--mol_theme_back);\n\tcolor: var(--mol_theme_text); */\n\tcontain: unset; /** Fixes bg ignoring when applied to body on Chrome */\n\ttab-size: 4;\n\t/*overscroll-behavior: contain; /** Disable navigation gestures **/\n}\n\n@media print {\n\t[mol_view_root] {\n\t\theight: auto;\n\t}\n}\n[mol_view][mol_view_error]:not([mol_view_error=\"Promise\"], [mol_view_error=\"$mol_promise_blocker\"]) {\n\tbackground-image: repeating-linear-gradient(\n\t\t-45deg,\n\t\t#f92323,\n\t\t#f92323 .5rem,\n\t\t#ff3d3d .5rem,\n\t\t#ff3d3d 1.5rem\n\t);\n\tcolor: black;\n\talign-items: center;\n\tjustify-content: center;\n}\n\n@keyframes mol_view_wait {\n\tfrom {\n\t\topacity: .25;\n\t}\n\t20% {\n\t\topacity: .75;\n\t}\n\tto {\n\t\topacity: .25;\n\t}\n}\n\n:where([mol_view][mol_view_error=\"$mol_promise_blocker\"]),\n:where([mol_view][mol_view_error=\"Promise\"]) {\n\tbackground: var(--mol_theme_hover);\n}\n\n[mol_view][mol_view_error=\"Promise\"] {\n\tanimation: mol_view_wait 1s steps(20,end) infinite;\n}\n");
+    $mol_style_attach("mol/view/view/view.css", "@view-transition {\n\tnavigation: auto;\n}\n\n[mol_view] {\n\ttransition-property: height, width, min-height, min-width, max-width, max-height, transform, scale, translate, rotate;\n\ttransition-duration: .2s;\n\ttransition-timing-function: ease-out;\n\t-webkit-appearance: none;\n\tbox-sizing: border-box;\n\tdisplay: flex;\n\tflex-shrink: 0;\n\tcontain: style;\n\tscrollbar-color: var(--mol_theme_line) transparent;\n\tscrollbar-width: thin;\n\ttext-wrap-style: pretty;\n}\t\n\n[mol_view]::selection {\n\tbackground: var(--mol_theme_line);\n}\t\n\n[mol_view]::-webkit-scrollbar {\n\twidth: .25rem;\n\theight: .25rem;\n}\n\n[mol_view]::-webkit-scrollbar-corner {\n\tbackground-color: var(--mol_theme_line);\n}\n\n[mol_view]::-webkit-scrollbar-track {\n\tbackground-color: transparent;\n}\n\n[mol_view]::-webkit-scrollbar-thumb {\n\tbackground-color: var(--mol_theme_line);\n\tborder-radius: var(--mol_gap_round);\n}\n\n[mol_view] > * {\n\tword-break: inherit;\n}\n\n[mol_view_root] {\n\tmargin: 0;\n\tpadding: 0;\n\twidth: 100%;\n\theight: 100%;\n\tbox-sizing: border-box;\n\tfont-family: system-ui, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n\tfont-size: 1rem;\n\tline-height: 1.5rem;\n\t/* background: var(--mol_theme_back);\n\tcolor: var(--mol_theme_text); */\n\tcontain: unset; /** Fixes bg ignoring when applied to body on Chrome */\n\ttab-size: 4;\n\t/*overscroll-behavior: contain; /** Disable navigation gestures **/\n}\n\n@media print {\n\t[mol_view_root] {\n\t\theight: auto;\n\t}\n}\n[mol_view][mol_view_error]:not([mol_view_error=\"Promise\"], [mol_view_error=\"$mol_promise_blocker\"]) {\n\tbackground-image: repeating-linear-gradient(\n\t\t-45deg,\n\t\t#f92323,\n\t\t#f92323 .5rem,\n\t\t#ff3d3d .5rem,\n\t\t#ff3d3d 1.5rem\n\t);\n\tcolor: black;\n\talign-items: center;\n\tjustify-content: center;\n}\n\n@keyframes mol_view_wait {\n\tfrom {\n\t\topacity: .25;\n\t}\n\t20% {\n\t\topacity: .75;\n\t}\n\tto {\n\t\topacity: .25;\n\t}\n}\n\n:where([mol_view][mol_view_error=\"$mol_promise_blocker\"]),\n:where([mol_view][mol_view_error=\"Promise\"]) {\n\tbackground: var(--mol_theme_hover);\n}\n\n[mol_view][mol_view_error=\"Promise\"] {\n\tanimation: mol_view_wait 1s steps(20,end) infinite;\n}\n");
 })($ || ($ = {}));
 
 ;
 "use strict";
+/** @jsx $mol_jsx */
 var $;
 (function ($) {
     function $mol_view_visible_width() {
@@ -3319,6 +3573,11 @@ var $;
         return suffix;
     }
     $.$mol_view_state_key = $mol_view_state_key;
+    /**
+     * The base class for all visual components. It provides the infrastructure for reactive lazy rendering, handling exceptions.
+     * @see https://mol.hyoo.ru/#!section=docs/=vv2nig_s5zr0f
+     */
+    /// Reactive statefull lazy ViewModel
     class $mol_view extends $mol_object {
         static Root(id) {
             return new this;
@@ -3383,16 +3642,22 @@ var $;
         state_key(suffix = '') {
             return this.$.$mol_view_state_key(suffix);
         }
+        /// Name of element that created when element not found in DOM
         dom_name() {
             return $mol_dom_qname(this.constructor.toString()) || 'div';
         }
+        /// NameSpace of element that created when element not found in DOM
         dom_name_space() { return 'http://www.w3.org/1999/xhtml'; }
+        /// Raw child views
         sub() {
             return [];
         }
+        /// Visible sub views with defined ambient context
+        /// Render all by default
         sub_visible() {
             return this.sub();
         }
+        /// Minimal width that used for lazy rendering
         minimal_width() {
             let min = 0;
             try {
@@ -3414,6 +3679,7 @@ var $;
         maximal_width() {
             return this.minimal_width();
         }
+        /// Minimal height that used for lazy rendering
         minimal_height() {
             let min = 0;
             try {
@@ -3433,11 +3699,11 @@ var $;
         view_rect() {
             if ($mol_wire_probe(() => this.view_rect()) === undefined) {
                 $mol_wire_watch();
-                return null;
+                return null; // don't touch DOM to prevent instant reflow
             }
             else {
                 const { width, height, left, right, top, bottom } = this.dom_node().getBoundingClientRect();
-                return { width, height, left, right, top, bottom };
+                return { width, height, left, right, top, bottom }; // pick to optimize compare
             }
         }
         dom_id() {
@@ -3627,6 +3893,7 @@ var $;
         [$mol_dev_format_head]() {
             return $mol_dev_format_span({}, $mol_dev_format_native(this));
         }
+        /** Deep search view by predicate. */
         *view_find(check, path = []) {
             if (path.length === 0 && check(this))
                 return yield [this];
@@ -3655,6 +3922,7 @@ var $;
                 $mol_fail_log(error);
             }
         }
+        /** Renders path of views to DOM. */
         force_render(path) {
             const kids = this.sub();
             const index = kids.findIndex(item => {
@@ -3669,6 +3937,7 @@ var $;
                 kids[index].force_render(path);
             }
         }
+        /** Renders view to DOM and scroll to it. */
         ensure_visible(view, align = "start") {
             const path = this.view_find(v => v === view).next().value;
             this.force_render(new Set(path));
@@ -3683,6 +3952,9 @@ var $;
             const win = this.$.$mol_dom_context;
             if (win.parent !== win.self && !win.document.hasFocus())
                 return;
+            // new this.$.$mol_after_frame( ()=> {
+            // 	this.dom_node().scrollIntoView({ block: 'start', inline: 'nearest' })
+            // } )
             new this.$.$mol_after_timeout(0, () => {
                 this.focused(true);
             });
@@ -3772,12 +4044,16 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Mixin view logic to DOM node of another component.
+         */
         class $mol_ghost extends $.$mol_ghost {
             dom_node_external(next) {
                 return this.Sub().dom_node(next);
@@ -3847,12 +4123,16 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Marker on top of another component with tracking of its position.
+         */
         class $mol_follower extends $.$mol_follower {
             pos() {
                 const self_rect = this.view_rect();
@@ -3989,6 +4269,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Z-index values for layers
+     * https://page.hyoo.ru/#!=xthcpx_wqmiba
+     */
     $.$mol_layer = $mol_style_prop('mol_layer', [
         'hover',
         'focus',
@@ -4173,7 +4457,7 @@ var $;
                         }
                     }
                 }
-                else if (key === '@media') {
+                else if (key === '@media' || key === '@container') {
                     const media = config[key];
                     for (let query of Object.keys(media).reverse()) {
                         rules.push('}\n');
@@ -4212,6 +4496,11 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * CSS in TS.
+     * Statically typed CSS style sheets. Following samples show which CSS code are generated from TS code.
+     * @see https://mol.hyoo.ru/#!section=docs/=xwq9q5_f966fg
+     */
     function $mol_style_define(Component, config) {
         return $mol_style_attach(Component.name, $mol_style_sheet(Component, config));
     }
@@ -4221,12 +4510,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Scrolling pane.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_scroll_demo
+         */
         class $mol_scroll extends $.$mol_scroll {
             scroll_top(next, cache) {
                 const el = this.dom_node();
@@ -4276,6 +4570,7 @@ var $;
                 direction: 'column',
                 grow: 1,
                 shrink: 1,
+                // basis: 0,
             },
             outline: 'none',
             align: {
@@ -4293,6 +4588,7 @@ var $;
             contain: 'content',
             '>': {
                 $mol_view: {
+                    // transform: 'translateZ(0)', // enforce gpu scroll in all agents
                     gridArea: '1/1',
                 },
             },
@@ -4323,12 +4619,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * `Bubble` that can be shown anchored to `Anchor` element.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_pop_demo
+         */
         class $mol_pop extends $.$mol_pop {
             showed(next = false) {
                 this.focused();
@@ -4469,6 +4770,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** State of time moment */
     class $mol_state_time extends $mol_object {
         static task(precision, reset) {
             if (precision) {
@@ -4495,12 +4797,14 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /** Base SVG component to display SVG images or icons. */
         class $mol_svg extends $.$mol_svg {
             computed_style() {
                 const win = this.$.$mol_dom_context;
@@ -4560,6 +4864,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_svg_path) = class $mol_svg_path extends ($.$mol_svg) {
 		geometry(){
@@ -4576,6 +4881,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_icon) = class $mol_icon extends ($.$mol_svg_root) {
@@ -4613,6 +4919,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_comment) = class $mol_icon_comment extends ($.$mol_icon) {
 		path(){
@@ -4624,6 +4931,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_comment_outline) = class $mol_icon_comment_outline extends ($.$mol_icon) {
 		path(){
@@ -4634,6 +4942,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_speck) = class $mol_speck extends ($.$mol_view) {
@@ -4658,6 +4967,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_button) = class $mol_button extends ($.$mol_view) {
@@ -4748,6 +5058,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+    * Key names code for hotkey
+    * @see [mol_hotkey](../../hotkey/hotkey.view.ts)
+    */
     let $mol_keyboard_code;
     (function ($mol_keyboard_code) {
         $mol_keyboard_code[$mol_keyboard_code["backspace"] = 8] = "backspace";
@@ -4856,12 +5170,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Simple button.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_button_demo
+         */
         class $mol_button extends $.$mol_button {
             disabled() {
                 return !this.enabled();
@@ -4877,6 +5196,7 @@ var $;
                     this.status([null]);
                 }
                 catch (error) {
+                    // Calling actions from catch section, if throwing promise breaks idempotency
                     Promise.resolve().then(() => this.status([error]));
                     $mol_fail_hidden(error);
                 }
@@ -4946,6 +5266,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_button_minor) = class $mol_button_minor extends ($.$mol_button_typed) {};
 
@@ -4959,6 +5280,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_paragraph) = class $mol_paragraph extends ($.$mol_view) {
@@ -4982,6 +5304,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -5180,6 +5503,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Decorates method to fiber to ensure it is executed only once inside other fiber from [mol_wire](../wire/README.md)
+     * @see https://mol.hyoo.ru/#!section=docs/=1fcpsq_1wh0h2
+     */
     $.$mol_action = $mol_wire_method;
 })($ || ($ = {}));
 
@@ -5256,7 +5583,8 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    let buf = new Uint8Array(2 ** 12);
+    let buf = new Uint8Array(2 ** 12); // 4KB Mem Page
+    /** Temporary buffer. Recursive usage isn't supported. */
     function $mol_charset_buffer(size) {
         if (buf.byteLength < size)
             buf = new Uint8Array(size);
@@ -5278,19 +5606,19 @@ var $;
         let pos = from;
         for (let i = 0; i < str.length; i++) {
             let code = str.charCodeAt(i);
-            if (code < 0x80) {
+            if (code < 0x80) { // ASCII - 1 octet
                 buf[pos++] = code;
             }
-            else if (code < 0x800) {
+            else if (code < 0x800) { // 2 octet
                 buf[pos++] = 0xc0 | (code >> 6);
                 buf[pos++] = 0x80 | (code & 0x3f);
             }
-            else if (code < 0xd800 || code >= 0xe000) {
+            else if (code < 0xd800 || code >= 0xe000) { // 3 octet
                 buf[pos++] = 0xe0 | (code >> 12);
                 buf[pos++] = 0x80 | ((code >> 6) & 0x3f);
                 buf[pos++] = 0x80 | (code & 0x3f);
             }
-            else {
+            else { // surrogate pair
                 const point = ((code - 0xd800) << 10) + str.charCodeAt(++i) + 0x2400;
                 buf[pos++] = 0xf0 | (point >> 18);
                 buf[pos++] = 0x80 | ((point >> 12) & 0x3f);
@@ -5354,12 +5682,16 @@ var $;
 (function ($) {
     let file_modes;
     (function (file_modes) {
+        /** create if it doesn't already exist */
         file_modes[file_modes["create"] = $node.fs.constants.O_CREAT] = "create";
+        /** truncate to zero size if it already exists */
         file_modes[file_modes["exists_truncate"] = $node.fs.constants.O_TRUNC] = "exists_truncate";
+        /** throw exception if it already exists */
         file_modes[file_modes["exists_fail"] = $node.fs.constants.O_EXCL] = "exists_fail";
         file_modes[file_modes["read_only"] = $node.fs.constants.O_RDONLY] = "read_only";
         file_modes[file_modes["write_only"] = $node.fs.constants.O_WRONLY] = "write_only";
         file_modes[file_modes["read_write"] = $node.fs.constants.O_RDWR] = "read_write";
+        /** data will be appended to the end */
         file_modes[file_modes["append"] = $node.fs.constants.O_APPEND] = "append";
     })(file_modes || (file_modes = {}));
     function mode_mask(modes) {
@@ -5424,12 +5756,24 @@ var $;
         root() {
             const path = this.path();
             const base = this.constructor.base;
+            // Если путь выше или равен base или если parent такойже как и this - считаем это корнем
             return base.startsWith(path) || this == this.parent();
         }
         stat(next, virt) {
             const path = this.path();
             const parent = this.parent();
+            // Отслеживать проверку наличия родительской папки не стоит до корня диска
+            // Лучше ограничить mam-ом
             if (!this.root()) {
+                /*
+                Если parent папка удалилась, надо ресетнуть все объекты в ней на любой глубине.
+                Например, rm -rf с последующим git pull: parent папка может удалиться, потом создасться,
+                а текущая папка успеет только удалиться до момента выполнения stat.
+                Поэтому parent.exists() не запустит перевычисления, нужна именно parent.version()
+
+                Однако, parent.version() меняется не только при удалении, будет ложное срабатывание
+                С этим придется мириться, красивого решения пока нет.
+                */
                 parent.version();
             }
             parent.watcher();
@@ -5443,9 +5787,19 @@ var $;
             if (/([\/\\]\.|___$)/.test(path))
                 return;
             const file = this.relative(path.at(-1) === '/' ? path.slice(0, -1) : path);
+            // console.log(type, path)
+            // add (change): добавился файл - у parent надо обновить список sub, если он был заюзан
+            // change, unlink (rename): обновился или удалился файл - ресетим
+            // addDir (change), добавилась папка, у parent обновляем список директорий в sub
+            // дочерние ресетим
+            // unlinkDir (rename), удалилась папка, ресетим ее
+            // stat у всех дочерних обновится сам, т.к. связан с parent.version()
             this.changed.add(file);
             if (!this.watching)
                 return;
+            // throttle, пока события поступают не сбрасываем.
+            // аналог awaitWriteFinish из chokidar
+            // интервалы между change-сообщениями модифицируемого файла должны быть меньше watch_debounce
             this.frame?.destructor();
             this.frame = new this.$.$mol_after_timeout(this.watch_debounce(), () => {
                 if (!this.watching)
@@ -5454,8 +5808,16 @@ var $;
                 $mol_wire_async(this).flush();
             });
         }
+        /**
+         * Должно быть больше, чем время между событиями от вотчера при записи внешним процессом.
+         * Иначе запуск ресетов паралельно с изменением может привести к неконсистентности.
+         */
         static watch_debounce() { return 500; }
         static flush() {
+            // Пока flush работает, вотчер сюда не заходит, но может добавлять новые изменения
+            // на каждом перезапуске они применятся
+            // Пока run выполняется, изменения накапливаются, в конце run вызывается flush
+            // Пока применяются изменения, run должен ожидать конца flush
             for (const file of this.changed) {
                 const parent = file.parent();
                 try {
@@ -5470,16 +5832,32 @@ var $;
             }
             this.changed.clear();
             this.watching = true;
+            // this.watch_wd?.destructor()
+            // this.watch_wd = null
         }
         static watching = true;
         static lock = new $mol_lock;
         static watch_off(path) {
             this.watching = false;
+            // run должен ожидать конца flush
             this.flush();
             this.watching = false;
+            /*
+            watch запаздывает и событие может прилететь через 3 сек после окончания сайд эффекта
+            поэтому добавляем папку, которую меняет side_effect
+            Когда дойдет до выполнения flush, он ресетнет ее
+            
+            Иначе будут лишние срабатывания
+            Например, удалили hyoo/board, watch ресетит и exists начинает отдавать false, срабатывает git clone
+            Сразу после него событие addDir еще не успело прийти,
+            на следующем перезапуске вызывается git pull, т.к.
+            с точки зрения реактивной системы hyoo/board еще не существует.
+            */
             this.changed.add(this.absolute(path));
         }
+        // protected static watch_wd = null as null | $mol_after_timeout
         static unwatched(side_effect, affected_dir) {
+            // ждем, пока выполнится предыдущий unwatched
             const unlock = this.lock.grab();
             this.watch_off(affected_dir);
             try {
@@ -5502,6 +5880,7 @@ var $;
         modified() { return this.stat()?.mtime ?? null; }
         version() {
             const next = this.stat()?.mtime.getTime().toString(36).toUpperCase() ?? '';
+            // console.log('version', next, this.path())
             return next;
         }
         info(path) { return null; }
@@ -5519,15 +5898,19 @@ var $;
         writable(opts) {
             return new WritableStream;
         }
+        // open( ... modes: readonly $mol_file_mode[] ) { return 0 }
         buffer(next) {
+            // Если версия пустая - возвращаем пустой буфер
             let readed = new Uint8Array();
             if (next === undefined) {
+                // Если меняется версия файла, буфер надо перечитать
                 if (this.version())
                     readed = this.read();
             }
             const prev = $mol_mem_cached(() => this.buffer());
             const changed = prev === undefined || !$mol_compare_array(prev, next ?? readed);
             if (prev !== undefined && changed) {
+                // Логируем, если повторно читаем/пишем и буфер поменялся
                 this.$.$mol_log3_rise({
                     place: `$mol_file_node.buffer()`,
                     message: 'Changed',
@@ -5536,6 +5919,11 @@ var $;
             }
             if (next === undefined)
                 return changed ? readed : prev;
+            // Если буфер при записи не поменялся и файл не удаляли перед этим - не записываем новую версию.
+            // Если записывать, это приведет к смене mtime и вотчер снова триггернется, даже если содержимое файла не поменялось.
+            // В этом алгоритме есть изъян.
+            // Если файл записали, потом отключили вотчер, кто-то из вне его поменял, потом включили вотчер, снова записали тот же буфер,
+            // то буфер не запишется на диск, т.к. кэш не консистентен с диском.
             if (!changed && this.exists())
                 return prev;
             this.parent().exists(true);
@@ -5571,13 +5959,21 @@ var $;
             }
             return null;
         }
+        // static watch_root = ''
+        // static watcher_warned = false
         watcher() {
+            // const constructor = this.constructor as typeof $mol_file_base
+            // if (! constructor.watcher_warned) {
+            // 	console.warn(`${constructor}.watcher() not implemented`)
+            // 	constructor.watcher_warned = true
+            // }
             return {
                 destructor() { }
             };
         }
         exists(next) {
             const exists = Boolean(this.stat());
+            // console.log('exists current', exists, 'next', next, this.path())
             if (next === undefined)
                 return exists;
             if (next === exists)
@@ -5603,6 +5999,10 @@ var $;
             return match ? match[1].substring(1) : '';
         }
         text(next, virt) {
+            // Если записываем text, и вотчер ресетнул записанный файл,
+            // то надо снова его обновить, вызвать логику, которая делала пуш в text.
+            // Например файл удалили, потом снова создали, версия поменялась - перезаписываем
+            // Если использовать version, то вновь созданный файл, через вотчер запустит свое пересоздание
             if (next !== undefined)
                 this.exists();
             return this.text_int(next, virt);
@@ -5627,6 +6027,7 @@ var $;
             if (this.type() !== 'dir')
                 return [];
             this.version();
+            // Если дочерний file удалился, список надо обновить
             return this.kids().filter(file => file.exists());
         }
         resolve(path) {
@@ -5771,10 +6172,15 @@ var $;
         watcher(reset) {
             const path = this.path();
             const root = this.root();
+            // Если папки/файла нет, watch упадет с ошибкой
+            // exists обратится к parent.version и parent.watcher
+            // Поэтому у root-папки и выше не надо вызывать exists, иначе поднимется выше base до корня диска
+            // exists вызывать надо, что б пересоздавать вотчер при появлении папки или файла
             if (!root && !this.exists())
                 return super.watcher();
             let watcher;
             try {
+                // Между exists и watch файл может удалиться, в любом случае надо обрабатывать ENOENT
                 watcher = $node.fs.watch(path);
             }
             catch (error) {
@@ -5784,6 +6190,8 @@ var $;
                 if (root || error.code !== 'ENOENT') {
                     this.$.$mol_fail_log(error);
                 }
+                // Если файла нет - вотчер не создается, создастся потом, когда exists поменяется на true.
+                // Если создание упало с другой ошибкой - не ломаем работу mol_file, деградируем до не реактивной fs.
                 return super.watcher();
             }
             watcher.on('change', (type, name) => {
@@ -5795,6 +6203,7 @@ var $;
             watcher.on('error', e => this.$.$mol_fail_log(e));
             let destructed = false;
             watcher.on('close', () => {
+                // Если в процессе работы вотчер сам закрылся, надо его переоткрыть
                 if (!destructed)
                     setTimeout(() => $mol_wire_async(this).watcher(null), 500);
             });
@@ -5976,6 +6385,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Localisation in $mol framework
+     * @see https://mol.hyoo.ru/#!section=docs/=s5aqnb_odub8l
+     */
     class $mol_locale extends $mol_object {
         static lang_default() {
             return 'en';
@@ -6049,6 +6462,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_list) = class $mol_list extends ($.$mol_view) {
 		gap_before(){
@@ -6121,12 +6535,18 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * The list of rows with lazy/virtual rendering support based on `minimal_height` of rows.
+         * `mol_list` should contain only components that inherits `mol_view`. You should not place raw strings or numbers in list.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_list_demo
+         */
         class $mol_list extends $.$mol_list {
             sub() {
                 const rows = this.rows();
@@ -6143,6 +6563,7 @@ var $;
             render_visible_only() {
                 return this.$.$mol_support_css_overflow_anchor();
             }
+            _view_window_last = [0, 0];
             view_window(next) {
                 const kids = this.sub();
                 if (kids.length < 3)
@@ -6152,7 +6573,7 @@ var $;
                 const rect = this.view_rect();
                 if (next)
                     return next;
-                let [min, max] = $mol_mem_cached(() => this.view_window()) ?? [0, 0];
+                let [min, max] = $mol_mem_cached(() => this.view_window()) ?? this._view_window_last;
                 const shift = this.view_window_shift();
                 this.view_window_shift(0);
                 min += shift;
@@ -6168,9 +6589,11 @@ var $;
                 const gap_after = $mol_mem_cached(() => this.gap_after()) ?? 0;
                 let top = Math.ceil(rect?.top ?? 0) + gap_before;
                 let bottom = Math.ceil(rect?.bottom ?? 0) - gap_after;
+                // change nothing when already covers all limits
                 if (top <= limit_top && bottom >= limit_bottom) {
                     return [min2, max2];
                 }
+                // jumps when fully over limits
                 if (anchoring && ((bottom < limit_top) || (top > limit_bottom))) {
                     min = 0;
                     top = Math.ceil(rect?.top ?? 0);
@@ -6187,18 +6610,22 @@ var $;
                 }
                 let top2 = top;
                 let bottom2 = bottom;
+                // force recalc min when overlapse top limit
                 if (anchoring && (top < limit_top) && (bottom < limit_bottom) && (max < kids.length)) {
                     min2 = max;
                     top2 = bottom;
                 }
+                // force recalc max when overlapse bottom limit
                 if ((bottom > limit_bottom) && (top > limit_top) && (min > 0)) {
                     max2 = min;
                     bottom2 = top;
                 }
+                // extend min to cover top limit
                 while (anchoring && ((top2 > limit_top) && (min2 > 0))) {
                     --min2;
                     top2 -= this.item_height_min(min2);
                 }
+                // extend max to cover bottom limit
                 while (bottom2 < limit_bottom && max2 < kids.length) {
                     bottom2 += this.item_height_min(max2);
                     ++max2;
@@ -6241,7 +6668,7 @@ var $;
             sub_visible() {
                 return [
                     ...this.gap_before() ? [this.Gap_before()] : [],
-                    ...this.sub().slice(...this.view_window()),
+                    ...this.sub().slice(...this._view_window_last = this.view_window()),
                     ...this.gap_after() ? [this.Gap_after()] : [],
                 ];
             }
@@ -6317,10 +6744,12 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
+    /** Creates lexer by dictionary of lexems. Lexem that started first wins. Then lexem that declared earlier wins. Use regexp capture to take parts of token. */
     class $mol_syntax2 {
         lexems;
         constructor(lexems) {
@@ -6419,8 +6848,10 @@ var $;
 var $;
 (function ($) {
     let x = /x/[Symbol.matchAll];
+    /** Type safe reguar expression builder */
     class $mol_regexp extends RegExp {
         groups;
+        /** Prefer to use $mol_regexp.from */
         constructor(source, flags = 'gsu', groups = []) {
             super(source, flags);
             this.groups = groups;
@@ -6440,12 +6871,14 @@ var $;
                 this.lastIndex = index;
             }
         }
+        /** Parses input and returns found capture groups or null */
         [Symbol.match](str) {
             const res = [...this[Symbol.matchAll](str)].filter(r => r.groups).map(r => r[0]);
             if (!res.length)
                 return null;
             return res;
         }
+        /** Splits string by regexp edges */
         [Symbol.split](str) {
             const res = [];
             let token_last = null;
@@ -6500,12 +6933,14 @@ var $;
         get native() {
             return new RegExp(this.source, this.flags);
         }
+        /** Makes regexp that greedy repeats this pattern with delimiter */
         static separated(chunk, sep) {
             return $mol_regexp.from([
                 $mol_regexp.repeat_greedy([[chunk], sep], 0),
                 chunk,
             ]);
         }
+        /** Makes regexp that non-greedy repeats this pattern from min to max count */
         static repeat(source, min = 0, max = Number.POSITIVE_INFINITY) {
             const regexp = $mol_regexp.from(source);
             const upper = Number.isFinite(max) ? max : '';
@@ -6521,6 +6956,7 @@ var $;
             };
             return regexp2;
         }
+        /** Makes regexp that greedy repeats this pattern from min to max count */
         static repeat_greedy(source, min = 0, max = Number.POSITIVE_INFINITY) {
             const regexp = $mol_regexp.from(source);
             const upper = Number.isFinite(max) ? max : '';
@@ -6536,6 +6972,7 @@ var $;
             };
             return regexp2;
         }
+        /** Makes regexp that match any of options */
         static vary(sources, flags = 'gsu') {
             const groups = [];
             const chunks = sources.map(source => {
@@ -6545,17 +6982,21 @@ var $;
             });
             return new $mol_regexp(`(?:${chunks.join('|')})`, flags, groups);
         }
+        /** Makes regexp that allow absent of this pattern */
         static optional(source) {
             return $mol_regexp.repeat_greedy(source, 0, 1);
         }
+        /** Makes regexp that look ahead for pattern */
         static force_after(source) {
             const regexp = $mol_regexp.from(source);
             return new $mol_regexp(`(?=${regexp.source})`, regexp.flags, regexp.groups);
         }
+        /** Makes regexp that look ahead for pattern */
         static forbid_after(source) {
             const regexp = $mol_regexp.from(source);
             return new $mol_regexp(`(?!${regexp.source})`, regexp.flags, regexp.groups);
         }
+        /** Converts some js values to regexp */
         static from(source, { ignoreCase, multiline } = {
             ignoreCase: false,
             multiline: false,
@@ -6656,9 +7097,11 @@ var $;
                 return regexp;
             }
         }
+        /** Makes regexp which includes only unicode category */
         static unicode_only(...category) {
             return new $mol_regexp(`\\p{${category.join('=')}}`);
         }
+        /** Makes regexp which excludes unicode category */
         static unicode_except(...category) {
             return new $mol_regexp(`\\P{${category.join('=')}}`);
         }
@@ -6699,12 +7142,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Output text with dimmed mismatched substrings.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_dimmer_demo
+         */
         class $mol_dimmer extends $.$mol_dimmer {
             parts() {
                 const needle = this.needle();
@@ -6781,6 +7229,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -6908,7 +7357,7 @@ var $;
         'spoiler': /^((?:(?:[\?] )(?:[^]*?)$(\r?\n?))+)([\n\r]*)/,
         'header': /^([#=]+)(\s+)(.*?)$([\n\r]*)/,
         'list': /^((?:(?: ?([*+-])|(?:\d+[\.\)])+) +(?:[^]*?)$(?:\r?\n?)(?:  (?:[^]*?)$(?:\r?\n?))*)+)((?:\r?\n)*)/,
-        'code': /^(```\s*)([\w.-]*)[\r\n]+([^]*?)^(```)$([\n\r]*)/,
+        'code': /^(```)([\w.-]*)[\r\n]+([^]*?)^(```)$([\n\r]*)/,
         'code-indent': /^((?:(?: |\t)(?:[^]*?)$\r?\n?)+)([\n\r]*)/,
         'table': /((?:^\|.+?$\r?\n?)+)([\n\r]*)/,
         'grid': /((?:^ *! .*?$\r?\n?)+)([\n\r]*)/,
@@ -6921,6 +7370,8 @@ var $;
         'code': /```(.+?)```|;;(.+?);;|`(.+?)`/,
         'insert': /\+\+(.+?)\+\+/,
         'delete': /~~(.+?)~~|--(.+?)--/,
+        // 'remark' : /(\()(.+?)(\))/ ,
+        // 'quote' : /(")(.+?)(")/ ,
         'embed': /""(?:(.*?)\\)?(.*?)""/,
         'link': /\\\\(?:(.*?)\\)?(.*?)\\\\/,
         'image-link': /!\[([^\[\]]*?)\]\((.*?)\)/,
@@ -6950,6 +7401,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -6966,6 +7418,7 @@ var $;
             tokens(path) {
                 const tokens = [];
                 const text = (path.length > 0)
+                    // @FIXME: this logic compatible only with `string`
                     ? this.tokens(path.slice(0, path.length - 1))[path[path.length - 1]].found.slice(1, -1)
                     : this.text();
                 this.syntax().tokenize(text, (name, found, chunks) => {
@@ -7112,6 +7565,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_clipboard_outline) = class $mol_icon_clipboard_outline extends ($.$mol_icon) {
 		path(){
@@ -7122,6 +7576,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_button_copy) = class $mol_button_copy extends ($.$mol_button_minor) {
@@ -7182,12 +7637,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Button copy text() value to clipboard
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_button_demo
+         */
         class $mol_button_copy extends $.$mol_button_copy {
             data() {
                 return Object.fromEntries(this.blobs().map(blob => [blob.type, blob]));
@@ -7302,12 +7762,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Code visualizer.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_text_code_demo
+         */
         class $mol_text_code extends $.$mol_text_code {
             render_visible_only() {
                 return this.$.$mol_support_css_overflow_anchor();
@@ -7432,6 +7897,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Plugin is component without its own DOM element, but instead uses the owner DOM element */
     class $mol_plugin extends $mol_view {
         dom_node_external(next) {
             return next ?? $mol_owning_get(this).host.dom_node();
@@ -7471,12 +7937,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Plugin which adds handlers for keyboard keys.
+         * @see [mol_keyboard_code](../keyboard/code/code.ts)
+         */
         class $mol_hotkey extends $.$mol_hotkey {
             key() {
                 return super.key();
@@ -7626,12 +8097,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * An input field for entering single line text.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_string_demo
+         */
         class $mol_string extends $.$mol_string {
             event_change(next) {
                 if (!next)
@@ -7898,12 +8374,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * An input field for entering multiline text.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_textarea_demo
+         */
         class $mol_textarea extends $.$mol_textarea {
             indent_inc() {
                 let text = this.value();
@@ -8017,6 +8498,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * 48-bit streamable array hash function
+     * Based on cyrb53: https://stackoverflow.com/a/52171480
+     */
     function $mol_hash_numbers(buff, seed = 0) {
         let h1 = 0xdeadbeef ^ seed;
         let h2 = 0x41c6ce57 ^ seed;
@@ -8036,6 +8521,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * 48-bit streamable string hash function
+     * Based on cyrb53: https://stackoverflow.com/a/52171480
+     */
     function $mol_hash_string(str, seed = 0) {
         let nums = new Array(str.length);
         for (let i = 0; i < str.length; ++i)
@@ -8048,12 +8537,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Avatar uniquely-generated by id string
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_avatar_demo
+         */
         class $mol_avatar extends $.$mol_avatar {
             path() {
                 const id = $mol_hash_string(this.id());
@@ -8184,11 +8678,17 @@ var $;
 (function ($) {
     let $giper_baza_slot_kind;
     (function ($giper_baza_slot_kind) {
+        /** Free Unit Slot */
         $giper_baza_slot_kind[$giper_baza_slot_kind["free"] = 0] = "free";
+        /** Land header for the following parts. */
         $giper_baza_slot_kind[$giper_baza_slot_kind["land"] = 76] = "land";
+        /** Unit of data. */
         $giper_baza_slot_kind[$giper_baza_slot_kind["sand"] = 252] = "sand";
+        /** Rights/Keys sharing. */
         $giper_baza_slot_kind[$giper_baza_slot_kind["gift"] = 253] = "gift";
+        /** Sign for hash list. */
         $giper_baza_slot_kind[$giper_baza_slot_kind["seal"] = 254] = "seal";
+        /** Public key. */
         $giper_baza_slot_kind[$giper_baza_slot_kind["pass"] = 255] = "pass";
     })($giper_baza_slot_kind = $.$giper_baza_slot_kind || ($.$giper_baza_slot_kind = {}));
 })($ || ($ = {}));
@@ -8234,6 +8734,7 @@ var $;
 var $;
 (function ($) {
     function $mol_base64_decode_node(base64Str) {
+        // without Uint8Array breaks $mol_compare_deep
         const buffer = Buffer.from(base64Str, 'base64');
         return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
     }
@@ -8293,6 +8794,7 @@ var $;
                 this.setUint16(offset + 4, (value / 2 ** 32) | 0, LE);
             }
         }
+        /** 1-byte signed integer channel for offset. */
         int8(offset, next) {
             if (next === undefined)
                 return this.getInt8(offset);
@@ -8300,6 +8802,7 @@ var $;
                 return this.setInt8(offset, next), next;
             $mol_fail(new Error(`Wrong int8 value ${next}`));
         }
+        /** 1-byte unsigned integer channel for offset. */
         uint8(offset, next) {
             if (next === undefined)
                 return this.getUint8(offset);
@@ -8307,6 +8810,7 @@ var $;
                 return this.setUint8(offset, next), next;
             $mol_fail(new Error(`Wrong uint8 value ${next}`));
         }
+        /** 2-byte signed integer little-endian channel for offset. */
         int16(offset, next) {
             if (next === undefined)
                 return this.getInt16(offset, true);
@@ -8314,6 +8818,7 @@ var $;
                 return this.setInt16(offset, next, true), next;
             $mol_fail(new Error(`Wrong int16 value ${next}`));
         }
+        /** 2-byte unsigned integer little-endian channel for offset. */
         uint16(offset, next) {
             if (next === undefined)
                 return this.getUint16(offset, true);
@@ -8321,6 +8826,7 @@ var $;
                 return this.setUint16(offset, next, true), next;
             $mol_fail(new Error(`Wrong uint16 value ${next}`));
         }
+        /** 4-byte signed integer little-endian channel for offset. */
         int32(offset, next) {
             if (next === undefined)
                 return this.getInt32(offset, true);
@@ -8328,6 +8834,7 @@ var $;
                 return this.setInt32(offset, next, true), next;
             $mol_fail(new Error(`Wrong int32 value ${next}`));
         }
+        /** 4-byte unsigned integer little-endian channel for offset. */
         uint32(offset, next) {
             if (next === undefined)
                 return this.getUint32(offset, true);
@@ -8335,6 +8842,7 @@ var $;
                 return this.setUint32(offset, next, true), next;
             $mol_fail(new Error(`Wrong uint32 value ${next}`));
         }
+        /** 8-byte signed integer little-endian channel for offset. */
         int64(offset, next) {
             if (next === undefined)
                 return this.getBigInt64(offset, true);
@@ -8342,6 +8850,7 @@ var $;
                 return this.setBigInt64(offset, next, true), next;
             $mol_fail(new Error(`Wrong int64 value ${next}`));
         }
+        /** 6-byte unsigned integer little-endian channel for offset. */
         uint48(offset, next) {
             if (next === undefined)
                 return this.getUint48(offset, true);
@@ -8349,6 +8858,7 @@ var $;
                 return this.setUint48(offset, next, true), next;
             $mol_fail(new Error(`Wrong uint48 value ${next}`));
         }
+        /** 8-byte unsigned integer little-endian channel for offset. */
         uint64(offset, next) {
             if (next === undefined)
                 return this.getBigUint64(offset, true);
@@ -8356,24 +8866,29 @@ var $;
                 return this.setBigUint64(offset, next, true), next;
             $mol_fail(new Error(`Wrong uint64 value ${next}`));
         }
+        /** 2-byte float little-endian channel for offset. */
         float16(offset, next) {
             if (next !== undefined)
                 this.setFloat16(offset, next, true);
             return this.getFloat16(offset, true);
         }
+        /** 4-byte float little-endian channel for offset. */
         float32(offset, next) {
             if (next !== undefined)
                 this.setFloat32(offset, next, true);
             return this.getFloat32(offset, true);
         }
+        /** 8-byte float little-endian channel for offset. */
         float64(offset, next) {
             if (next !== undefined)
                 this.setFloat64(offset, next, true);
             return this.getFloat64(offset, true);
         }
+        /** A Uint8Array view for the same buffer. */
         asArray() {
             return new Uint8Array(this.buffer, this.byteOffset, this.byteLength);
         }
+        /** base64ae string from buffer. */
         toString() {
             return $mol_base64_ae_encode(this.asArray());
         }
@@ -8410,6 +8925,7 @@ var $;
         $.$mol_base64_url_encode = $mol_base64_url_encode_node;
     }
     function $mol_base64_url_decode_node(str) {
+        // without Uint8Array breaks $mol_compare_deep
         const buffer = Buffer.from(str, 'base64url');
         return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
     }
@@ -8423,9 +8939,11 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Base class for crypto keys. */
     class $mol_crypto2_key extends $mol_buffer {
         static size_str = 43;
         static size_bin = 32;
+        /** Kakes key from different params. */
         static from(serial) {
             if (typeof serial === 'string') {
                 serial = new Uint8Array(serial.match(/.{43}/g)
@@ -8437,6 +8955,7 @@ var $;
             }
             return super.from(serial);
         }
+        /** Array view of public part. */
         asArray() {
             const size = this.constructor.size_bin;
             if (this.byteLength < size) {
@@ -8447,6 +8966,7 @@ var $;
             }
             return new Uint8Array(this.buffer, this.byteOffset, size);
         }
+        /** String representation of public part. */
         toString() {
             return $mol_base64_url_encode(this.asArray());
         }
@@ -8468,6 +8988,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Derived debuggable error with stack */
     function $mol_crypto_restack(error) {
         error = new Error(error instanceof Error ? error.message : String(error), { cause: error });
         $mol_fail_hidden(error);
@@ -8479,7 +9000,9 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Ed25519 public key for sign verifying. */
     class $mol_crypto2_auditor extends $mol_crypto2_key {
+        /** Native WebAPI public key. */
         async native() {
             return $mol_crypto_native.subtle.importKey('jwk', {
                 crv: "Ed25519",
@@ -8489,6 +9012,7 @@ var $;
                 x: this.toString(),
             }, "Ed25519", Boolean('extractable'), ['verify']).catch($mol_crypto_restack);
         }
+        /** Verifies signature of data. */
         async verify(data, sign) {
             return await $mol_crypto_native.subtle.verify("Ed25519", await this.native(), sign, data).catch($mol_crypto_restack);
         }
@@ -8503,7 +9027,9 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** x25519 public key for data encryption. */
     class $mol_crypto2_socket extends $mol_crypto2_key {
+        /** Native WebAPI public key. */
         async native() {
             return await $mol_crypto_native.subtle.importKey('jwk', {
                 crv: 'X25519',
@@ -8524,12 +9050,15 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Compose public key for verifying and encryption, based on Curve25519. */
     class $mol_crypto2_public extends $mol_crypto2_key {
         static size_str = 86;
         static size_bin = 64;
+        /** Return Auditor part. */
         auditor() {
             return $mol_crypto2_auditor.from(this.asArray().subarray(0, 32));
         }
+        /** Return Socket part. */
         socket() {
             return $mol_crypto2_socket.from(this.asArray().subarray(32, 64));
         }
@@ -8554,6 +9083,7 @@ var $;
 var $;
 (function ($) {
     let sponge = new Uint32Array(80);
+    /** Fast small sync SHA-1 (20 bytes, 160 bits) */
     function $mol_crypto2_hash(input) {
         const data = input instanceof Uint8Array
             ? input
@@ -8568,7 +9098,9 @@ var $;
         for (let i = wlen; i < data.length; ++i) {
             tail |= data[i] << ((3 - i & 0b11) << 3);
         }
+        // Initial
         const hash = new Int32Array([1732584193, -271733879, -1732584194, 271733878, -1009589776]);
+        // Digest
         for (let i = 0; i < bytes; i += 16) {
             let h0 = hash[0];
             let h1 = hash[1];
@@ -8644,7 +9176,7 @@ var $;
         }
         for (let i = 0; i < 20; ++i) {
             const word = hash[i];
-            hash[i] = word << 24 | word << 8 & 0xFF0000 | word >>> 8 & 0xFF00 | word >>> 24 & 0xFF;
+            hash[i] = word << 24 | word << 8 & 0xFF0000 | word >>> 8 & 0xFF00 | word >>> 24 & 0xFF; // BE -> LE
         }
         return new Uint8Array(hash.buffer);
     }
@@ -8655,7 +9187,130 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** @deprecated Use $mol_crypto2_hash */
     $.$mol_crypto_hash = $mol_crypto2_hash;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $mol_memo_key extends $mol_wrapper {
+        static wrap(task) {
+            const store = new WeakMap();
+            const fun = function (key, next) {
+                let store2 = store.get(this ?? fun);
+                if (!store2)
+                    store.set(this ?? fun, store2 = new Map);
+                const key_str = $mol_key(key);
+                if (next === undefined && store2.has(key_str))
+                    return store2.get(key_str);
+                const val = task.call(this, key, next) ?? next;
+                store2.set(key_str, val);
+                return val;
+            };
+            Reflect.defineProperty(fun, 'name', { value: task.name + ' ' });
+            return fun;
+        }
+    }
+    $.$mol_memo_key = $mol_memo_key;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $mol_schema_any extends Object {
+        static [Symbol.toStringTag];
+        static [$mol_key_handle]() {
+            return this.toString();
+        }
+        /** Short user-readable identity. */
+        static toString() {
+            return $$.$mol_func_name(this);
+        }
+        /** Type-predicate that checks value by schema. */
+        static check(value) {
+            try {
+                this.guard(value);
+                return true;
+            }
+            catch (error) {
+                return false;
+            }
+        }
+        /** `instanceof` support */
+        static [Symbol.hasInstance](value) {
+            return this.check(value);
+        }
+        /** Type-parser that fails of wrong values. */
+        static guard(value) {
+            return value;
+        }
+        /** Type-caster that normalizes wrong values. */
+        static cast(value) {
+            try {
+                this.guard(value);
+                return value;
+            }
+            catch (error) {
+                return this.default;
+            }
+        }
+        /** Default value which conforms schema. */
+        static default = null;
+    }
+    $.$mol_schema_any = $mol_schema_any;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $.$mol_schema_maybe = $mol_memo_key.func(function $mol_schema_maybe(Some) {
+        return class $mol_schema_maybe_ extends $mol_schema_any {
+            static Some = Some;
+            static toString() {
+                if (this !== $mol_schema_maybe_)
+                    return super.toString();
+                return '$mol_schema_maybe<' + $mol_key(Some) + '>';
+            }
+            static guard(value) {
+                if (value == null)
+                    return value;
+                return Some.guard(value);
+            }
+            static default = null;
+        };
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $.$mol_schema_instance = $mol_memo_key.func(function $mol_schema_instance(Class) {
+        class $mol_schema_instance_ extends $mol_schema_any {
+            static Class = Class;
+            static toString() {
+                if (this !== $mol_schema_instance_)
+                    return super.toString();
+                return '$mol_schema_instance<' + $$.$mol_func_name(Class) + '>';
+            }
+            static guard(value) {
+                if (value != null && Object(value) instanceof Class)
+                    return value;
+                return $mol_fail(new TypeError('Wrong class', { cause: { value, schema: this } }));
+            }
+            static cast(value) {
+                return this.guard(value);
+            }
+            static default;
+        }
+        return ((Class?.[Symbol.hasInstance] === $mol_schema_any[Symbol.hasInstance])
+            ? Class
+            : $mol_schema_instance_);
+    });
 })($ || ($ = {}));
 
 ;
@@ -8701,23 +9356,35 @@ var $;
         [$mol_dev_format_head]() {
             return $mol_dev_format_span({ 'color': 'darkorange' }, this.str || '_');
         }
+        _bin = null;
+        /** Binary representation (6/12/18/24 bytes). */
         toBin() {
+            if (this._bin)
+                return this._bin;
             const str = this.relate(_base).str;
             const norm = str && str
                 .replace(/^___/, '')
                 .split('_')
                 .map(numb => numb || 'AAAAAAAA')
                 .join('');
-            return $mol_base64_ae_decode(norm);
+            return this._bin = $mol_base64_ae_decode(norm);
         }
+        /** Make from integer (6 bytes). */
         static from_int(int) {
-            return new this($mol_base64_ae_encode(new Uint8Array(new BigUint64Array([BigInt(int)]).buffer, 0, 6)));
+            const bin = new Uint8Array(new BigUint64Array([BigInt(int)]).buffer, 0, 6);
+            const link = new this($mol_base64_ae_encode(bin));
+            link._bin = bin;
+            return link;
         }
+        /** Read from binary (6/12/18/24 bytes). */
         static from_bin(bin) {
             const str = [...$mol_base64_ae_encode(bin).match(/(.{8})/g) ?? []].join('_');
-            return new this(str).resolve(_base);
+            const link = new this(str).resolve(_base);
+            link._bin = bin;
+            return link;
         }
         static _hash_cache = new WeakMap();
+        /** Make hash from binary (12 bytes). */
         static hash_bin(bin) {
             let link = this._hash_cache.get(bin);
             if (link)
@@ -8727,24 +9394,31 @@ var $;
             this._hash_cache.set(bin, link);
             return link;
         }
+        /** Make hash from string (12 bytes). */
         static hash_str(str) {
             return this.hash_bin($mol_charset_encode(str));
         }
+        /** Land-local Peer id. */
         peer() {
             return new $giper_baza_link(this.str.split('_')[0] ?? '');
         }
+        /** Lord-local Area id. */
         area() {
             return new $giper_baza_link(this.str.split('_')[2] ?? '');
         }
+        /** Land-local Head id. */
         head() {
             return new $giper_baza_link(this.str.split('_')[3] ?? '');
         }
+        /** Link to Lord Home. */
         lord() {
             return new $giper_baza_link(this.str.split('_').slice(0, 2).join('_'));
         }
+        /** Link to Land Root. */
         land() {
             return new $giper_baza_link(this.str.split('_').slice(0, 3).join('_'));
         }
+        /** Pawn Link relative to base Land: `___QWERTYUI` */
         relate(base) {
             if (base.str === '')
                 return this;
@@ -8754,6 +9428,7 @@ var $;
             const head = this.head();
             return new $giper_baza_link('___' + head);
         }
+        /** Absolute Pawn Link from relative (`___QWERTYUI`) using base Land Link. */
         resolve(base) {
             if (base.str === '')
                 return this;
@@ -8770,7 +9445,7 @@ var $;
         mix(mixin) {
             if (mixin instanceof $giper_baza_link)
                 mixin = mixin.toBin();
-            const mix = this.toBin();
+            const mix = this.toBin().slice();
             for (let i = 0; i < mix.length; ++i)
                 mix[i] ^= mixin[i];
             return mix;
@@ -8789,19 +9464,23 @@ var $;
         }
     }
     $.$giper_baza_link_base = $giper_baza_link_base;
+    $.$giper_baza_link_schema = $mol_schema_maybe($mol_schema_instance($giper_baza_link));
 })($ || ($ = {}));
 
 ;
 "use strict";
 var $;
 (function ($) {
+    /** Ed25519 private key for data signing. */
     class $mol_crypto2_signer extends $mol_crypto2_auditor {
         static size_sign = 64;
+        /** Generates new Signer. */
         static async generate() {
             const pair = await $mol_crypto_native.subtle.generateKey("Ed25519", Boolean('extractable'), ['sign', 'verify']).catch($mol_crypto_restack);
             const { x, d } = await $mol_crypto_native.subtle.exportKey('jwk', pair.privateKey).catch($mol_crypto_restack);
             return this.from(x + d);
         }
+        /** Native WebAPI private key. */
         async nativePrivate() {
             return await $mol_crypto_native.subtle.importKey('jwk', {
                 crv: "Ed25519",
@@ -8812,15 +9491,19 @@ var $;
                 d: this.toStringPrivate(),
             }, "Ed25519", Boolean('extractable'), ['sign']).catch($mol_crypto_restack);
         }
+        /** Array view of private part. */
         asArrayPrivate() {
             return new Uint8Array(this.buffer, this.byteOffset + 32, 32);
         }
+        /** String representation of private part. */
         toStringPrivate() {
             return $mol_base64_url_encode(this.asArrayPrivate());
         }
+        /** Returns Auditor from this Signer. */
         auditor() {
             return $mol_crypto2_auditor.from(this.asArray());
         }
+        /** Makes Signature for data. */
         async sign(data) {
             return new Uint8Array(await $mol_crypto_native.subtle.sign("Ed25519", await this.nativePrivate(), data).catch($mol_crypto_restack));
         }
@@ -8841,6 +9524,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** 16 unique bytes. */
     function $mol_crypto2_nonce() {
         return $mol_crypto_native.getRandomValues(new Uint8Array(16));
     }
@@ -8851,6 +9535,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** @deprecated Use $mol_crypto2_nonce */
     $.$mol_crypto_salt = $mol_crypto2_nonce;
 })($ || ($ = {}));
 
@@ -8858,11 +9543,15 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Symmetric cipher with shortest payload. */
     class $mol_crypto_sacred extends $mol_buffer {
+        /** Key size in bytes. */
         static size = 16;
+        /** Makes new random secret. */
         static make() {
             return this.from($mol_crypto_salt());
         }
+        /** Makes from string of buffer view. */
         static from(serial) {
             if (typeof serial === 'string') {
                 serial = new Uint8Array([
@@ -8892,12 +9581,14 @@ var $;
             return $mol_base64_url_encode(this.asArray());
         }
         _native;
+        /** Native crypto secret */
         async native() {
             return this._native ?? (this._native = await $mol_crypto_native.subtle.importKey('raw', this, {
                 name: 'AES-CBC',
                 length: 128,
             }, true, ['encrypt', 'decrypt']).catch($mol_crypto_restack));
         }
+        /** Encrypt any binary message. 16n bytes */
         async encrypt(open, salt) {
             return new Uint8Array(await $mol_crypto_native.subtle.encrypt({
                 name: 'AES-CBC',
@@ -8906,6 +9597,7 @@ var $;
                 iv: salt,
             }, await this.native(), open).catch($mol_crypto_restack));
         }
+        /** Decrypt any binary message. */
         async decrypt(closed, salt) {
             return new Uint8Array(await $mol_crypto_native.subtle.decrypt({
                 name: 'AES-CBC',
@@ -8914,12 +9606,14 @@ var $;
                 iv: salt,
             }, await this.native(), closed).catch($mol_crypto_restack));
         }
+        /** Encrypts 0xFF prefixed buffer. 16 bytes */
         async close(opened, salt) {
             if (opened.getUint8(0) !== 0xFF)
                 throw new Error('Closable buffer should starts with 0xFF');
             const trimed = new Uint8Array(opened.buffer, opened.byteOffset + 1, opened.byteLength - 1);
             return this.encrypt(trimed, salt);
         }
+        /** Decrypts 0xFF prefixed buffer. 16 bytes */
         async open(closed, salt) {
             const trimed = await this.decrypt(closed, salt);
             if (trimed.byteLength !== closed.byteLength - 1)
@@ -8940,13 +9634,16 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** x25519 private key for data encryption. */
     class $mol_crypto2_cipher extends $mol_crypto2_socket {
         static size_secret = 16;
+        /** Generates new Cipher. */
         static async generate() {
             const pair = await $mol_crypto_native.subtle.generateKey("X25519", Boolean('extractable'), ['deriveKey']).catch($mol_crypto_restack);
             const { x, d } = await $mol_crypto_native.subtle.exportKey('jwk', pair.privateKey).catch($mol_crypto_restack);
             return this.from(x + d);
         }
+        /** Native WebAPI private key. */
         async nativePrivate() {
             return $mol_crypto_native.subtle.importKey('jwk', {
                 crv: 'X25519',
@@ -8957,15 +9654,19 @@ var $;
                 d: this.toStringPrivate(),
             }, "X25519", Boolean('extractable'), ['deriveKey', 'deriveBits']).catch($mol_crypto_restack);
         }
+        /** Array view of private part. */
         asArrayPrivate() {
             return new Uint8Array(this.buffer, this.byteOffset + 32, 32);
         }
+        /** String representation of private part. */
         toStringPrivate() {
             return $mol_base64_url_encode(this.asArrayPrivate());
         }
+        /** Returns Socket from this Chipher. */
         socket() {
             return $mol_crypto2_socket.from(this.asArray());
         }
+        /** Makes shared secret for combination of Chiper and Soacket. */
         async secret(pub) {
             return $mol_crypto_sacred.from(new Uint8Array(await $mol_crypto_native.subtle.deriveBits({
                 name: "X25519",
@@ -8989,7 +9690,9 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Compose private key for signing and encryption, based on Curve25519. */
     class $mol_crypto2_private extends $mol_crypto2_public {
+        /** Generates new private key. */
         static async generate() {
             const [signer, cipher] = await Promise.all([
                 $mol_crypto2_signer.generate(),
@@ -9002,24 +9705,29 @@ var $;
             key.asArrayPrivate().set(cipher.asArrayPrivate(), 32);
             return key;
         }
+        /** Return Signer part. */
         signer() {
             const signer = $mol_crypto2_signer.from($mol_crypto2_auditor.size_bin + $mol_crypto2_signer.size_bin);
             signer.asArray().set(this.asArray().subarray(0, 32));
             signer.asArrayPrivate().set(this.asArrayPrivate().subarray(0, 32));
             return signer;
         }
+        /** Return Cipher part. */
         cipher() {
             const cipher = $mol_crypto2_cipher.from($mol_crypto2_socket.size_bin + $mol_crypto2_cipher.size_bin);
             cipher.asArray().set(this.asArray().subarray(32, 64));
             cipher.asArrayPrivate().set(this.asArrayPrivate().subarray(32, 64));
             return cipher;
         }
+        /** Return Public part. */
         public() {
             return $mol_crypto2_public.from(this.asArray());
         }
+        /** Array view of private part. */
         asArrayPrivate() {
             return new Uint8Array(this.buffer, this.byteOffset + 64, 64);
         }
+        /** String representation of private part. */
         toStringPrivate() {
             return this.signer().toStringPrivate() + this.cipher().toStringPrivate();
         }
@@ -9043,6 +9751,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Public key generated with Proof of Work */
     class $giper_baza_auth_pass extends $mol_crypto2_public {
         static like(bin) {
             const pass = this.from(bin);
@@ -9058,9 +9767,11 @@ var $;
         path() {
             return `pass:${this.hash().str}`;
         }
+        /** Independent actor with global unique id generated from Auth key */
         lord() {
             return this.hash().lord();
         }
+        /** Land local unique identifier of independent actor (first half of Lord) */
         peer() {
             return this.hash().peer();
         }
@@ -9084,7 +9795,9 @@ var $;
         $mol_memo.method
     ], $giper_baza_auth_pass.prototype, "peer", null);
     $.$giper_baza_auth_pass = $giper_baza_auth_pass;
+    /** Private key generated with Proof of Work */
     class $giper_baza_auth extends $mol_crypto2_private {
+        /** Current Private key generated with Proof of Work  */
         static current(next) {
             $mol_wire_solid();
             if (next === undefined) {
@@ -9151,18 +9864,33 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * # Generic Graph model
+     * - Supports any type of Nodes and Edges.
+     * - All links are ordered, but this may be ignored.
+     * - Multigraph supported using arrays of Edges.
+     * - Hypergraph supported by reusing same Edge on set of links.
+     * - Ubergraph supported using Edges as Nodes to.
+     **/
     class $mol_graph {
+        /** All registered Nodes */
         nodes = new Set();
+        /** Edges for Nodes pairs (from-to-edge) */
         edges_out = new Map();
+        /** Edges for Nodes pairs (to-from-edge) */
         edges_in = new Map();
+        // LINKING NODES
+        /** Full connect two Nodes */
         link(from, to, edge) {
             this.link_out(from, to, edge);
             this.link_in(to, from, edge);
         }
+        /** Full disconnect two Nodes */
         unlink(from, to) {
             this.edges_in.get(to)?.delete(from);
             this.edges_out.get(from)?.delete(to);
         }
+        /** Forward connect two Nodes */
         link_out(from, to, edge) {
             let pair = this.edges_out.get(from);
             if (!pair) {
@@ -9173,6 +9901,7 @@ var $;
             pair.set(to, edge);
             this.nodes.add(to);
         }
+        /** Backward connect two Nodes */
         link_in(to, from, edge) {
             let pair = this.edges_in.get(to);
             if (!pair) {
@@ -9183,15 +9912,21 @@ var $;
             pair.set(from, edge);
             this.nodes.add(to);
         }
+        // GETTING EDGES
+        /** Return any Edge for two Nodes or null */
         edge(from, to) {
             return this.edge_out(from, to) ?? this.edge_in(to, from);
         }
+        /** Return output Edge for two Nodes or null */
         edge_out(from, to) {
             return this.edges_out.get(from)?.get(to) ?? null;
         }
+        /** Return input Edge for two Nodes or null */
         edge_in(to, from) {
             return this.edges_in.get(to)?.get(from) ?? null;
         }
+        // MUTATIONS
+        /** Cut cycles at lowest priority of Edges */
         acyclic(get_weight) {
             const checked = [];
             for (const start of this.nodes) {
@@ -9236,6 +9971,8 @@ var $;
                 visit(start);
             }
         }
+        // NODES SELECTION
+        /** Topoligical ordered set of all Nodes for acyclic graph */
         get sorted() {
             const sorted = new Set();
             const visit = (node) => {
@@ -9253,6 +9990,7 @@ var $;
             }
             return sorted;
         }
+        /** All Nodes which don't have input Edges */
         get roots() {
             const roots = [];
             for (const node of this.nodes) {
@@ -9262,6 +10000,13 @@ var $;
             }
             return roots;
         }
+        // DEPTH STATS
+        /**
+         * Nodes depth statistics for acyclic graph
+         * @example
+         * graph.depth_stat( Math.min )
+         * graph.depth_stat( Math.max )
+         **/
         nodes_depth(select) {
             const stat = new Map();
             const visit = (node, depth = 0) => {
@@ -9276,6 +10021,12 @@ var $;
                 visit(root);
             return stat;
         }
+        /**
+         * Depth's Nodes statistics for acyclic graph
+         * @example
+         * graph.depth_nodes( Math.min )
+         * graph.depth_nodes( Math.max )
+         **/
         depth_nodes(select) {
             const groups = [];
             for (const [node, depth] of this.nodes_depth(select).entries()) {
@@ -9329,6 +10080,12 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Small, simple, powerful, and fast TypeScript/JavaScript library for proper date/time/duration/interval arithmetic.
+     *
+     * Immutable iso8601 time duration representation.
+     * @see http://localhost:9080/mol/app/docs/-/test.html#!demo=mol_time_demo
+     */
     class $mol_time_duration extends $mol_time_base {
         constructor(config = 0) {
             super();
@@ -9529,6 +10286,7 @@ var $;
             '.sss': (moment) => {
                 if (moment.second == null)
                     return '';
+                // if( moment.second === ( moment.second | 0 ) ) return ''
                 return '.' + $mol_time_moment.patterns['sss'](moment);
             },
             'sss': (moment) => {
@@ -9562,6 +10320,12 @@ var $;
             return numb;
         $mol_fail(new Error(`Wrong time component ${str}`));
     }
+    /**
+     * Small, simple, powerful, and fast TypeScript/JavaScript library for proper date/time/duration/interval arithmetic.
+     *
+     * Immutable iso8601 time moment representation.
+     * @see http://localhost:9080/mol/app/docs/-/test.html#!demo=mol_time_demo
+     */
     class $mol_time_moment extends $mol_time_base {
         constructor(config = new Date) {
             super();
@@ -9726,6 +10490,12 @@ var $;
         [$mol_dev_format_head]() {
             return $mol_dev_format_span({}, $mol_dev_format_native(this), ' ', $mol_dev_format_accent(this.toString('YYYY-MM-DD hh:mm:ss.sss Z')));
         }
+        /// Mnemonics:
+        ///  * single letter for numbers: M - month number, D - day of month.
+        ///  * uppercase letters for dates, lowercase for times: M - month number , m - minutes number
+        ///  * repeated letters for define register count: YYYY - full year, YY - shot year, MM - padded month number
+        ///  * words for word representation: Month - month name, WeekDay - day of week name
+        ///  * shortcuts: WD - short day of week, Mon - short month name.
         static patterns = {
             'YYYY': (moment) => {
                 if (moment.year == null)
@@ -9954,6 +10724,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Checks for given runtype and returns tagged version of returned type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_tagged_demo
+     */
     function $mol_data_tagged(config) {
         return config;
     }
@@ -9996,6 +10770,11 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Combines list of unary functions/classes to one function.
+     *
+     * 	const reparse = $mol_data_pipe( JSON.stringify , JSON.parse )
+     **/
     function $mol_data_pipe(...funcs) {
         return $mol_data_setup(function (input) {
             let value = input;
@@ -10020,6 +10799,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Checks for number and returns number type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_number_demo
+     */
     $.$mol_data_number = (val) => {
         if (typeof val === 'number')
             return val;
@@ -10031,6 +10814,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Checks for integer and returns number type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_integer_demo
+     */
     function $mol_data_integer(val) {
         const val2 = $mol_data_number(val);
         if (Math.floor(val2) === val2)
@@ -10051,22 +10838,30 @@ var $;
             $mol_fail(new $mol_data_error(`${rank} is out of Ran range`));
         }),
     }).$giper_baza_rank;
+    /** Makes Rank from Tier and Fame names. */
     function $giper_baza_rank_make(tier, fame) {
         return ($giper_baza_rank_tier[tier] | $giper_baza_rank_rate[fame]);
     }
     $.$giper_baza_rank_make = $giper_baza_rank_make;
+    /** Access level: deny, read, post, pull, rule */
     let $giper_baza_rank_tier;
     (function ($giper_baza_rank_tier) {
+        /** Forbidden. There is no access, neither read nor write. */
         $giper_baza_rank_tier[$giper_baza_rank_tier["deny"] = 0] = "deny";
+        /** Read only */
         $giper_baza_rank_tier[$giper_baza_rank_tier["read"] = 16] = "read";
+        /** Post changes (Sand) */
         $giper_baza_rank_tier[$giper_baza_rank_tier["post"] = 48] = "post";
+        /** Pull forks (Sand) */
         $giper_baza_rank_tier[$giper_baza_rank_tier["pull"] = 112] = "pull";
+        /** Full control (Sand, Gift) */
         $giper_baza_rank_tier[$giper_baza_rank_tier["rule"] = 240] = "rule";
     })($giper_baza_rank_tier = $.$giper_baza_rank_tier || ($.$giper_baza_rank_tier = {}));
     function $giper_baza_rank_tier_of(rank) {
         return rank & 0b1111_0000;
     }
     $.$giper_baza_rank_tier_of = $giper_baza_rank_tier_of;
+    /** Work as bits count by Rate */
     $.$giper_baza_rank_work_rates = [
         0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF,
         0xE, 0xE, 0xE, 0xE, 0xD, 0xD, 0xD, 0xD,
@@ -10074,12 +10869,18 @@ var $;
         0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1,
         0x0,
     ];
+    /** Ease of making changes, depends on fame: evil, harm, even, nice, good */
     let $giper_baza_rank_rate;
     (function ($giper_baza_rank_rate) {
+        /** Days delay. */
         $giper_baza_rank_rate[$giper_baza_rank_rate["late"] = 0] = "late";
+        /** Seconds delay. */
         $giper_baza_rank_rate[$giper_baza_rank_rate["long"] = 12] = "long";
+        /** Half-second delay. */
         $giper_baza_rank_rate[$giper_baza_rank_rate["slow"] = 13] = "slow";
+        /** Milli-seconds delay. */
         $giper_baza_rank_rate[$giper_baza_rank_rate["fast"] = 14] = "fast";
+        /** Micro-seconds delay. */
         $giper_baza_rank_rate[$giper_baza_rank_rate["just"] = 15] = "just";
     })($giper_baza_rank_rate = $.$giper_baza_rank_rate || ($.$giper_baza_rank_rate = {}));
     function $giper_baza_rank_rate_of(rank) {
@@ -10103,11 +10904,13 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Moment from time. */
     function $giper_baza_time_moment(time) {
         const stamp = time * 1000;
         return new $mol_time_moment(stamp);
     }
     $.$giper_baza_time_moment = $giper_baza_time_moment;
+    /** User readable time+tick view. */
     function $giper_baza_time_dump(time, tick) {
         let res = $giper_baza_time_moment(time).toString('YYYY-MM-DD hh:mm:ss Z');
         if (tick !== undefined)
@@ -10115,11 +10918,13 @@ var $;
         return res;
     }
     $.$giper_baza_time_dump = $giper_baza_time_dump;
+    /** Current time with 0 tick. */
     function $giper_baza_time_now() {
         return now || Math.floor(Date.now() / 1000);
     }
     $.$giper_baza_time_now = $giper_baza_time_now;
     let now = 0;
+    /** Run atomic transaction by temp freezing time. */
     function $giper_baza_time_freeze(task) {
         if (now)
             return task();
@@ -10189,7 +10994,9 @@ var $;
         }
     }
     $.$giper_baza_face = $giper_baza_face;
+    /** Statistics about Units in Land. it's total Units count & dictionary which maps Peer to Time */
     class $giper_baza_face_map extends Map {
+        /** Cumulative face for all peers. */
         stat = new $giper_baza_face;
         constructor(entries) {
             super();
@@ -10199,6 +11006,7 @@ var $;
         clone() {
             return new $giper_baza_face_map(this);
         }
+        /** Synchronize this clock with another. */
         sync(right) {
             if (right instanceof $giper_baza_face_map)
                 this.stat = right.stat.clone();
@@ -10207,6 +11015,7 @@ var $;
                 this.peer_summ(peer, face.summ);
             }
         }
+        /** Update last time for peer. */
         peer_time(peer, time, tick) {
             this.stat.sync_time(time, tick);
             let prev = this.get(peer);
@@ -10215,6 +11024,7 @@ var $;
             else
                 this.set(peer, new $giper_baza_face(time, tick));
         }
+        /** Update Summ for Peer. */
         peer_summ(peer, summ) {
             this.stat.sync_summ(summ);
             let prev = this.get(peer);
@@ -10226,6 +11036,7 @@ var $;
         peer_summ_shift(peer, diff) {
             this.peer_summ(peer, (this.get(peer)?.summ ?? 0) + diff);
         }
+        /** Generates new time for peer that greater then other seen. */
         tick() {
             const now = $giper_baza_time_now();
             if (this.stat.time < now) {
@@ -10262,8 +11073,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** reactive Dictionary */
     class $mol_wire_dict extends Map {
         pub = new $mol_wire_pub;
+        // Accessors
         has(key) {
             this.pub.promote();
             return super.has(key);
@@ -10296,11 +11109,12 @@ var $;
             this.pub.promote();
             return super.size;
         }
+        // Mutators
         set(key, value) {
             if (super.get(key) === value)
                 return this;
             super.set(key, value);
-            this.pub?.emit();
+            this.pub?.emit(); // undefined in constructor
             return this;
         }
         delete(key) {
@@ -10315,6 +11129,7 @@ var $;
             super.clear();
             this.pub.emit();
         }
+        // Extensions
         item(key, next) {
             if (next === undefined)
                 return this.get(key) ?? null;
@@ -10332,6 +11147,12 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Simple memory allocator.
+     * Holds linked list of free blocks.
+     * Prefers blocks from the beginning.
+     * Near blocks are joined automatically.
+     */
     class $mol_memory_pool extends Object {
         _free;
         constructor(size = Number.POSITIVE_INFINITY) {
@@ -10346,6 +11167,7 @@ var $;
                 }
             };
         }
+        /** Returns offset of first free block with required size. */
         acquire(size) {
             let prev = this._free;
             let next = prev.next;
@@ -10368,6 +11190,7 @@ var $;
             }
             return from;
         }
+        /** Allows memory range to be acquired. */
         release(from, size) {
             let prev = this._free;
             let next = prev.next;
@@ -10415,8 +11238,14 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    $.$giper_baza_pack_four_code = $mol_charset_encode('LAND');
-    $.$giper_baza_pack_head_size = 4 + 12 + 6 + 2;
+    $.$giper_baza_pack_four_code = $mol_charset_encode('LAND'); // 76 65 78 68
+    $.$giper_baza_pack_head_size = 4 /*BAZA*/ + 12 /*Lord*/ + 6 /*Area*/ + 2; /*Size*/
+    /**
+     * One Land info (Faces+Units) to Pack.
+     * Sync: +Faces -Units
+     * Diff: -Faces +Units
+     * Stop: -Faces -Units
+     */
     class $giper_baza_pack_part extends $mol_object {
         units;
         faces;
@@ -10439,6 +11268,7 @@ var $;
         $mol_action
     ], $giper_baza_pack_part, "from", null);
     $.$giper_baza_pack_part = $giper_baza_pack_part;
+    /** Universal binary package which contains some Faces/Units/Rocks */
     class $giper_baza_pack extends $mol_buffer {
         toBlob() {
             return new Blob([this], { type: 'application/vnd.giper_baza_pack.v1' });
@@ -10462,6 +11292,7 @@ var $;
                             parts.set(link.str, part = new $giper_baza_pack_part);
                         const size = this.uint16(offset + 22);
                         offset += 24;
+                        // Faces
                         for (let i = 0; i < size; ++i) {
                             const peer = $giper_baza_link.from_bin(new Uint8Array(buf.buffer, buf.byteOffset + offset, 6));
                             const tick = this.uint16(offset + 6);
@@ -10550,11 +11381,14 @@ var $;
             const buff = new Uint8Array(length);
             const pack = new $giper_baza_pack(buff.buffer);
             let offset = 0;
+            // fill Lands
             for (const [id, { units, faces }] of parts) {
-                buff.set($.$giper_baza_pack_four_code, offset);
-                buff.set(new $giper_baza_link(id).toBin(), offset + 4);
-                pack.uint16(offset + 22, faces.size);
+                // Head
+                buff.set($.$giper_baza_pack_four_code, offset); // 4B
+                buff.set(new $giper_baza_link(id).toBin(), offset + 4); // Land = Lord + Area
+                pack.uint16(offset + 22, faces.size); // Vers
                 offset += 24;
+                // Peer + Tick + Time + Summ for every Face
                 for (const [peer, face] of faces) {
                     buff.set(new $giper_baza_link(peer).toBin(), offset);
                     pack.uint16(offset + 6, face.tick);
@@ -10562,6 +11396,7 @@ var $;
                     pack.uint32(offset + 12, face.summ);
                     offset += $giper_baza_face.length();
                 }
+                // Units + Balls
                 for (const unit of units) {
                     buff.set(unit.asArray(), offset);
                     offset += unit.byteLength;
@@ -10595,6 +11430,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Registry of Pawns as Deck entities. */
     class $giper_baza_fund extends $mol_object {
         item_make;
         constructor(item_make) {
@@ -10621,6 +11457,12 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Small, simple, powerful, and fast TypeScript/JavaScript library for proper date/time/duration/interval arithmetic.
+     *
+     * Immutable iso8601 time interval representation.
+     * @see http://localhost:9080/mol/app/docs/-/test.html#!demo=mol_time_demo
+     */
     class $mol_time_interval extends $mol_time_base {
         constructor(config) {
             super();
@@ -10717,9 +11559,9 @@ var $;
     for (let i = 0; i < ascii_set.length; ++i)
         ascii_map[ascii_set[i]] = i | 0x80;
     const diacr_set = [
-        0x00, 0x01, 0x0F, 0x0B, 0x07, 0x08, 0x12, 0x13,
-        0x02, 0x0C, 0x06, 0x11, 0x03, 0x09, 0x0A, 0x04,
-        0x28, 0x31, 0x27, 0x26, 0x23,
+        0x00, 0x01, 0x0F, 0x0B, 0x07, 0x08, 0x12, 0x13, // up
+        0x02, 0x0C, 0x06, 0x11, 0x03, 0x09, 0x0A, 0x04, // up
+        0x28, 0x31, 0x27, 0x26, 0x23, // down
     ];
     const diacr_map = new Array(0x80).fill(0);
     for (let i = 0; i < diacr_set.length; ++i)
@@ -10730,6 +11572,7 @@ var $;
     const full_mode = 0x95;
     const wide_mode = 0x96;
     const tiny_mode = 0x9E;
+    /** Encode text to Unicode Compact Format. */
     function $mol_charset_ucf_encode(str) {
         const buf = $mol_charset_buffer(str.length * 3);
         return buf.slice(0, $mol_charset_ucf_encode_to(str, buf));
@@ -10756,7 +11599,7 @@ var $;
             let code = str.charCodeAt(i);
             if (code >= 0xD8_00 && code < 0xDC_00)
                 code = ((code - 0xd800) << 10) + str.charCodeAt(++i) + 0x2400;
-            if (code < 0x80) {
+            if (code < 0x80) { // ASCII
                 if (mode !== tiny_mode) {
                     const fast = ascii_map[code];
                     if (!fast)
@@ -10764,10 +11607,10 @@ var $;
                 }
                 buf[pos++] = code;
             }
-            else if (code < tiny_limit) {
+            else if (code < tiny_limit) { // Tiny
                 const page = (code >> 7) + tiny_mode;
                 code &= 0x7F;
-                if (page === 164) {
+                if (page === 164) { // diacritics
                     const fast = diacr_map[code];
                     if (fast) {
                         if (mode !== tiny_mode)
@@ -10780,7 +11623,7 @@ var $;
                     write_mode(page);
                 write_remap(code);
             }
-            else if (code < wide_limit) {
+            else if (code < wide_limit) { // Wide
                 code -= wide_offset;
                 const page = (code >> 14) + wide_mode;
                 if (mode !== page)
@@ -10788,7 +11631,7 @@ var $;
                 write_remap(code & 0x7F);
                 write_remap((code >> 7) & 0x7F);
             }
-            else {
+            else { // Full
                 if (mode !== full_mode)
                     write_mode(full_mode);
                 write_remap(code & 0x7F);
@@ -10801,6 +11644,7 @@ var $;
         return pos - from;
     }
     $.$mol_charset_ucf_encode_to = $mol_charset_ucf_encode_to;
+    /** Decode text from Unicode Compact Format. */
     function $mol_charset_ucf_decode(buffer, mode = tiny_mode) {
         let text = '';
         let pos = 0;
@@ -10821,7 +11665,7 @@ var $;
         };
         while (pos < buffer.length) {
             let code = read_code();
-            if (code < full_mode) {
+            if (code < full_mode) { // Char Code
                 if (mode === tiny_mode) {
                     if (code > 0x80) {
                         code = diacr_set[code - 0x080] | (6 << 7);
@@ -10838,15 +11682,15 @@ var $;
                 }
                 text += String.fromCodePoint(code);
             }
-            else if (code >= tiny_mode) {
+            else if (code >= tiny_mode) { // Tiny Set
                 mode = code;
                 page_offset = (mode - tiny_mode) << 7;
             }
-            else if (code === full_mode) {
+            else if (code === full_mode) { // Full Set
                 mode = code;
                 page_offset = 0;
             }
-            else {
+            else { // Wide Set
                 mode = code;
                 page_offset = ((mode - wide_mode) << 14) + wide_offset;
             }
@@ -10952,10 +11796,12 @@ var $;
             obj[keys[i]] = vals[i];
         return obj;
     };
+    /** VaryPack - simple fast compact data binarization format. */
     class $mol_vary_class extends Object {
         lean_symbol = Symbol('$mol_vary_lean');
         array = new Uint8Array(256);
         buffer = new DataView(this.array.buffer);
+        /** Packs any data to Uint8Array with deduplication. */
         pack(data) {
             let pos = 0;
             let capacity = 0;
@@ -11212,6 +12058,7 @@ var $;
                     return dump_object(val);
                 }
             };
+            /** Recursive fills buffer with data. */
             const dump = (val) => {
                 const dumper = dumpers[typeof val];
                 if (!dumper)
@@ -11229,6 +12076,7 @@ var $;
                 $mol_fail(new Error('Wrong reserved capacity', { cause: { capacity, size: pos, data } }));
             return this.array.slice(0, pos);
         }
+        /** Parses buffer to rich runtime structures. */
         take(array) {
             const buffer = new DataView(array.buffer, array.byteOffset, array.byteLength);
             const stream = [];
@@ -11418,6 +12266,7 @@ var $;
         rich_index = new Map([
             [null, () => ({})]
         ]);
+        /** Isolated Vary for custom types */
         zone() {
             const room = new $mol_vary_class;
             Object.setPrototypeOf(room, this);
@@ -11445,6 +12294,7 @@ var $;
                 return;
             return sup.lean_find(val);
         }
+        /** Adds custom types support. */
         type({ type, keys, rich, lean }) {
             this.rich_node(keys).set(null, rich);
             type.prototype[this.lean_symbol] = (val) => [keys, lean(val)];
@@ -11452,25 +12302,29 @@ var $;
     }
     $.$mol_vary_class = $mol_vary_class;
     $.$mol_vary = new $mol_vary_class;
+    /** Native Map support */
     $.$mol_vary.type({
         type: Map,
         keys: ['keys', 'vals'],
         lean: obj => [[...obj.keys()], [...obj.values()]],
         rich: ([keys, vals]) => new Map(keys.map((k, i) => [k, vals[i]])),
     });
+    /** Native Set support */
     $.$mol_vary.type({
         type: Set,
         keys: ['set'],
         lean: obj => [[...obj.values()]],
         rich: ([vals]) => new Set(vals),
     });
+    /** Native Date support */
     $.$mol_vary.type({
         type: Date,
         keys: ['unix_time'],
         lean: obj => [obj.valueOf() / 1000],
         rich: ([ts]) => new Date(ts * 1000),
     });
-    if ('Element' in $mol_dom) {
+    if ('Element' in $mol_dom) { // Absent in workers
+        /** Native Element support */
         $.$mol_vary.type({
             type: $mol_dom.Element,
             keys: ['XML'],
@@ -11484,6 +12338,16 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    // export let $giper_baza_vary_schema = $mol_schema_some([
+    // 	$mol_schema_boolean, $mol_schema_float, $mol_schema_bigint, $mol_schema_string,
+    // 	Uint8Array, Uint16Array, Uint32Array, BigUint64Array,
+    // 	Int8Array, Int16Array, Int32Array, BigInt64Array,
+    // 	Float64Array, Float32Array, Float64Array,
+    // 	$mol_time_moment, $mol_time_duration, $mol_time_interval,
+    // 	$mol_tree2, $giper_baza_link, Element,
+    // 	$mol_schema_list( ()=> $giper_baza_vary_schema ),
+    // 	$mol_schema_dict([ ()=> $giper_baza_vary_schema, ()=> $giper_baza_vary_schema ]),
+    // ].map( klass => $mol_schema_instance( klass ) )
     $.$giper_baza_vary = $mol_vary.zone();
     $.$giper_baza_vary.type({
         type: $giper_baza_link,
@@ -11515,454 +12379,6 @@ var $;
         lean: obj => [$$.$mol_tree2_to_string(obj)],
         rich: ([str]) => $$.$mol_tree2_from_string(str),
     });
-    function $giper_baza_vary_switch(vary, ways) {
-        if (vary === null)
-            return ways.none(vary);
-        switch (typeof vary) {
-            case "boolean": return ways.bool(vary);
-            case "bigint": return ways.bint(vary);
-            case "number": return ways.real(vary);
-            case "string": return ways.text(vary);
-        }
-        if (ArrayBuffer.isView(vary))
-            return ways.blob(vary);
-        switch (Reflect.getPrototypeOf(vary)) {
-            case Object.prototype: return ways.dict(vary);
-            case Array.prototype: return ways.list(vary);
-            case $giper_baza_link.prototype: return ways.link(vary);
-            case $mol_time_moment.prototype: return ways.time(vary);
-            case $mol_time_duration.prototype: return ways.dura(vary);
-            case $mol_time_interval.prototype: return ways.span(vary);
-            case $mol_tree2.prototype: return ways.tree(vary);
-        }
-        if (vary instanceof $mol_dom_context.Element)
-            return ways.elem(vary);
-        return $mol_fail(new TypeError(`Unsupported vary type`, { cause: { vary } }));
-    }
-    $.$giper_baza_vary_switch = $giper_baza_vary_switch;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function $mol_tree2_bin_to_bytes(tree) {
-        return Uint8Array.from(tree.kids, kid => parseInt(kid.value, 16));
-    }
-    $.$mol_tree2_bin_to_bytes = $mol_tree2_bin_to_bytes;
-    function $mol_tree2_bin_from_bytes(bytes, span = $mol_span.unknown) {
-        return $mol_tree2.list(Array.from(bytes, code => {
-            return $mol_tree2.data(code.toString(16).padStart(2, '0'), [], span);
-        }), span);
-    }
-    $.$mol_tree2_bin_from_bytes = $mol_tree2_bin_from_bytes;
-    function $mol_tree2_bin_from_string(str, span = $mol_span.unknown) {
-        return $mol_tree2_bin_from_bytes([...new TextEncoder().encode(str)], span);
-    }
-    $.$mol_tree2_bin_from_string = $mol_tree2_bin_from_string;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function $mol_tree2_xml_from_dom(dom) {
-        switch (dom.nodeType) {
-            case dom.DOCUMENT_NODE: {
-                let kids = [];
-                for (const kid of dom.childNodes) {
-                    kids.push($mol_tree2_xml_from_dom(kid));
-                }
-                return $mol_tree2.list(kids);
-            }
-            case dom.PROCESSING_INSTRUCTION_NODE: {
-                return $mol_tree2.struct('?', [
-                    $mol_tree2.struct(dom.nodeName, dom.nodeValue.split(' ').map(chunk => {
-                        const [, name, value] = /^(.*?)(?:="(.*?)")?$/.exec(chunk);
-                        const kids = value ? [$mol_tree2.data(value)] : [];
-                        return $mol_tree2.struct(name, kids);
-                    }))
-                ]);
-            }
-            case dom.DOCUMENT_TYPE_NODE: {
-                const dom2 = dom;
-                return $mol_tree2.struct('!', [
-                    $mol_tree2.struct('DOCTYPE', [
-                        $mol_tree2.struct(dom2.name)
-                    ])
-                ]);
-            }
-            case dom.ELEMENT_NODE: {
-                let kids = [];
-                for (const attr of dom.attributes) {
-                    kids.push($mol_tree2.struct('@', [
-                        $mol_tree2.struct(attr.nodeName, [
-                            $mol_tree2.data(attr.nodeValue)
-                        ])
-                    ]));
-                }
-                for (const kid of dom.childNodes) {
-                    const k = $mol_tree2_xml_from_dom(kid);
-                    if (k.type || k.value)
-                        kids.push(k);
-                }
-                return $mol_tree2.struct(dom.nodeName, kids);
-            }
-            case dom.COMMENT_NODE: {
-                return $mol_tree2.struct('--', [
-                    $mol_tree2.data(dom.nodeValue)
-                ]);
-            }
-            case dom.TEXT_NODE: {
-                if (!dom.nodeValue.trim())
-                    return $mol_tree2.list([]);
-                return $mol_tree2.data(dom.nodeValue.replace(/\s+/g, ' '));
-            }
-        }
-        return $mol_fail(new Error(`Unsupported node ${dom.nodeName}`));
-    }
-    $.$mol_tree2_xml_from_dom = $mol_tree2_xml_from_dom;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function $giper_baza_vary_cast_blob(vary) {
-        return ArrayBuffer.isView(vary) ? vary : null;
-    }
-    $.$giper_baza_vary_cast_blob = $giper_baza_vary_cast_blob;
-    function $giper_baza_vary_cast_bool(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => Boolean(vary.byteLength),
-            bool: vary => vary,
-            bint: vary => Boolean(vary),
-            real: vary => Boolean(vary),
-            link: vary => vary.str !== '',
-            text: vary => Boolean(vary),
-            time: vary => Boolean(vary.valueOf()),
-            dura: vary => Boolean(vary.valueOf()),
-            span: vary => Boolean(vary.duration.valueOf()),
-            dict: vary => Boolean(Reflect.ownKeys(vary).length),
-            list: vary => Boolean(vary.length),
-            elem: vary => Boolean(vary.attributes.length + vary.childNodes.length),
-            tree: vary => Boolean(vary.value || vary.kids.length),
-        });
-    }
-    $.$giper_baza_vary_cast_bool = $giper_baza_vary_cast_bool;
-    function $giper_baza_vary_cast_bint(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => BigInt(vary.length),
-            bool: vary => BigInt(vary),
-            bint: vary => vary,
-            real: vary => Number.isFinite(vary) ? BigInt(Math.trunc(vary)) : null,
-            link: vary => null,
-            text: vary => {
-                try {
-                    return vary ? BigInt(vary) : null;
-                }
-                catch {
-                    return null;
-                }
-            },
-            time: vary => BigInt(vary.valueOf()),
-            dura: vary => BigInt(vary.valueOf()),
-            span: vary => BigInt(vary.duration.valueOf()),
-            dict: vary => BigInt(Reflect.ownKeys(vary).length),
-            list: vary => BigInt(vary.length),
-            elem: vary => BigInt(vary.attributes.length + vary.childNodes.length),
-            tree: vary => {
-                try {
-                    return BigInt(vary.value);
-                }
-                catch {
-                    return BigInt(vary.kids.length);
-                }
-            },
-        });
-    }
-    $.$giper_baza_vary_cast_bint = $giper_baza_vary_cast_bint;
-    function $giper_baza_vary_cast_real(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => vary.length,
-            bool: vary => Number(vary),
-            bint: vary => Number(vary),
-            real: vary => vary,
-            link: vary => null,
-            text: vary => vary ? Number(vary) : null,
-            time: vary => vary.valueOf(),
-            dura: vary => vary.valueOf(),
-            span: vary => vary.duration.valueOf(),
-            dict: vary => Reflect.ownKeys(vary).length,
-            list: vary => vary.length,
-            elem: vary => Number(vary.attributes.length + vary.childNodes.length),
-            tree: vary => Number(vary.value || vary.kids.length),
-        });
-    }
-    $.$giper_baza_vary_cast_real = $giper_baza_vary_cast_real;
-    function $giper_baza_vary_cast_link(vary) {
-        return vary instanceof $giper_baza_link ? vary : null;
-    }
-    $.$giper_baza_vary_cast_link = $giper_baza_vary_cast_link;
-    function $giper_baza_vary_cast_text(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => $mol_base64_ae_encode(new Uint8Array(vary.buffer, vary.byteOffset, vary.byteLength)),
-            bool: vary => String(vary),
-            bint: vary => String(vary),
-            real: vary => String(vary),
-            link: vary => vary.str,
-            text: vary => vary,
-            time: vary => String(vary),
-            dura: vary => String(vary),
-            span: vary => String(vary),
-            dict: vary => JSON.stringify(vary),
-            list: vary => JSON.stringify(vary),
-            elem: vary => $mol_dom_serialize(vary),
-            tree: vary => String(vary),
-        });
-    }
-    $.$giper_baza_vary_cast_text = $giper_baza_vary_cast_text;
-    function $giper_baza_vary_cast_time(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => null,
-            bool: vary => null,
-            bint: vary => new $mol_time_moment(Number(vary & 0xffffffffffffn)),
-            real: vary => {
-                try {
-                    return new $mol_time_moment(vary);
-                }
-                catch {
-                    return null;
-                }
-            },
-            link: vary => null,
-            text: vary => {
-                try {
-                    return vary ? new $mol_time_moment(vary) : null;
-                }
-                catch {
-                    return null;
-                }
-            },
-            time: vary => vary,
-            dura: vary => null,
-            span: vary => null,
-            dict: vary => {
-                try {
-                    return new $mol_time_moment(vary);
-                }
-                catch {
-                    return null;
-                }
-            },
-            list: vary => null,
-            elem: vary => null,
-            tree: vary => null,
-        });
-    }
-    $.$giper_baza_vary_cast_time = $giper_baza_vary_cast_time;
-    function $giper_baza_vary_cast_dura(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => null,
-            bool: vary => null,
-            bint: vary => new $mol_time_duration(Number(vary & 0xffffffffffffn)),
-            real: vary => {
-                try {
-                    return new $mol_time_duration(vary);
-                }
-                catch {
-                    return null;
-                }
-            },
-            link: vary => null,
-            text: vary => {
-                try {
-                    return new $mol_time_duration(vary);
-                }
-                catch {
-                    return null;
-                }
-            },
-            time: vary => null,
-            dura: vary => vary,
-            span: vary => null,
-            dict: vary => new $mol_time_duration(vary),
-            list: vary => null,
-            elem: vary => null,
-            tree: vary => null,
-        });
-    }
-    $.$giper_baza_vary_cast_dura = $giper_baza_vary_cast_dura;
-    function $giper_baza_vary_cast_span(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => null,
-            bool: vary => null,
-            bint: vary => null,
-            real: vary => null,
-            link: vary => null,
-            text: vary => {
-                try {
-                    return vary ? new $mol_time_interval(vary) : null;
-                }
-                catch {
-                    return null;
-                }
-            },
-            time: vary => new $mol_time_interval({ start: vary, duration: 0 }),
-            dura: vary => null,
-            span: vary => vary,
-            dict: vary => {
-                try {
-                    return new $mol_time_interval(vary);
-                }
-                catch {
-                    return null;
-                }
-            },
-            list: vary => null,
-            elem: vary => null,
-            tree: vary => null,
-        });
-    }
-    $.$giper_baza_vary_cast_span = $giper_baza_vary_cast_span;
-    function $giper_baza_vary_cast_dict(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => null,
-            bool: vary => null,
-            bint: vary => null,
-            real: vary => null,
-            link: vary => null,
-            text: vary => {
-                if (!vary)
-                    return null;
-                try {
-                    const res = JSON.parse(vary);
-                    if (typeof res === 'object')
-                        return res;
-                    return null;
-                }
-                catch {
-                    return null;
-                }
-            },
-            time: vary => ({ ...vary }),
-            dura: vary => ({ ...vary }),
-            span: vary => ({ ...vary }),
-            dict: vary => vary,
-            list: vary => Object(vary[0]),
-            elem: vary => null,
-            tree: vary => null,
-        });
-    }
-    $.$giper_baza_vary_cast_dict = $giper_baza_vary_cast_dict;
-    function $giper_baza_vary_cast_list(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => [...vary],
-            bool: vary => [vary],
-            bint: vary => [vary.toString()],
-            real: vary => Number.isFinite(vary) ? [vary] : null,
-            link: vary => [vary.str],
-            text: vary => {
-                if (!vary)
-                    return null;
-                try {
-                    return [].concat(JSON.parse(vary));
-                }
-                catch {
-                    return [vary];
-                }
-            },
-            time: vary => [vary.toJSON()],
-            dura: vary => [vary.toJSON()],
-            span: vary => [vary.toJSON()],
-            dict: vary => [vary],
-            list: vary => vary,
-            elem: vary => [$mol_dom_serialize(vary)],
-            tree: vary => [vary.toString()],
-        });
-    }
-    $.$giper_baza_vary_cast_list = $giper_baza_vary_cast_list;
-    function $giper_baza_vary_cast_elem(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => $mol_jsx("body", null, $giper_baza_vary_cast_text(vary)),
-            bool: vary => $mol_jsx("body", null, vary),
-            bint: vary => $mol_jsx("body", null, vary),
-            real: vary => $mol_jsx("body", null, vary),
-            link: vary => $mol_jsx("body", null, vary.str),
-            text: vary => {
-                if (!vary)
-                    return null;
-                try {
-                    return vary ? $mol_dom_parse(vary, 'application/xhtml+xml').documentElement : null;
-                }
-                catch {
-                    return $mol_jsx("body", null, vary);
-                }
-            },
-            time: vary => $mol_jsx("body", null, vary),
-            dura: vary => $mol_jsx("body", null, vary),
-            span: vary => $mol_jsx("body", null, vary),
-            dict: vary => $mol_jsx("body", null, JSON.stringify(vary)),
-            list: vary => $mol_jsx("body", null, JSON.stringify(vary)),
-            elem: vary => vary,
-            tree: vary => $mol_jsx("body", null, vary),
-        });
-    }
-    $.$giper_baza_vary_cast_elem = $giper_baza_vary_cast_elem;
-    function $giper_baza_vary_cast_tree(vary) {
-        return $giper_baza_vary_switch(vary, {
-            none: vary => null,
-            blob: vary => vary instanceof Uint8Array ? $mol_tree2_bin_from_bytes(vary) : null,
-            bool: vary => $mol_tree2.struct(vary.toString()),
-            bint: vary => $mol_tree2.struct(vary.toString()),
-            real: vary => $mol_tree2.struct(vary.toString()),
-            link: vary => $mol_tree2.struct(vary.str),
-            text: vary => {
-                if (!vary)
-                    return null;
-                try {
-                    return $$.$mol_tree2_from_string(vary);
-                }
-                catch {
-                    return $$.$mol_tree2.data(vary);
-                }
-            },
-            time: vary => $mol_tree2.struct(vary.toString()),
-            dura: vary => $mol_tree2.struct(vary.toString()),
-            span: vary => $mol_tree2.struct(vary.toString()),
-            dict: vary => $$.$mol_tree2_from_json(vary),
-            list: vary => $$.$mol_tree2_from_json(vary),
-            elem: vary => $$.$mol_tree2_xml_from_dom(vary),
-            tree: vary => vary,
-        });
-    }
-    $.$giper_baza_vary_cast_tree = $giper_baza_vary_cast_tree;
-    $.$giper_baza_vary_cast_funcs = {
-        none: () => null,
-        blob: $giper_baza_vary_cast_blob,
-        bool: $giper_baza_vary_cast_bool,
-        bint: $giper_baza_vary_cast_bint,
-        real: $giper_baza_vary_cast_real,
-        link: $giper_baza_vary_cast_link,
-        text: $giper_baza_vary_cast_text,
-        time: $giper_baza_vary_cast_time,
-        dura: $giper_baza_vary_cast_dura,
-        span: $giper_baza_vary_cast_span,
-        dict: $giper_baza_vary_cast_dict,
-        list: $giper_baza_vary_cast_list,
-        elem: $giper_baza_vary_cast_elem,
-        tree: $giper_baza_vary_cast_tree,
-    };
 })($ || ($ = {}));
 
 ;
@@ -12002,6 +12418,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** State of arguments like `foo=bar xxx` */
     class $mol_state_arg extends $mol_object {
         prefix;
         static prolog = '';
@@ -12108,7 +12525,7 @@ var $;
 var $;
 (function ($) {
     function batch(host, items, task) {
-        items.call(host);
+        items.call(host); // track deps
         const skip = new Set();
         while (true) {
             const snap = $mol_wire_sync(items).call(host);
@@ -12121,13 +12538,16 @@ var $;
         }
     }
     $.$giper_baza_land_root = {
-        data: new $giper_baza_link(''),
-        tine: new $giper_baza_link('AQAAAAAA'),
+        data: new $giper_baza_link(''), // 0
+        tine: new $giper_baza_link('AQAAAAAA'), // 1
     };
+    /** Standalone part of Glob which syncs separately, have own rights, and contains Units */
     class $giper_baza_land extends $mol_object {
+        /** Auth Independent actor with global unique id generated from Auth key */
         link() {
             return this.auth().pass().lord();
         }
+        /** Auth Private key generated with Proof of Work  */
         auth() {
             return this.$.$giper_baza_auth.current();
         }
@@ -12272,6 +12692,7 @@ var $;
             return this._sand.get(head.str)?.get(lord.str)?.get(self.str) ?? null;
         }
         _self_all = new $mol_wire_dict();
+        /** Generates unique local id base on optional idea number or random. */
         self_make(idea = Math.floor(Math.random() * 2 ** 48)) {
             const auth = this.auth();
             const rank = this.pass_rank(auth.pass());
@@ -12291,7 +12712,9 @@ var $;
             }
             $mol_fail(new Error(`Too long self generation`));
         }
+        /** Makes new Area based on Idea or random. Once transfers rights from this Land. */
         area_make(idea = Math.floor($mol_wire_sync(Math).random() * 2 ** 48)) {
+            // this.saving()
             let id = '';
             while (true) {
                 idea = $mol_hash_numbers([idea]);
@@ -12340,20 +12763,24 @@ var $;
             part = pack.parts()[0][1];
             this.diff_apply(part.units);
         }
+        /** Data root */
         Data(Pawn) {
             return this.Pawn(Pawn).Head($.$giper_baza_land_root.data);
         }
+        /** Lands for inheritance */
         Tine() {
             return this.Pawn($giper_baza_list_link).Head($.$giper_baza_land_root.tine);
         }
+        /** High level representation of stored data */
         Pawn(Pawn) {
             return new $giper_baza_fund((head) => {
                 return Pawn.make({
-                    land: $mol_const(this),
+                    land: $mol_const(this), //.sync(),
                     head: $mol_const(head),
                 });
             });
         }
+        /** Total count of Units inside Land. */
         total() {
             let total = this._gift.size + this._seal_item.size;
             for (const peers of this._sand.values()) {
@@ -12366,6 +12793,7 @@ var $;
         king_pass() {
             return this.lord_pass(this.link().lord());
         }
+        /** Rights level of Pass for Land. */
         pass_rank(pass, next) {
             const prev = this.lord_rank(pass?.lord() ?? null);
             if (next === undefined)
@@ -12381,6 +12809,7 @@ var $;
         lord_rate(lord) {
             return $giper_baza_rank_rate_of(this.lord_rank(lord));
         }
+        /** Rights level of Lord for Land. Works only when Pass for Lord exists in Land. */
         lord_rank(lord, next) {
             if (lord?.str === this.link().lord().str)
                 return $giper_baza_rank_rule;
@@ -12390,8 +12819,10 @@ var $;
                     ?? (this.encrypted() ? $giper_baza_rank_deny : $giper_baza_rank_read);
             }
             const pass = lord ? this.lord_pass(lord) : null;
+            // if( !pass ) $mol_fail( new Error( `No Pass for ${ lord }` ) )
             return this.pass_rank(pass, next);
         }
+        /** Picks units between Face and current state. */
         diff_units(skip_faces = new $giper_baza_face_map) {
             this.units_signing();
             const skipped = new Map();
@@ -12431,6 +12862,7 @@ var $;
                     }
                 }
             }
+            // detect Unit absence and then restore all for Peer
             for (const [peer, face] of skip_faces) {
                 const skipped_units = skipped.get(peer);
                 const skip_mass = skipped_units?.size ?? 0;
@@ -12459,6 +12891,8 @@ var $;
             }
             return [...passes, ...delta];
         }
+        /** Picks units between Face and current state and make Part. */
+        // @ $mol_action
         diff_part(skip_faces = new $giper_baza_face_map) {
             const units = this.diff_units(skip_faces);
             const faces = new $giper_baza_face_map;
@@ -12473,6 +12907,8 @@ var $;
             }
             return new $giper_baza_pack_part(units, faces);
         }
+        /** Picks units between Face and current state and make Parts. */
+        // @ $mol_action
         diff_parts(skip_faces = new $giper_baza_face_map) {
             return [[this.link().str, this.diff_part(skip_faces)]];
         }
@@ -12482,6 +12918,7 @@ var $;
                     new $giper_baza_pack_part([], this.faces.clone()),
                 ]]);
         }
+        /** Applies Diff to current state with verification. */
         diff_apply(units, skip_load) {
             if (units.length === 0)
                 return;
@@ -12496,20 +12933,19 @@ var $;
                     passes.set(unit.hash().str, unit);
                 }
             }
-            for (const unit of units) {
+            for (const unit of units)
                 if (unit instanceof $giper_baza_unit_seal) {
                     const lord_pass = this.lord_pass(unit.lord()) ?? passes.get(unit.lord().str);
                     if (!lord_pass)
                         return this.$.$mol_fail(new Error(`No Pass for Lord`, { cause: unit.lord() }));
-                    if (!this.$.$giper_baza_unit_trusted_check(unit)) {
-                        const mixin = unit.wide() ? mixin_lord : mixin_area;
-                        const sens = unit.shot().mix(mixin);
-                        const checked = $mol_wire_sync(lord_pass.auditor()).verify(sens, unit.sign());
-                        if (!checked)
-                            return $mol_fail(new Error(`Wrong Sign`));
-                    }
+                    if (this.$.$giper_baza_unit_trusted_check(unit))
+                        continue;
+                    const mixin = unit.wide() ? mixin_lord : mixin_area;
+                    const sens = unit.shot().mix(mixin);
+                    const checked = $mol_wire_sync(lord_pass.auditor()).verify(sens, unit.sign());
+                    if (!checked)
+                        return $mol_fail(new Error(`Wrong Sign`));
                 }
-            }
             for (const unit of units) {
                 if (unit instanceof $giper_baza_unit_seal) {
                     $giper_baza_unit_trusted_grant(unit);
@@ -12586,9 +13022,11 @@ var $;
                     this.seal_del(seal);
                 }
                 for (const [lord, gift] of this._gift) {
+                    // if( this.unit_seal( gift ) ) {
                     const tier = this.lord_tier(gift.lord());
                     if (tier >= gift.tier_min())
                         continue;
+                    // }
                     this.gift_del(gift);
                     continue start;
                 }
@@ -12612,6 +13050,7 @@ var $;
         }
         sand_ordered({ head, peer }) {
             this.sync();
+            // this.secret() // early async to prevent async on put
             const queue = (peer?.str)
                 ? [...this._sand.get(head.str)?.get(peer.str)?.values() ?? []]
                 : [...this._sand.get(head.str)?.values() ?? []].flatMap(units => [...units.values()]);
@@ -12620,7 +13059,7 @@ var $;
                 slices.set(sand, 0);
             merge: if (head.str !== $.$giper_baza_land_root.tine.str) {
                 const tines = (this.Tine()?.items_vary().slice().reverse() ?? [])
-                    .map($giper_baza_vary_cast_link)
+                    .map(val => $giper_baza_link_schema.cast(val))
                     .filter($mol_guard_defined);
                 if (!tines.length)
                     break merge;
@@ -12705,6 +13144,10 @@ var $;
         join() {
             this.encrypted(this.encrypted());
         }
+        /**
+         * Gives access rights to Lord by Auth key.
+         * `null` - gives rights for all Peers.
+         */
         give(mate_pass, rank) {
             this.join();
             const gift = $giper_baza_unit_gift.make();
@@ -12736,6 +13179,7 @@ var $;
             this.broadcast();
             return gift;
         }
+        /** Places data to tree. */
         post(lead, head, self, vary, tag = 'term') {
             this.join();
             const lord_pass = this.auth().pass();
@@ -12840,7 +13284,7 @@ var $;
         }
         sand_encoding() {
             this.loading();
-            const sync = $mol_wire_sync(this);
+            const sands = [];
             for (const kids of this._sand.values()) {
                 for (const units of kids.values()) {
                     for (const sand of units.values()) {
@@ -12849,10 +13293,13 @@ var $;
                             continue;
                         if (sync_sand._ball)
                             continue;
-                        sync.sand_encode(sand);
+                        sands.push(sand);
                     }
                 }
             }
+            if (!sands.length)
+                return;
+            $mol_wire_sync(this).sands_encode(sands);
         }
         units_unsigned() {
             const signing = [];
@@ -12919,12 +13366,12 @@ var $;
         }
         async units_save(units) {
             const mine = this.mine();
-            const part = new $giper_baza_pack_part(units);
-            const pack = $giper_baza_pack.make([[this.link().str, part]]);
-            this.bus().send(pack.buffer);
             const reaping = [...this.units_reaping];
             this.units_reaping.clear();
             await $mol_wire_async(mine).units_save({ ins: units, del: reaping });
+            const part = new $giper_baza_pack_part(units);
+            const pack = $giper_baza_pack.make([[this.link().str, part]]);
+            this.bus().send(pack.buffer);
             if (this.$.$giper_baza_log())
                 this.$.$mol_log3_done({
                     place: this,
@@ -12934,7 +13381,7 @@ var $;
                 });
         }
         async units_sign(units) {
-            await Promise.resolve();
+            await Promise.resolve(); // prevent deps
             const lands = new Map();
             for (const unit of units) {
                 if (!unit._land)
@@ -12957,6 +13404,7 @@ var $;
                     lands.set(seal._land, us = []);
                 const hashes = seal.alive_list();
                 us.push(...hashes);
+                // this.seal_del( seal )
             }
             const threads = [...lands.entries()].flatMap(([land, hashes]) => {
                 const auth = land.auth();
@@ -12984,6 +13432,9 @@ var $;
             }
             return seals;
         }
+        sands_encode(sands) {
+            return Promise.all(sands.map(sand => this.sand_encode(sand)));
+        }
         async sand_encode(sand) {
             let bin = sand._open;
             if (sand._vary !== null) {
@@ -13001,7 +13452,8 @@ var $;
         }
         sand_decode(sand) {
             try {
-                const open = this.sand_decrypt(sand);
+                // const open = this.sand_decrypt( sand )
+                const open = sand._open;
                 return $giper_baza_link_base(this.link(), () => $giper_baza_vary.take(open)[0]);
             }
             catch (error) {
@@ -13011,10 +13463,42 @@ var $;
                 return null;
             }
         }
-        sand_decrypt(sand) {
+        // @ $mol_mem_key
+        // sand_decrypt( sand: $giper_baza_unit_sand ): Uint8Array< ArrayBuffer > {
+        // 	if( this.sand_get( sand.head(), sand.lord(), sand.self() ) !== sand ) {
+        // 		for( const id of this.Tine().items_vary() ?? [] ) {
+        // 			const open = this.$.$giper_baza_glob.Land( $giper_baza_vary_cast_link( id! )! ).sand_decrypt( sand )
+        // 			if( open ) return open
+        // 		}
+        // 		return undefined!
+        // 	}
+        // 	const secret = this.secret()
+        // 	if( sand._open ) return sand._open
+        // 	if( !sand._ball ) sand._ball = sand.big() ? $mol_wire_sync( this.mine() ).ball_load( sand ) : sand.data()
+        // 	if( secret && sand._ball && !sand.dead() ) {
+        // 		try {
+        // 			sand._open = $mol_wire_sync( secret ).decrypt( sand._ball, sand.salt() )
+        // 		} catch( error: any ) {
+        // 			if( $mol_fail_catch( error ) ) {
+        // 				if( error.message ) $mol_fail_hidden( error )
+        // 				else $mol_fail_hidden( new Error( `Can't decrypt`, { cause: error } ) )
+        // 			}
+        // 		}
+        // 	} else {
+        // 		sand._open = sand._ball
+        // 	}
+        // 	return sand._open!
+        // }
+        sands_open(sands) {
+            const closed = sands.filter(sand => !sand._open);
+            if (!closed.length)
+                return;
+            return Promise.all(closed.map(sand => this.sand_open(sand)));
+        }
+        async sand_open(sand) {
             if (this.sand_get(sand.head(), sand.lord(), sand.self()) !== sand) {
                 for (const id of this.Tine().items_vary() ?? []) {
-                    const open = this.$.$giper_baza_glob.Land($giper_baza_vary_cast_link(id)).sand_decrypt(sand);
+                    const open = await this.$.$giper_baza_glob.Land($giper_baza_link_schema.cast(id)).sand_open(sand);
                     if (open)
                         return open;
                 }
@@ -13024,10 +13508,10 @@ var $;
             if (sand._open)
                 return sand._open;
             if (!sand._ball)
-                sand._ball = sand.big() ? $mol_wire_sync(this.mine()).ball_load(sand) : sand.data();
+                sand._ball = sand.big() ? await $mol_wire_async(this.mine()).ball_load(sand) : sand.data();
             if (secret && sand._ball && !sand.dead()) {
                 try {
-                    sand._open = $mol_wire_sync(secret).decrypt(sand._ball, sand.salt());
+                    sand._open = await secret.decrypt(sand._ball, sand.salt());
                 }
                 catch (error) {
                     if ($mol_fail_catch(error)) {
@@ -13219,8 +13703,8 @@ var $;
         $mol_mem_key
     ], $giper_baza_land.prototype, "sand_decode", null);
     __decorate([
-        $mol_mem_key
-    ], $giper_baza_land.prototype, "sand_decrypt", null);
+        $mol_action
+    ], $giper_baza_land.prototype, "sands_open", null);
     __decorate([
         $mol_mem
     ], $giper_baza_land.prototype, "encryptable", null);
@@ -13373,8 +13857,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Reactive Set */
     class $mol_wire_set extends Set {
         pub = new $mol_wire_pub;
+        // Accessors
         has(value) {
             this.pub.promote();
             return super.has(value);
@@ -13403,6 +13889,7 @@ var $;
             this.pub.promote();
             return super.size;
         }
+        // Mutators
         add(value) {
             if (super.has(value))
                 return this;
@@ -13422,6 +13909,7 @@ var $;
             super.clear();
             this.pub.emit();
         }
+        // Extensions
         item(val, next) {
             if (next === undefined)
                 return this.has(val);
@@ -13457,7 +13945,13 @@ var $;
         $mol_websocket_frame_op[$mol_websocket_frame_op["ping"] = 9] = "ping";
         $mol_websocket_frame_op[$mol_websocket_frame_op["pong"] = 10] = "pong";
     })($mol_websocket_frame_op = $.$mol_websocket_frame_op || ($.$mol_websocket_frame_op = {}));
+    /**
+     * WebSocket frame header.
+     * https://datatracker.ietf.org/doc/html/rfc6455#section-5.2
+     * Payload >= 2^32 isn't supported
+     */
     class $mol_websocket_frame extends $mol_buffer {
+        /** Kind of socket frame. */
         kind(next) {
             if (next) {
                 this.setUint8(0, Number(next.fin) << 7 | $mol_websocket_frame_op[next.op]);
@@ -13472,6 +13966,7 @@ var $;
                 return { op, fin };
             }
         }
+        /** Payload info. */
         data(next) {
             if (next === undefined) {
                 const state = this.getUint8(1);
@@ -13498,11 +13993,15 @@ var $;
                 return next;
             }
         }
+        /** Header size (2..14). */
         size() {
+            if (this.byteLength < 2)
+                return 2;
             const short = this.getUint8(1) & 0b0111_1111;
             const mask = this.getUint8(1) >> 7;
             return (short === 127 ? 10 : short === 126 ? 4 : 2) + (mask ? 4 : 0);
         }
+        /** 4 byte mask. */
         mask() {
             return new Uint8Array(this.buffer, this.byteOffset + this.size() - 4, 4);
         }
@@ -13600,7 +14099,9 @@ var $;
 var $;
 (function ($) {
     const Passives = new WeakMap();
+    /** Glob synchronizer */
     class $giper_baza_yard extends $mol_object {
+        /** Whole global graph database which contains Lands */
         glob() {
             return null;
         }
@@ -13796,6 +14297,10 @@ var $;
                 if (!port_faces)
                     this.face_port_land([port, land_link], port_faces = new $giper_baza_face_map);
                 port_faces.sync(faces);
+                // for( let unit of part.units ) {
+                // 	if( unit instanceof $giper_baza_auth_pass ) continue
+                // 	port_faces.peer_time( unit.lord().peer().str, unit.time(), unit.tick() )
+                // }
             }
         }
         sync_land(land) {
@@ -13854,6 +14359,7 @@ var $;
             }
         }
         init_port_land([port, land]) {
+            // $mol_wire_solid() 
             const Land = this.$.$giper_baza_glob.Land(land);
             Land.loading();
             if (this.$.$giper_baza_log())
@@ -13945,11 +14451,16 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Kind of Unit */
     let $giper_baza_unit_kind;
     (function ($giper_baza_unit_kind) {
+        /** Unit of data. */
         $giper_baza_unit_kind[$giper_baza_unit_kind["sand"] = $giper_baza_slot_kind.sand] = "sand";
+        /** Rights/Keys sharing. */
         $giper_baza_unit_kind[$giper_baza_unit_kind["gift"] = $giper_baza_slot_kind.gift] = "gift";
+        /** Sign for hash list. */
         $giper_baza_unit_kind[$giper_baza_unit_kind["seal"] = $giper_baza_slot_kind.seal] = "seal";
+        /** Public key. */
         $giper_baza_unit_kind[$giper_baza_unit_kind["pass"] = $giper_baza_slot_kind.pass] = "pass";
     })($giper_baza_unit_kind = $.$giper_baza_unit_kind || ($.$giper_baza_unit_kind = {}));
     $.$giper_baza_unit_trusted = new WeakSet();
@@ -13965,6 +14476,7 @@ var $;
         return $.$giper_baza_unit_trusted.has(unit);
     }
     $.$giper_baza_unit_trusted_check = $giper_baza_unit_trusted_check;
+    /** Order units: lord / seal / gift / sand */
     function $giper_baza_unit_sort(units) {
         const nodes = new Map();
         const graph = new $mol_graph();
@@ -13984,21 +14496,21 @@ var $;
                 continue;
             unit.choose({
                 gift: gift => {
-                    graph.link(gift, nodes.get(gift.lord().str) ?? null, 1);
-                    graph.link(gift, null, 0);
+                    graph.link(gift, nodes.get(gift.lord().str) ?? null, 1); // gift => lord
+                    graph.link(gift, null, 0); // gift -> every
                     if (gift.lord().str === gift.mate().str)
                         return;
-                    graph.link(nodes.get(gift.mate().str) ?? null, gift, 1);
+                    graph.link(nodes.get(gift.mate().str) ?? null, gift, 1); // mate => gift
                 },
                 sand: sand => {
-                    graph.link(sand, nodes.get(sand.lord().str) ?? null, 1);
-                    graph.link(sand, null, 1);
+                    graph.link(sand, nodes.get(sand.lord().str) ?? null, 1); // sand => lord
+                    graph.link(sand, null, 1); // sand => every
                 },
                 seal: seal => {
-                    graph.link(seal, nodes.get(seal.lord().str) ?? null, 0);
-                    graph.link(seal, null, 0);
+                    graph.link(seal, nodes.get(seal.lord().str) ?? null, 0); // seal -> lord
+                    graph.link(seal, null, 0); // seal -> every
                     for (const hash of seal.hash_list()) {
-                        graph.link(nodes.get(hash.str) ?? null, seal, 1);
+                        graph.link(nodes.get(hash.str) ?? null, seal, 1); // unit => seal
                     }
                 }
             });
@@ -14007,7 +14519,12 @@ var $;
         return [...graph.sorted].filter(Boolean);
     }
     $.$giper_baza_unit_sort = $giper_baza_unit_sort;
+    /** Minimal independent stable part of information. */
     class $giper_baza_unit_base extends $mol_buffer {
+        /**
+         * Compare Seals on timeline ( right - left )
+         * Priority: time > lord > tick
+         */
         static compare(left, right) {
             if (!left && !right)
                 return 0;
@@ -14073,15 +14590,18 @@ var $;
                 return next;
             }
         }
+        /** Seconds from UNIX epoch */
         time(next) {
             return this.uint32(4, next);
         }
         moment() {
             return new $mol_time_moment(Number(this.time() * 1000));
         }
+        /** Step in transaction */
         tick(next) {
             return this.uint16(2, next);
         }
+        /** Monotonic Real+Logic Time */
         time_tick(next) {
             if (!next)
                 return this.tick() + this.time() * 2 ** 16;
@@ -14095,8 +14615,9 @@ var $;
                 return this._lord = this.id12(8, next);
             return this._lord ?? (this._lord = this.id12(8));
         }
+        /** Unique number for encryption */
         salt() {
-            return new Uint8Array(this.buffer, this.byteOffset + 2, 16);
+            return new Uint8Array(this.buffer, this.byteOffset + 2, 16); /* tick(2), time(4), lord(10) */
         }
         hash() {
             return $giper_baza_link.hash_bin(this.asArray());
@@ -14151,6 +14672,7 @@ var $;
         return keys.map(key => dict.get(key)).filter(Boolean);
     }
     $.$giper_baza_unit_gift_sort = $giper_baza_unit_gift_sort;
+    /** Given Rank and Secret */
     class $giper_baza_unit_gift extends $giper_baza_unit_base {
         static length() {
             return 48;
@@ -14228,6 +14750,7 @@ var $;
 var $;
 (function ($) {
     $.$giper_baza_unit_seal_limit = 10;
+    /**  Sign for hash list */
     class $giper_baza_unit_seal extends $giper_baza_unit_base {
         static length(size) {
             return Math.ceil((84 + size * 12) / 8) * 8;
@@ -14264,6 +14787,7 @@ var $;
                 for (let i = 0; i < next.length; ++i) {
                     this.hash_item(i, next[i]);
                 }
+                // this.size( next.length )
                 return this._hash_list = next;
             }
             else {
@@ -14275,6 +14799,7 @@ var $;
                 return this._hash_list = list;
             }
         }
+        /** Hash for signing. */
         shot() {
             return $giper_baza_link.hash_bin(new Uint8Array(this.buffer, this.byteOffset, this.byteLength - 64));
         }
@@ -14284,6 +14809,7 @@ var $;
                 buf.set(next);
             return buf;
         }
+        // @ $mol_memo.method
         work() {
             let int = new Uint32Array(this.hash().toBin().buffer)[0];
             let count = 0;
@@ -14331,13 +14857,19 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Hint how interpret inner Units: term, solo, vals, keys */
     let $giper_baza_unit_sand_tag;
     (function ($giper_baza_unit_sand_tag) {
+        /** Itself value. Ignore */
         $giper_baza_unit_sand_tag[$giper_baza_unit_sand_tag["term"] = 0] = "term";
+        /** Value in first sub node. Ignore all after first */
         $giper_baza_unit_sand_tag[$giper_baza_unit_sand_tag["solo"] = 64] = "solo";
+        /** List of values */
         $giper_baza_unit_sand_tag[$giper_baza_unit_sand_tag["vals"] = 128] = "vals";
+        /** List of keys */
         $giper_baza_unit_sand_tag[$giper_baza_unit_sand_tag["keys"] = 192] = "keys";
     })($giper_baza_unit_sand_tag = $.$giper_baza_unit_sand_tag || ($.$giper_baza_unit_sand_tag = {}));
+    /** Data. Actually it's edge between nodes in graph model. */
     class $giper_baza_unit_sand extends $giper_baza_unit_base {
         static size_equator = 63;
         static size_max = 2 ** 16;
@@ -14380,7 +14912,7 @@ var $;
                 return true;
             if (this.size() > 1)
                 return false;
-            if (this.uint8(38) !== 78)
+            if (this.uint8(38) !== 78 /*N*/)
                 return false;
             return true;
         }
@@ -14454,7 +14986,7 @@ var $;
             return super.hash();
         }
         idea_seed() {
-            return $mol_hash_numbers(new Uint8Array(this.buffer, this.byteOffset + 26, 12));
+            return $mol_hash_numbers(new Uint8Array(this.buffer, this.byteOffset + 26, 12)); // head + lead
         }
         dump() {
             return {
@@ -14500,7 +15032,7 @@ var $;
             return `${super.toString()} ${tag} ${lead}\\${head}/${self} ${vary}`;
         }
         [$mol_dev_format_head]() {
-            return $mol_dev_format_span({}, $mol_dev_format_native(this), ' 👾', $mol_dev_format_auto(this.lord()), ' 📦 ', $mol_dev_format_shade($giper_baza_time_dump(this.time(), this.tick())), ' #', $mol_dev_format_auto(this.hash()), ' ', this.lead().str || '__knot__', $mol_dev_format_shade('\\'), $mol_dev_format_accent(this.head().str || '__root__'), $mol_dev_format_shade('/'), this.self().str || '__meta__', ' ', {
+            return $mol_dev_format_span({}, $mol_dev_format_native(this), ' 👾', $mol_dev_format_auto(this.lord()), ' 📦 ', $mol_dev_format_shade($giper_baza_time_dump(this.time(), this.tick())), ' #', this.encoded() ? $mol_dev_format_auto(this.hash()) : undefined, ' ', this.lead().str || '__knot__', $mol_dev_format_shade('\\'), $mol_dev_format_accent(this.head().str || '__root__'), $mol_dev_format_shade('/'), this.self().str || '__meta__', ' ', {
                 term: '💼',
                 solo: '1️⃣',
                 vals: '🎹',
@@ -14532,10 +15064,13 @@ var $;
         ball_inserts = 0;
         ball_deletes = 0;
         units_persisted = new WeakSet();
+        /** Updates Units in storage */
         units_save(diff) { }
+        /** Loads Units from storage */
         units_load() {
             return [];
         }
+        /** Loads Ball from storage */
         ball_load(sand) {
             return null;
         }
@@ -14551,6 +15086,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Atomic transaction. */
     class $giper_baza_mine_fs_yym_act extends $mol_object2 {
         yym;
         constructor(yym) {
@@ -14560,6 +15096,7 @@ var $;
         transaction;
         offsets_del = new WeakMap;
         offsets_ins = new WeakMap;
+        /** Stores data and returns offset in file. */
         save(...data) {
             let offset = this.offsets_ins.get(data[0].buffer);
             if (offset === undefined) {
@@ -14578,6 +15115,7 @@ var $;
             });
             return offset;
         }
+        /** Marks slice of file as free. */
         free(data, size = data.byteLength) {
             size = Math.ceil(size / 8) * 8;
             let offset = this.offsets_del.get(data.buffer);
@@ -14603,17 +15141,22 @@ var $;
         $mol_action
     ], $giper_baza_mine_fs_yym_act.prototype, "free", null);
     $.$giper_baza_mine_fs_yym_act = $giper_baza_mine_fs_yym_act;
+    /** Yin-Yan Mirrors Storage. */
     class $giper_baza_mine_fs_yym extends $mol_object2 {
         sides;
+        /** Memory allocator. */
         pool(reset) {
             $mol_wire_solid();
             return new $mol_memory_pool;
         }
+        /** Offsets of stored buffers. */
         offsets(reset) {
             $mol_wire_solid();
             return new Map;
         }
-        constructor(sides) {
+        constructor(
+        /** Yin & Yan mirrors files. */
+        sides) {
             super();
             this.sides = sides;
         }
@@ -14625,11 +15168,13 @@ var $;
             this.pool(null);
             this.offsets(null);
         }
+        /** Prepare mirrors to read. */
         load_init() {
             const version = (file) => file.modified()?.valueOf() ?? 0;
             if (version(this.sides[0]) < version(this.sides[1]))
                 this.sides.reverse();
         }
+        /** Load whole data. */
         load() {
             this.load_init();
             try {
@@ -14645,6 +15190,7 @@ var $;
                 return $mol_fail_hidden(error);
             }
         }
+        /** Safe writes to both mirrors. */
         atomic(task) {
             this.save_init();
             const act = new $giper_baza_mine_fs_yym_act(this);
@@ -14657,6 +15203,7 @@ var $;
             task(act);
             tx2.destructor();
         }
+        /** Prepares mirrors to write. */
         save_init() {
             $mol_wire_solid();
             this.load_init();
@@ -14745,6 +15292,7 @@ var $;
                     return $mol_fail(new Error('Unexpected land', { cause: { expected: this.land().str, existen: land } }));
                 for (const unit of part.units) {
                     this.units_persisted.add(unit);
+                    $giper_baza_unit_trusted_grant(unit);
                 }
                 return part.units;
             }
@@ -14780,43 +15328,53 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Virtual Pawn that represents contained units as high-level data types. */
     class $giper_baza_pawn extends $mol_object {
         static tag = 'vals';
         static meta = null;
+        /** Standalone part of Glob which syncs separately, have own rights, and contains Units */
         land() {
             return null;
         }
+        /** Land local Pawn id */
         head() {
             return $giper_baza_link.hole;
         }
+        /** Link to Land/Lord. */
         land_link() {
             return this.land()?.link() ?? this.$.$giper_baza_auth.current().pass().lord();
         }
+        /** Link to Pawn/Land/Lord. */
         link() {
             return new $giper_baza_link('___' + this.head()).resolve(this.land_link());
         }
         toJSON() {
             return this.link().str;
         }
+        /** Returns another representation of this Pawn. */
         cast(Pawn) {
             return this.land().Pawn(Pawn).Head(this.head());
         }
+        /** Ordered inner alive Pawn. */
         pawns(Pawn) {
             const land = this.land();
             const map = {
-                term: () => land.Pawn(Pawn || $giper_baza_atom_vary),
-                solo: () => land.Pawn(Pawn || $giper_baza_atom_vary),
-                vals: () => land.Pawn(Pawn || $giper_baza_list_vary),
+                term: () => land.Pawn(Pawn || $giper_baza_atom),
+                solo: () => land.Pawn(Pawn || $giper_baza_atom),
+                vals: () => land.Pawn(Pawn || $giper_baza_list),
                 keys: () => land.Pawn(Pawn || $giper_baza_dict),
             };
             return this.units().map(unit => map[unit.tag()]().Head(unit.self()));
         }
+        /** All ordered alive Units */
         units() {
             return this.units_of($giper_baza_link.hole);
         }
         units_of(peer) {
             const head = this.head();
-            return this.land().sand_ordered({ head, peer }).filter(unit => !unit.dead() && unit.self().str !== '');
+            const units = this.land().sand_ordered({ head, peer }).filter(unit => !unit.dead() && unit.self().str !== '');
+            this.land().sands_open(units);
+            return units;
         }
         meta(next) {
             const prev = this.meta_of($giper_baza_link.hole);
@@ -14831,14 +15389,18 @@ var $;
         meta_of(peer) {
             const head = this.head();
             const unit = this.land().sand_ordered({ head, peer }).find(unit => !unit.dead() && unit.self().str === '') ?? null;
-            return unit ? $giper_baza_vary_cast_link(this.land().sand_decode(unit)) : null;
+            if (unit)
+                this.land().sands_open([unit]);
+            return unit ? $giper_baza_link_schema.cast(this.land().sand_decode(unit)) : null;
         }
         filled() {
             return this.units().length > 0;
         }
+        /** Ability to make changes by current peer. */
         can_change() {
             return this.land().pass_rank(this.land().auth().pass()) >= $giper_baza_rank_post('late');
         }
+        /** Time of last changed unit inside Pawn subtree */
         last_change() {
             const land = this.land();
             let last = 0;
@@ -14852,6 +15414,7 @@ var $;
             this.units().forEach(visit);
             return last ? $giper_baza_time_moment(last) : null;
         }
+        /** All author Passes of Pawn subtree */
         authors() {
             const land = this.land();
             const peers = new Set();
@@ -14906,9 +15469,9 @@ var $;
         if (!replace)
             replace = (next, prev, lead) => insert(next, drop(prev, lead));
         if (to > prev.length)
-            to = prev.length;
+            to = prev.length; // $mol_fail( new RangeError( `To(${ to }) greater then length(${ prev.length })` ) )
         if (from > to)
-            from = to;
+            from = to; // $mol_fail( new RangeError( `From(${ to }) greater then to(${ to })` ) )
         let p = from;
         let n = 0;
         let lead = p ? prev[p - 1] : null;
@@ -14940,8 +15503,180 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    class $giper_baza_list_vary extends $giper_baza_pawn {
+    class $mol_schema_boolean extends $mol_schema_any {
+        static guard(value) {
+            if (typeof value === 'boolean')
+                return value;
+            return $mol_fail(new TypeError('Wrong type', { cause: { value, schema: this } }));
+        }
+        static default = false;
+    }
+    $.$mol_schema_boolean = $mol_schema_boolean;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $mol_schema_float extends $mol_schema_any {
+        static guard(value) {
+            if (typeof value === 'number')
+                return value;
+            return $mol_fail(new TypeError('Wrong type', { cause: { value, schema: this } }));
+        }
+        static default = Number.NaN;
+    }
+    $.$mol_schema_float = $mol_schema_float;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $mol_schema_integer extends $mol_schema_float {
+        $mol_schema_integer = true;
+        static guard(value) {
+            const val = super.guard(value);
+            if (!Number.isFinite(val))
+                return $mol_fail(new TypeError('Non finite', { cause: { value, schema: this } }));
+            if (Math.trunc(val) !== val)
+                return $mol_fail(new TypeError('Non integer', { cause: { value, schema: this } }));
+            return val;
+        }
+        static default = 0;
+    }
+    $.$mol_schema_integer = $mol_schema_integer;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $mol_schema_bigint extends $mol_schema_any {
+        static guard(value) {
+            if (typeof value === 'bigint')
+                return value;
+            return $mol_fail(new TypeError('Wrong type', { cause: { value, schema: this } }));
+        }
+        static cast(value) {
+            if (typeof value === 'number')
+                return BigInt($mol_schema_integer.cast(value));
+            return super.cast(value);
+        }
+        static default = 0n;
+    }
+    $.$mol_schema_bigint = $mol_schema_bigint;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class $mol_schema_string extends $mol_schema_any {
+        static guard(value) {
+            if (typeof value === 'string')
+                return value;
+            return $mol_fail(new TypeError('Wrong type', { cause: { value, schema: this } }));
+        }
+        static cast(value) {
+            return super.cast(value);
+        }
+        static default = '';
+    }
+    $.$mol_schema_string = $mol_schema_string;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $.$mol_schema_dict = $mol_memo_key.func(function $mol_schema_dict(Pair) {
+        return class $mol_schema_dict_ extends $mol_schema_any {
+            static Pair = Pair;
+            static toString() {
+                if (this !== $mol_schema_dict_)
+                    return super.toString();
+                return '$mol_schema_dict<' + $mol_key(Pair) + '>';
+            }
+            static guard(value) {
+                if (Object.getPrototypeOf(Object.getPrototypeOf(value))) {
+                    return $mol_fail(new TypeError('Non dictionary', { cause: { value, schema: this } }));
+                }
+                for (const key in value) {
+                    try {
+                        Pair[0].guard(key);
+                    }
+                    catch (error) {
+                        return $mol_fail(new TypeError('Wrong key', { cause: { key, error, value, schema: this } }));
+                    }
+                    try {
+                        Pair[1].guard(value[key]);
+                    }
+                    catch (error) {
+                        return $mol_fail(new TypeError('Wrong val', { cause: { key, error, value, schema: this } }));
+                    }
+                }
+                return value;
+            }
+            static cast(value) {
+                if (Object.getPrototypeOf(Object.getPrototypeOf(value)))
+                    return this.default;
+                const res = {};
+                for (const key in value) {
+                    if (!Pair[0].check(key))
+                        continue;
+                    res[key] = Pair[1].cast(value[key]);
+                }
+                return res;
+            }
+            static default = {};
+        };
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $.$mol_schema_list = $mol_memo_key.func(function $mol_schema_list(Item) {
+        return class $mol_schema_list_ extends $mol_schema_any {
+            static Item = Item;
+            static toString() {
+                if (this !== $mol_schema_list_)
+                    return super.toString();
+                return '$mol_schema_list<' + $mol_key(Item) + '>';
+            }
+            static guard(value) {
+                if (!Array.isArray(value))
+                    return $mol_fail(new TypeError('Non array', { cause: { value, schema: this } }));
+                for (const [index, item] of super.guard(value).entries()) {
+                    try {
+                        Item.guard(item);
+                    }
+                    catch (error) {
+                        return $mol_fail(new TypeError('Wrong item', { cause: { index, error, value, schema: this } }));
+                    }
+                }
+                return value;
+            }
+            static cast(value) {
+                if (!Array.isArray(value))
+                    return this.default;
+                return value.map(item => Item.cast(item));
+            }
+            static default = [];
+        };
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /** Reactive convergent list. */
+    class $giper_baza_list extends $giper_baza_pawn {
         static tag = $giper_baza_unit_sand_tag[$giper_baza_unit_sand_tag.vals];
+        /** All Vary in the list. */
         items_vary(next, tag = 'term') {
             const units = this.units();
             if (next === undefined)
@@ -14949,6 +15684,7 @@ var $;
             this.splice(next, 0, units.length, tag);
             return this.items_vary();
         }
+        /** Replace sublist by  new one with reconciliation. */
         splice(next, from = this.units().length, to = from, tag = 'term') {
             const land = this.land();
             $mol_reconcile({
@@ -14962,6 +15698,7 @@ var $;
                 replace: (next, prev, lead) => this.land().post(lead?.self() ?? $giper_baza_link.hole, prev.head(), prev.self(), next, prev.tag()),
             });
         }
+        /** Unit by Vary. */
         find(vary) {
             for (const unit of this.units()) {
                 if ($mol_compare_deep(this.land().sand_decode(unit), vary))
@@ -14969,6 +15706,7 @@ var $;
             }
             return null;
         }
+        /** Existence of Vary in the list. */
         has(vary, next, tag = 'term') {
             if (next === undefined)
                 return Boolean(this.find(vary));
@@ -14978,11 +15716,13 @@ var $;
                 this.cut(vary);
             return next;
         }
+        /** Add Vary a the beginning if it doesn't exists. */
         add(vary, tag = 'term') {
             if (this.has(vary))
                 return;
             this.land().post($giper_baza_link.hole, this.head(), null, vary, tag);
         }
+        /** Removes all Vary presence. */
         cut(vary) {
             const units = [...this.units()];
             for (let i = 0; i < units.length; ++i) {
@@ -14993,12 +15733,15 @@ var $;
                 --i;
             }
         }
+        /** Moves item from one Seat to another. */
         move(from, to) {
             this.land().sand_move(this.units()[from], this.head(), to);
         }
+        /** Remove item by Seat. */
         wipe(seat) {
             this.land().sand_wipe(this.units()[seat]);
         }
+        /** Add vary at the end and use maked Self as Pawn Head. */
         pawn_make(Pawn, vary, tag = 'term') {
             this.splice([vary], undefined, undefined, tag);
             return this.land().Pawn(Pawn).Head(this.units().at(-1).self());
@@ -15007,125 +15750,149 @@ var $;
         [$mol_dev_format_head]() {
             return $mol_dev_format_span({}, $mol_dev_format_native(this), ' ', this.head(), ' ', $mol_dev_format_auto(this.items_vary()));
         }
+        /** Mergeable list of atomic vary type factory */
+        static of(init) {
+            const Item = $mol_schema_instance(init);
+            class $giper_baza_list_of extends $giper_baza_list {
+                static Item = Item;
+                items(next) {
+                    if (next === undefined)
+                        return this.items_vary().map(item => Item.cast(item));
+                    for (const item of next)
+                        Item.guard(item);
+                    this.items_vary(next);
+                    return this.items();
+                }
+                static toString() {
+                    return this === $giper_baza_list_of ? '$giper_baza_list.of<' + Item + '>' : super.toString();
+                }
+            }
+            __decorate([
+                $mol_mem
+            ], $giper_baza_list_of.prototype, "items", null);
+            return $giper_baza_list_of;
+        }
     }
     __decorate([
         $mol_mem
-    ], $giper_baza_list_vary.prototype, "items_vary", null);
+    ], $giper_baza_list.prototype, "items_vary", null);
     __decorate([
         $mol_action
-    ], $giper_baza_list_vary.prototype, "splice", null);
-    $.$giper_baza_list_vary = $giper_baza_list_vary;
-    function $giper_baza_list(parse) {
-        class $giper_baza_list extends $giper_baza_list_vary {
-            static parse = parse;
-            items(next) {
-                return this.items_vary(next?.map(parse)).map(parse);
-            }
-            static toString() {
-                return this === $giper_baza_list ? '$giper_baza_list<' + this.$.$mol_func_name(parse) + '>' : super.toString();
-            }
-        }
-        __decorate([
-            $mol_mem
-        ], $giper_baza_list.prototype, "items", null);
-        return $giper_baza_list;
-    }
+    ], $giper_baza_list.prototype, "splice", null);
+    __decorate([
+        $mol_memo_key.method
+    ], $giper_baza_list, "of", null);
     $.$giper_baza_list = $giper_baza_list;
-    class $giper_baza_list_bin extends $giper_baza_list($giper_baza_vary_cast_blob) {
+    /** Mergeable list of atomic buffers */
+    class $giper_baza_list_bin extends $giper_baza_list.of(Uint8Array) {
     }
     $.$giper_baza_list_bin = $giper_baza_list_bin;
-    class $giper_baza_list_bool extends $giper_baza_list($giper_baza_vary_cast_bool) {
+    /** Mergeable list of atomic booleans */
+    class $giper_baza_list_bool extends $giper_baza_list.of($mol_schema_boolean) {
     }
     $.$giper_baza_list_bool = $giper_baza_list_bool;
-    class $giper_baza_list_int extends $giper_baza_list($giper_baza_vary_cast_bint) {
+    /** Mergeable list of atomic big integers */
+    class $giper_baza_list_int extends $giper_baza_list.of($mol_schema_bigint) {
     }
     $.$giper_baza_list_int = $giper_baza_list_int;
-    class $giper_baza_list_real extends $giper_baza_list($giper_baza_vary_cast_real) {
+    /** Mergeable list of atomic floats */
+    class $giper_baza_list_real extends $giper_baza_list.of($mol_schema_float) {
     }
     $.$giper_baza_list_real = $giper_baza_list_real;
-    class $giper_baza_list_link extends $giper_baza_list($giper_baza_vary_cast_link) {
-    }
-    $.$giper_baza_list_link = $giper_baza_list_link;
-    class $giper_baza_list_str extends $giper_baza_list($giper_baza_vary_cast_text) {
+    /** Mergeable list of atomic strings */
+    class $giper_baza_list_str extends $giper_baza_list.of($mol_schema_string) {
     }
     $.$giper_baza_list_str = $giper_baza_list_str;
-    class $giper_baza_list_time extends $giper_baza_list($giper_baza_vary_cast_time) {
+    /** Mergeable list of atomic time moments */
+    class $giper_baza_list_time extends $giper_baza_list.of($mol_time_moment) {
     }
     $.$giper_baza_list_time = $giper_baza_list_time;
-    class $giper_baza_list_dur extends $giper_baza_list($giper_baza_vary_cast_dura) {
+    /** Mergeable list of atomic time durations */
+    class $giper_baza_list_dur extends $giper_baza_list.of($mol_time_duration) {
     }
     $.$giper_baza_list_dur = $giper_baza_list_dur;
-    class $giper_baza_list_range extends $giper_baza_list($giper_baza_vary_cast_span) {
+    /** Mergeable list of atomic time intervals */
+    class $giper_baza_list_range extends $giper_baza_list.of($mol_time_interval) {
     }
     $.$giper_baza_list_range = $giper_baza_list_range;
-    class $giper_baza_list_json extends $giper_baza_list($giper_baza_vary_cast_dict) {
+    /** Mergeable list of atomic dictionaries */
+    class $giper_baza_list_dict extends $giper_baza_list.of($mol_schema_dict([$mol_schema_string, $mol_schema_any])) {
     }
-    $.$giper_baza_list_json = $giper_baza_list_json;
-    class $giper_baza_list_jsan extends $giper_baza_list($giper_baza_vary_cast_list) {
+    $.$giper_baza_list_dict = $giper_baza_list_dict;
+    /** Mergeable list of atomic arrays */
+    class $giper_baza_list_list extends $giper_baza_list.of($mol_schema_list($mol_schema_any)) {
     }
-    $.$giper_baza_list_jsan = $giper_baza_list_jsan;
-    class $giper_baza_list_dom extends $giper_baza_list($giper_baza_vary_cast_elem) {
+    $.$giper_baza_list_list = $giper_baza_list_list;
+    /** Mergeable list of atomic DOM elements */
+    class $giper_baza_list_dom extends $giper_baza_list.of($mol_dom.Element ?? Object) {
     }
     $.$giper_baza_list_dom = $giper_baza_list_dom;
-    class $giper_baza_list_tree extends $giper_baza_list($giper_baza_vary_cast_tree) {
+    /** Mergeable list of atomic Trees */
+    class $giper_baza_list_tree extends $giper_baza_list.of($mol_tree2) {
     }
     $.$giper_baza_list_tree = $giper_baza_list_tree;
-    class $giper_baza_list_link_base extends $giper_baza_list_link {
-    }
-    $.$giper_baza_list_link_base = $giper_baza_list_link_base;
-    function $giper_baza_list_link_to(Value) {
-        class $giper_baza_list_link_to extends $giper_baza_list_link_base {
-            static Value = $mol_memo.func(Value);
-            static toString() {
-                return this === $giper_baza_list_link_to ? '$giper_baza_list_link_to[ []=> ' + Value() + ' ]' : super.toString();
-            }
-            remote_list(next) {
-                const glob = this.$.$giper_baza_glob;
-                const Pawn = Value();
-                return this.items_vary(next?.map(item => item.link()))
-                    .map($giper_baza_vary_cast_link)
-                    .filter($mol_guard_defined)
-                    .map(link => glob.Pawn(link, Pawn));
-            }
-            remote_add(item) {
-                this.add(item.link());
-            }
-            make(config) {
-                const Pawn = Value();
-                let pawn;
-                if (config === null || typeof config === 'number') {
-                    const self = this.land().self_make(config || undefined);
-                    pawn = this.land().Pawn(Pawn).Head(self);
-                    this.splice([pawn.link()]);
+    /** Mergeable list of atomic Links */
+    class $giper_baza_list_link extends $giper_baza_list.of($giper_baza_link) {
+        /** Mergeable List of atomic Links to some Pawn type */
+        static to(Value) {
+            class $giper_baza_list_link_to extends $giper_baza_list_link {
+                Value = $mol_memo.func(Value);
+                static toString() {
+                    return this === $giper_baza_list_link_to ? '$giper_baza_list_link_to[ []=> ' + Value() + ' ]' : super.toString();
                 }
-                else if (config instanceof $giper_baza_land) {
-                    const land = config.area_make();
-                    this.splice([land.link()]);
-                    pawn = land.Pawn(Pawn).Data();
+                /** List of linked Pawns */
+                remote_list(next) {
+                    const glob = this.$.$giper_baza_glob;
+                    const Pawn = Value();
+                    return this.items(next?.map(item => item.link()))
+                        .map(link => glob.Pawn(link, Pawn));
                 }
-                else if (config) {
-                    const land = this.$.$giper_baza_glob.land_grab(config);
-                    this.splice([land.link()]);
-                    pawn = land.Pawn(Pawn).Data();
+                remote_add(item) {
+                    this.add(item.link());
                 }
-                else {
-                    return $mol_fail(new Error('Wrong config'));
+                /** Make new Pawn and place it at end. */
+                make(config) {
+                    const Pawn = Value();
+                    let pawn;
+                    if (config === null || typeof config === 'number') {
+                        const self = this.land().self_make(config || undefined);
+                        pawn = this.land().Pawn(Pawn).Head(self);
+                        this.splice([pawn.link()]);
+                    }
+                    else if (config instanceof $giper_baza_land) {
+                        const land = config.area_make();
+                        this.splice([land.link()]);
+                        pawn = land.Pawn(Pawn).Data();
+                    }
+                    else if (config) {
+                        const land = this.$.$giper_baza_glob.land_grab(config);
+                        this.splice([land.link()]);
+                        pawn = land.Pawn(Pawn).Data();
+                    }
+                    else {
+                        return $mol_fail(new Error('Wrong config'));
+                    }
+                    if (Pawn.meta)
+                        pawn.meta(Pawn.meta);
+                    return pawn;
                 }
-                if (Pawn.meta)
-                    pawn.meta(Pawn.meta);
-                return pawn;
             }
+            __decorate([
+                $mol_mem
+            ], $giper_baza_list_link_to.prototype, "remote_list", null);
+            __decorate([
+                $mol_action
+            ], $giper_baza_list_link_to.prototype, "remote_add", null);
+            __decorate([
+                $mol_action
+            ], $giper_baza_list_link_to.prototype, "make", null);
+            return $giper_baza_list_link_to;
         }
-        __decorate([
-            $mol_mem
-        ], $giper_baza_list_link_to.prototype, "remote_list", null);
-        __decorate([
-            $mol_action
-        ], $giper_baza_list_link_to.prototype, "remote_add", null);
-        __decorate([
-            $mol_action
-        ], $giper_baza_list_link_to.prototype, "make", null);
-        return $giper_baza_list_link_to;
+    }
+    $.$giper_baza_list_link = $giper_baza_list_link;
+    /** @deprecated Use $giper_baza_list_link.to( Target ) */
+    function $giper_baza_list_link_to(Value) {
+        return $giper_baza_list_link.to(Value);
     }
     $.$giper_baza_list_link_to = $giper_baza_list_link_to;
 })($ || ($ = {}));
@@ -15134,11 +15901,14 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    class $giper_baza_dict extends $giper_baza_list_vary {
+    /** Mergeable dictionary Pawn with any keys mapped to any embedded Pawn types */
+    class $giper_baza_dict extends $giper_baza_list {
         static tag = $giper_baza_unit_sand_tag[$giper_baza_unit_sand_tag.keys];
+        /** List of Vary keys. */
         keys() {
             return this.items_vary();
         }
+        /** Inner Pawn by key. */
         dive(key, Pawn, auto) {
             if (this.can_change() && auto !== undefined)
                 this.has(key, true, Pawn.tag);
@@ -15146,9 +15916,11 @@ var $;
             return unit ? this.land().Pawn(Pawn).Head(unit.self()) : null;
         }
         static schema = {};
+        /** Mergeable dictionary Pawn with defined keys mapped to different embedded Pawn types */
         static with(schema, path = '') {
             const prefix = path ? path + ':' : '';
             const $giper_baza_dict_with = class $giper_baza_dict_with extends this {
+                // static get schema() { return { ... this.schema, ... schema } }
                 static path = path;
                 static toString() {
                     if (this !== $giper_baza_dict_with)
@@ -15163,6 +15935,7 @@ var $;
                         return this.dive(prefix + Field, schema[Field], auto);
                     }
                 });
+                // $mol_wire_field( Entity.prototype, Field as any )
             }
             return Object.assign($giper_baza_dict_with, { schema: { ...this.schema, ...schema } });
         }
@@ -15189,6 +15962,7 @@ var $;
             return $mol_dev_format_tr({}, $mol_dev_format_td({}, $mol_dev_format_auto(this.key)), $mol_dev_format_td({}, ': '), $mol_dev_format_td({}, $mol_dev_format_auto(this.val)));
         }
     }
+    /** Mergeable dictionary with any keys mapped to any embedded Pawn types */
     function $giper_baza_dict_to(Value) {
         return class $giper_baza_dict_to extends $giper_baza_dict {
             Value = Value;
@@ -15207,7 +15981,8 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    class $giper_baza_atom_vary extends $giper_baza_pawn {
+    /** Atomic dynamic register */
+    class $giper_baza_atom extends $giper_baza_pawn {
         static tag = $giper_baza_unit_sand_tag[$giper_baza_unit_sand_tag.solo];
         pick_unit(peer) {
             return this.units_of(peer).at(0);
@@ -15225,93 +16000,6 @@ var $;
             this.land().post($giper_baza_link.hole, unit_prev?.head() ?? this.head(), unit_prev?.self() ?? null, next);
             return this.vary_of(peer);
         }
-        ;
-        [$mol_dev_format_head]() {
-            return $mol_dev_format_span({}, $mol_dev_format_native(this), ' ', this.head(), ' ', $mol_dev_format_auto(this.vary()));
-        }
-    }
-    __decorate([
-        $mol_mem_key
-    ], $giper_baza_atom_vary.prototype, "vary_of", null);
-    $.$giper_baza_atom_vary = $giper_baza_atom_vary;
-    class $giper_baza_atom_enum_base extends $giper_baza_atom_vary {
-        static options = [];
-    }
-    $.$giper_baza_atom_enum_base = $giper_baza_atom_enum_base;
-    function $giper_baza_atom_enum(options) {
-        class $giper_baza_atom_enum extends $giper_baza_atom_enum_base {
-            static options = options;
-            static toString() {
-                return this === $giper_baza_atom_enum ? '$giper_baza_atom_enum<' + options.map($giper_baza_vary_cast_text) + '>' : super.toString();
-            }
-            val(next) {
-                return this.val_of($giper_baza_link.hole, next);
-            }
-            val_of(peer, next) {
-                validate: if (next !== undefined) {
-                    for (const option of options) {
-                        if ($mol_compare_deep(option, next))
-                            break validate;
-                    }
-                    $mol_fail(new Error(`Wrong value (${$giper_baza_vary_cast_text(next)})`));
-                }
-                const val = this.vary_of(peer, next);
-                for (const option of options) {
-                    if ($mol_compare_deep(option, val))
-                        return val;
-                }
-                return null;
-            }
-        }
-        __decorate([
-            $mol_mem_key
-        ], $giper_baza_atom_enum.prototype, "val_of", null);
-        return $giper_baza_atom_enum;
-    }
-    $.$giper_baza_atom_enum = $giper_baza_atom_enum;
-    function $giper_baza_atom(parse) {
-        class $giper_baza_atom extends $giper_baza_atom_vary {
-            static parse = parse;
-            val(next) {
-                return this.val_of($giper_baza_link.hole, next);
-            }
-            val_of(peer, next) {
-                if (next !== undefined)
-                    parse(next);
-                const res = this.vary_of(peer, next);
-                try {
-                    return parse(res);
-                }
-                catch {
-                    return null;
-                }
-            }
-            static toString() {
-                return this === $giper_baza_atom ? '$giper_baza_atom<' + this.$.$mol_func_name(parse) + '>' : super.toString();
-            }
-        }
-        __decorate([
-            $mol_mem_key
-        ], $giper_baza_atom.prototype, "val_of", null);
-        return $giper_baza_atom;
-    }
-    $.$giper_baza_atom = $giper_baza_atom;
-    class $giper_baza_atom_blob extends $giper_baza_atom($giper_baza_vary_cast_blob) {
-    }
-    $.$giper_baza_atom_blob = $giper_baza_atom_blob;
-    class $giper_baza_atom_bool extends $giper_baza_atom($giper_baza_vary_cast_bool) {
-    }
-    $.$giper_baza_atom_bool = $giper_baza_atom_bool;
-    class $giper_baza_atom_bint extends $giper_baza_atom($giper_baza_vary_cast_bint) {
-    }
-    $.$giper_baza_atom_bint = $giper_baza_atom_bint;
-    class $giper_baza_atom_real extends $giper_baza_atom($giper_baza_vary_cast_real) {
-    }
-    $.$giper_baza_atom_real = $giper_baza_atom_real;
-    class $giper_baza_atom_link extends $giper_baza_atom($giper_baza_vary_cast_link) {
-    }
-    $.$giper_baza_atom_link = $giper_baza_atom_link;
-    class $giper_baza_atom_text extends $giper_baza_atom($giper_baza_vary_cast_text) {
         selection(lord, next) {
             const link = this.link().head().str;
             const user = this.$.$giper_baza_glob.Land(lord).Data($giper_baza_flex_user);
@@ -15320,7 +16008,7 @@ var $;
                 return next;
             }
             else {
-                this.val();
+                this.vary(); // track text to recalc selection on its change
                 const selection = user.caret();
                 if (!selection)
                     return [0, 0];
@@ -15331,114 +16019,188 @@ var $;
                 return [selection[0][1], selection[0][1]];
             }
         }
+        ;
+        [$mol_dev_format_head]() {
+            return $mol_dev_format_span({}, $mol_dev_format_native(this), ' ', this.head(), ' ', $mol_dev_format_auto(this.vary()));
+        }
+        /** Atom which typed by Schema/Class. */
+        static of(init) {
+            const Schema = $mol_schema_maybe($mol_schema_instance(init));
+            class $giper_baza_atom_of extends $giper_baza_atom {
+                static Schema = Schema;
+                /** Get/Set value of Pawn field */
+                val(next) {
+                    return this.val_of($giper_baza_link.hole, next);
+                }
+                val_of(peer, next) {
+                    if (next !== undefined)
+                        Schema.guard(next);
+                    const res = this.vary_of(peer, next);
+                    return next === undefined ? Schema.cast(res) : this.val_of(peer);
+                }
+                static toString() {
+                    return this === $giper_baza_atom_of ? '$giper_baza_atom.of<' + Schema + '>' : super.toString();
+                }
+            }
+            __decorate([
+                $mol_mem_key
+            ], $giper_baza_atom_of.prototype, "val_of", null);
+            return $giper_baza_atom_of;
+        }
     }
     __decorate([
         $mol_mem_key
-    ], $giper_baza_atom_text.prototype, "selection", null);
+    ], $giper_baza_atom.prototype, "vary_of", null);
+    __decorate([
+        $mol_mem_key
+    ], $giper_baza_atom.prototype, "selection", null);
+    __decorate([
+        $mol_memo_key.method
+    ], $giper_baza_atom, "of", null);
+    $.$giper_baza_atom = $giper_baza_atom;
+    /** @deprecated Use $giper_baza_atom */
+    $.$giper_baza_atom_vary = $giper_baza_atom;
+    /** Atomic buffer */
+    class $giper_baza_atom_blob extends $giper_baza_atom.of(Uint8Array) {
+    }
+    $.$giper_baza_atom_blob = $giper_baza_atom_blob;
+    /** Atomic boolean */
+    class $giper_baza_atom_bool extends $giper_baza_atom.of($mol_schema_boolean) {
+    }
+    $.$giper_baza_atom_bool = $giper_baza_atom_bool;
+    /** Atomic big integer */
+    class $giper_baza_atom_bint extends $giper_baza_atom.of($mol_schema_bigint) {
+    }
+    $.$giper_baza_atom_bint = $giper_baza_atom_bint;
+    /** Atomic float number */
+    class $giper_baza_atom_real extends $giper_baza_atom.of($mol_schema_float) {
+    }
+    $.$giper_baza_atom_real = $giper_baza_atom_real;
+    /** Atomic string */
+    class $giper_baza_atom_text extends $giper_baza_atom.of($mol_schema_string) {
+    }
     $.$giper_baza_atom_text = $giper_baza_atom_text;
-    class $giper_baza_atom_time extends $giper_baza_atom($giper_baza_vary_cast_time) {
+    /** Atomic time moment */
+    class $giper_baza_atom_time extends $giper_baza_atom.of($mol_time_moment) {
     }
     $.$giper_baza_atom_time = $giper_baza_atom_time;
-    class $giper_baza_atom_dura extends $giper_baza_atom($giper_baza_vary_cast_dura) {
+    /** Atomic time duration */
+    class $giper_baza_atom_dura extends $giper_baza_atom.of($mol_time_duration) {
     }
     $.$giper_baza_atom_dura = $giper_baza_atom_dura;
-    class $giper_baza_atom_span extends $giper_baza_atom($giper_baza_vary_cast_span) {
+    /** Atomic time interval */
+    class $giper_baza_atom_span extends $giper_baza_atom.of($mol_time_interval) {
     }
     $.$giper_baza_atom_span = $giper_baza_atom_span;
-    class $giper_baza_atom_dict extends $giper_baza_atom($giper_baza_vary_cast_dict) {
+    /** Atomic dictionary */
+    class $giper_baza_atom_dict extends $giper_baza_atom.of($mol_schema_dict([$mol_schema_string, $mol_schema_any])) {
     }
     $.$giper_baza_atom_dict = $giper_baza_atom_dict;
-    class $giper_baza_atom_list extends $giper_baza_atom($giper_baza_vary_cast_list) {
+    /** Atomic array */
+    class $giper_baza_atom_list extends $giper_baza_atom.of($mol_schema_list($mol_schema_any)) {
     }
     $.$giper_baza_atom_list = $giper_baza_atom_list;
-    class $giper_baza_atom_elem extends $giper_baza_atom($giper_baza_vary_cast_elem) {
+    /** Atomic DOM element */
+    class $giper_baza_atom_elem extends $giper_baza_atom.of($mol_dom.Element ?? Object) {
     }
     $.$giper_baza_atom_elem = $giper_baza_atom_elem;
-    class $giper_baza_atom_tree extends $giper_baza_atom($giper_baza_vary_cast_tree) {
+    /** Atomic Tree */
+    class $giper_baza_atom_tree extends $giper_baza_atom.of($mol_tree2) {
     }
     $.$giper_baza_atom_tree = $giper_baza_atom_tree;
-    class $giper_baza_atom_link_base extends $giper_baza_atom_link {
-        static Value = $giper_baza_dict;
-    }
-    $.$giper_baza_atom_link_base = $giper_baza_atom_link_base;
-    function $giper_baza_atom_link_to(Value) {
-        class $giper_baza_atom_link_to extends $giper_baza_atom_link_base {
-            Value = $mol_memo.func(Value);
-            static toString() {
-                return this === $giper_baza_atom_link_to ? '$giper_baza_atom_link_to[ []=> ' + Value() + ' ]' : super.toString();
-            }
-            remote(next) {
-                return this.remote_of($giper_baza_link.hole, next);
-            }
-            remote_of(peer, next) {
-                let link = next?.link() ?? next;
-                link = $giper_baza_vary_cast_link(this.vary_of(peer, link));
-                if (!link)
-                    return null;
-                return this.$.$giper_baza_glob.Pawn(link, Value());
-            }
-            ensure(config) {
-                return this.ensure_of($giper_baza_link.hole, config);
-            }
-            ensure_of(peer, config) {
-                if (!this.val_of(peer)) {
-                    if (config === null)
-                        this.ensure_here(peer);
-                    else if (config instanceof $giper_baza_land)
-                        this.ensure_area(peer, config);
-                    else if (config)
-                        this.ensure_lord(peer, config);
-                    else
-                        return null;
+    /** Atomic Link */
+    class $giper_baza_atom_link extends $giper_baza_atom.of($giper_baza_link) {
+        /** Atomic link to some Pawn type register */
+        static to(Value) {
+            class $giper_baza_atom_link_to extends $giper_baza_atom_link {
+                Value = $mol_memo.func(Value);
+                static toString() {
+                    return this === $giper_baza_atom_link_to ? '$giper_baza_atom_link.to[ []=> ' + Value() + ' ]' : super.toString();
                 }
-                return this.remote_of(peer);
+                /** Target Pawn */
+                remote(next) {
+                    return this.remote_of($giper_baza_link.hole, next);
+                }
+                remote_of(peer, next) {
+                    const link = this.val_of(peer, next?.link() ?? next);
+                    if (!link)
+                        return null;
+                    return this.$.$giper_baza_glob.Pawn(link, Value());
+                }
+                /** Target Pawn. Creates if not exists. */
+                ensure(config) {
+                    return this.ensure_of($giper_baza_link.hole, config);
+                }
+                ensure_of(peer, config) {
+                    if (!this.val_of(peer)) {
+                        if (config === null)
+                            this.ensure_here(peer);
+                        else if (config instanceof $giper_baza_land)
+                            this.ensure_area(peer, config);
+                        else if (config)
+                            this.ensure_lord(peer, config);
+                        else
+                            return null;
+                    }
+                    return this.remote_of(peer);
+                }
+                ensure_here(peer) {
+                    const Pawn = Value();
+                    const idea = $mol_hash_string(this.link().str);
+                    const head = this.land().self_make(idea);
+                    const pawn = this.land().Pawn(Pawn).Head(head);
+                    if (Pawn.meta)
+                        pawn.meta(Pawn.meta);
+                    this.remote_of(peer, pawn);
+                }
+                ensure_area(peer, land) {
+                    const Pawn = Value();
+                    const idea = $mol_hash_string(this.link().str);
+                    const area = land.area_make(idea);
+                    const pawn = area.Data(Pawn);
+                    if (Pawn.meta)
+                        pawn.meta(Pawn.meta);
+                    this.val_of(peer, pawn.link());
+                }
+                ensure_lord(peer, preset) {
+                    const Pawn = Value();
+                    const land = this.$.$giper_baza_glob.land_grab(preset);
+                    const pawn = land.Data(Pawn);
+                    if (Pawn.meta)
+                        pawn.meta(Pawn.meta);
+                    this.val_of(peer, pawn.link());
+                }
+                /** @deprecated Use ensure( preset ) */
+                remote_ensure(preset) {
+                    return this.ensure(preset);
+                }
+                /** @deprecated Use ensure( null ) */
+                local_ensure() {
+                    return this.ensure(null);
+                }
             }
-            ensure_here(peer) {
-                const Pawn = Value();
-                const idea = $mol_hash_string(this.link().str);
-                const head = this.land().self_make(idea);
-                const pawn = this.land().Pawn(Pawn).Head(head);
-                if (Pawn.meta)
-                    pawn.meta(Pawn.meta);
-                this.remote_of(peer, pawn);
-            }
-            ensure_area(peer, land) {
-                const Pawn = Value();
-                const idea = $mol_hash_string(this.link().str);
-                const area = land.area_make(idea);
-                const pawn = area.Data(Pawn);
-                if (Pawn.meta)
-                    pawn.meta(Pawn.meta);
-                this.val_of(peer, pawn.link());
-            }
-            ensure_lord(peer, preset) {
-                const Pawn = Value();
-                const land = this.$.$giper_baza_glob.land_grab(preset);
-                const pawn = land.Data(Pawn);
-                if (Pawn.meta)
-                    pawn.meta(Pawn.meta);
-                this.val_of(peer, pawn.link());
-            }
-            remote_ensure(preset) {
-                return this.ensure(preset);
-            }
-            local_ensure() {
-                return this.ensure(null);
-            }
+            __decorate([
+                $mol_mem_key
+            ], $giper_baza_atom_link_to.prototype, "remote_of", null);
+            __decorate([
+                $mol_action
+            ], $giper_baza_atom_link_to.prototype, "ensure_here", null);
+            __decorate([
+                $mol_action
+            ], $giper_baza_atom_link_to.prototype, "ensure_area", null);
+            __decorate([
+                $mol_action
+            ], $giper_baza_atom_link_to.prototype, "ensure_lord", null);
+            return $giper_baza_atom_link_to;
         }
-        __decorate([
-            $mol_mem_key
-        ], $giper_baza_atom_link_to.prototype, "remote_of", null);
-        __decorate([
-            $mol_action
-        ], $giper_baza_atom_link_to.prototype, "ensure_here", null);
-        __decorate([
-            $mol_action
-        ], $giper_baza_atom_link_to.prototype, "ensure_area", null);
-        __decorate([
-            $mol_action
-        ], $giper_baza_atom_link_to.prototype, "ensure_lord", null);
-        return $giper_baza_atom_link_to;
+    }
+    __decorate([
+        $mol_memo_key.method
+    ], $giper_baza_atom_link, "to", null);
+    $.$giper_baza_atom_link = $giper_baza_atom_link;
+    /** @deprecated Use $giper_baza_atom_link.to( Target ) */
+    function $giper_baza_atom_link_to(Value) {
+        return $giper_baza_atom_link.to(Value);
     }
     $.$giper_baza_atom_link_to = $giper_baza_atom_link_to;
 })($ || ($ = {}));
@@ -15447,7 +16209,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    class $giper_baza_stat_series extends $giper_baza_atom_list {
+    class $giper_baza_stat_series extends $giper_baza_atom.of($mol_schema_list($mol_schema_float)) {
         tick(key, val, count) {
             let vals = this.values().slice();
             while (vals.length < count)
@@ -15506,6 +16268,7 @@ var $;
         Hours: $giper_baza_stat_series,
         Days: $giper_baza_stat_series,
         Months: $giper_baza_stat_series,
+        // Years: $giper_baza_stat_series,
     }) {
         _last_instant = 0;
         tick_instant(val) {
@@ -15518,6 +16281,7 @@ var $;
             this.Hours(null).tick(now.hour, val, 24);
             this.Days(null).tick(now.day, val, 31);
             this.Months(null).tick(now.month, val, 12);
+            // this.Years( null )!.tick( now.year!, val )
         }
         series() {
             function pick(Series, length, range) {
@@ -15574,13 +16338,14 @@ var $;
         }
     }
     const handler_promise = (event) => handler('Unhandled Rejection', '', 0, 0, event.reason);
+    const handler_promise_node = (reason) => handler('Unhandled Rejection', '', 0, 0, reason);
     if ('addEventListener' in globalThis) {
         globalThis.addEventListener('error', handler);
         globalThis.addEventListener('unhandledrejection', handler_promise);
     }
     if ('process' in globalThis) {
         process.on('uncaughtExceptionMonitor', handler);
-        process.on('unhandledrejection', handler_promise);
+        process.on('unhandledRejection', handler_promise_node);
     }
     const console_error = console.error;
     console.error = function console_error_custom(...args) {
@@ -15604,16 +16369,27 @@ var $;
 (function ($) {
     class $giper_baza_app_stat extends $giper_baza_dict.with({
         Uptime: $giper_baza_atom_dura,
+        /** User time in secs */
         Cpu_user: $giper_baza_stat_ranges,
+        /** System time in secs */
         Cpu_system: $giper_baza_stat_ranges,
+        /** Memory in MB */
         Mem_used: $giper_baza_stat_ranges,
+        /** Memory in MB */
         Mem_free: $giper_baza_stat_ranges,
+        /** FS free */
         Fs_free: $giper_baza_stat_ranges,
+        /** FS read count */
         Fs_reads: $giper_baza_stat_ranges,
+        /** FS write count */
         Fs_writes: $giper_baza_stat_ranges,
+        /** Slave sockets count */
         Port_slaves: $giper_baza_stat_ranges,
+        /** Masters sockets count */
         Port_masters: $giper_baza_stat_ranges,
+        /** Active lands count */
         Land_active: $giper_baza_stat_ranges,
+        /** Unhandled errors */
         Errors: $giper_baza_stat_ranges,
     }) {
         freshness() {
@@ -15630,7 +16406,7 @@ var $;
             return this.Uptime(next)?.val(next) ?? new $mol_time_duration(0);
         }
         init() {
-            this.Errors(null).tick_instant(1);
+            this.Errors(null).tick_instant(1); // restarts as errors
             let handler = () => this.Errors(null).tick_instant(1);
             $mol_report_handler_all.add(handler);
             return { destructor: () => $mol_report_handler_all.delete(handler) };
@@ -15648,23 +16424,23 @@ var $;
             this.$.$mol_state_time.now(1000);
             this.uptime(new $mol_time_duration({ second: Math.floor(process.uptime()) }).normal);
             const res = process.resourceUsage();
-            this.Cpu_user(null).tick_integral(Math.ceil(res.userCPUTime / 1e4));
-            this.Cpu_system(null).tick_integral(Math.ceil(res.systemCPUTime / 1e4));
-            this.Fs_reads(null).tick_integral(res.fsRead);
-            this.Fs_writes(null).tick_integral(res.fsWrite);
+            this.Cpu_user(null).tick_integral(Math.ceil(res.userCPUTime / 1e4)); // %
+            this.Cpu_system(null).tick_integral(Math.ceil(res.systemCPUTime / 1e4)); // %
+            this.Fs_reads(null).tick_integral(res.fsRead); // pct
+            this.Fs_writes(null).tick_integral(res.fsWrite); // pct
             const mem_total = $node.os.totalmem();
-            this.Mem_used(null).tick_instant(Math.ceil((res.maxRSS - res.sharedMemorySize) * 1024 / mem_total * 100));
-            this.Mem_free(null).tick_instant(Math.floor($node.os.freemem() / mem_total * 100));
+            this.Mem_used(null).tick_instant(Math.ceil((res.maxRSS - res.sharedMemorySize) * 1024 / mem_total * 100)); // %
+            this.Mem_free(null).tick_instant(Math.floor($node.os.freemem() / mem_total * 100)); // %
             const fs = $node.fs.statfsSync('.');
-            this.Fs_free(null).tick_instant(Math.floor(Number(fs.bfree) / Number(fs.blocks) * 100));
+            this.Fs_free(null).tick_instant(Math.floor(Number(fs.bfree) / Number(fs.blocks) * 100)); // %
             const yard = $mol_wire_sync(this.$.$giper_baza_glob.yard());
             const masters = yard.masters().length;
-            this.Port_masters(null).tick_instant(masters);
+            this.Port_masters(null).tick_instant(masters); // pct
             const ports = yard.ports();
-            this.Port_slaves(null).tick_instant(ports.length - masters);
+            this.Port_slaves(null).tick_instant(ports.length - masters); // pct
             const lands = ports.reduce((sum, port) => sum + yard.port_lands_active(port).size, 0);
-            this.Land_active(null).tick_instant(lands);
-            this.Errors(null).tick_instant(0);
+            this.Land_active(null).tick_instant(lands); // pct
+            this.Errors(null).tick_instant(0); // pct
         }
     }
     __decorate([
@@ -15687,6 +16463,7 @@ var $;
 var $;
 (function ($) {
     $.$giper_baza_flex_deck_link = new $giper_baza_link('AyiXyvOr_k8TaNSel_TkJWFugO');
+    /** Subj - named entity */
     class $giper_baza_flex_subj extends $giper_baza_dict.with({
         Name: $giper_baza_atom_text,
         Icon: $giper_baza_atom_text,
@@ -15704,12 +16481,14 @@ var $;
         }
     }
     $.$giper_baza_flex_subj = $giper_baza_flex_subj;
-    class $giper_baza_flex_subj_link extends $giper_baza_atom_link_to(() => $giper_baza_flex_subj) {
+    /** Atomic Link to any Subj */
+    class $giper_baza_flex_subj_link extends $giper_baza_atom_link.to(() => $giper_baza_flex_subj) {
     }
     $.$giper_baza_flex_subj_link = $giper_baza_flex_subj_link;
+    /** Meta - schema of entitiy */
     class $giper_baza_flex_meta extends $giper_baza_flex_subj.with({
-        Pulls: $giper_baza_list_link_to(() => $giper_baza_flex_subj),
-        Props: $giper_baza_list_link_to(() => $giper_baza_flex_prop),
+        Pulls: $giper_baza_list_link.to(() => $giper_baza_flex_subj),
+        Props: $giper_baza_list_link.to(() => $giper_baza_flex_prop),
     }, 'Meta') {
         static meta = new $giper_baza_link(`${$.$giper_baza_flex_deck_link.str}_Atd6Ty7F`);
         prop_new(key, type, kind, vars, base) {
@@ -15757,12 +16536,18 @@ var $;
         $mol_mem
     ], $giper_baza_flex_meta.prototype, "pull_all", null);
     $.$giper_baza_flex_meta = $giper_baza_flex_meta;
+    /** Property - attribute of entity */
     class $giper_baza_flex_prop extends $giper_baza_flex_subj.with({
+        /** Key to store value */
         Path: $giper_baza_atom_text,
+        /** Type of value */
         Type: $giper_baza_atom_text,
-        Kind: $giper_baza_atom_link_to(() => $giper_baza_flex_meta),
-        Enum: $giper_baza_atom_link_to(() => $giper_baza_list_vary),
-        Base: $giper_baza_atom_vary,
+        /** Target Meta */
+        Kind: $giper_baza_atom_link.to(() => $giper_baza_flex_meta),
+        /** Variants of values */
+        Enum: $giper_baza_atom_link.to(() => $giper_baza_list),
+        /** Base value */
+        Base: $giper_baza_atom,
     }, 'Prop') {
         static meta = new $giper_baza_link(`${$.$giper_baza_flex_deck_link.str}_DOnW7Ah9`);
         path(next) {
@@ -15782,8 +16567,9 @@ var $;
         }
     }
     $.$giper_baza_flex_prop = $giper_baza_flex_prop;
+    /** Deck - set of schemes and types */
     class $giper_baza_flex_deck extends $giper_baza_flex_subj.with({
-        Metas: $giper_baza_list_link_to(() => $giper_baza_flex_meta),
+        Metas: $giper_baza_list_link.to(() => $giper_baza_flex_meta),
         Types: $giper_baza_list_str,
     }, 'Deck') {
         static meta = new $giper_baza_link(`${$.$giper_baza_flex_deck_link.str}_3AvnmQ4q`);
@@ -15807,9 +16593,10 @@ var $;
         $mol_action
     ], $giper_baza_flex_deck.prototype, "meta_for", null);
     $.$giper_baza_flex_deck = $giper_baza_flex_deck;
+    /** Seed - global network config */
     class $giper_baza_flex_seed extends $giper_baza_flex_subj.with({
-        Deck: $giper_baza_atom_link_to(() => $giper_baza_flex_deck),
-        Peers: $giper_baza_list_link_to(() => $giper_baza_flex_peer),
+        Deck: $giper_baza_atom_link.to(() => $giper_baza_flex_deck),
+        Peers: $giper_baza_list_link.to(() => $giper_baza_flex_peer),
     }, 'Seed') {
         static meta = new $giper_baza_link(`${$.$giper_baza_flex_deck_link.str}_nrUK4ZIW`);
         deck() {
@@ -15826,9 +16613,10 @@ var $;
         $mol_mem
     ], $giper_baza_flex_seed.prototype, "peers", null);
     $.$giper_baza_flex_seed = $giper_baza_flex_seed;
+    /** Peer - network peering info */
     class $giper_baza_flex_peer extends $giper_baza_flex_subj.with({
         Urls: $giper_baza_list_str,
-        Stat: $giper_baza_atom_link_to(() => $giper_baza_app_stat),
+        Stat: $giper_baza_atom_link.to(() => $giper_baza_app_stat),
     }, 'Peer') {
         static meta = new $giper_baza_link(`${$.$giper_baza_flex_deck_link.str}_xEibvNCP`);
         stat(auto) {
@@ -15845,8 +16633,9 @@ var $;
         $mol_mem
     ], $giper_baza_flex_peer.prototype, "urls", null);
     $.$giper_baza_flex_peer = $giper_baza_flex_peer;
+    /** User - human profile */
     class $giper_baza_flex_user extends $giper_baza_flex_subj.with({
-        Caret: $giper_baza_atom_list,
+        Caret: $giper_baza_atom.of($mol_schema_list($mol_schema_any)),
     }, 'User') {
         static meta = new $giper_baza_link(`${$.$giper_baza_flex_deck_link.str}_csm0VtAK`);
         caret(next) {
@@ -15857,6 +16646,7 @@ var $;
         $mol_mem
     ], $giper_baza_flex_user.prototype, "caret", null);
     $.$giper_baza_flex_user = $giper_baza_flex_user;
+    /** Makes new Seed with Deck */
     function $giper_baza_flex_init() {
         const seed_land = this.$.$giper_baza_glob.land_grab();
         const seed = seed_land.Data($giper_baza_flex_seed);
@@ -15906,11 +16696,14 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Whole global graph database which contains Lands. */
     class $giper_baza_glob extends $mol_object {
         static lands_touched = new $mol_wire_set();
+        /** Glob synchronizer. */
         static yard() {
             return new this.$.$giper_baza_yard;
         }
+        /** Land where Lord is King. Contains only main info */
         static home(Home) {
             const home = this.Land(this.$.$giper_baza_auth.current().pass().lord()).Data(Home ?? this.$.$giper_baza_flex_subj);
             if (Home?.meta && !home.meta())
@@ -15933,6 +16726,7 @@ var $;
         static land_grab(preset = [[null, this.$.$giper_baza_rank_read]]) {
             return this.Land(this.king_grab(preset).pass().lord());
         }
+        /** Standalone part of Glob which syncs separately, have own rights, and contains Units */
         static Land(link) {
             if (!link.str)
                 $mol_fail(new Error('Empty Land Link'));
@@ -15941,6 +16735,7 @@ var $;
                 link: $mol_const(link),
             });
         }
+        /** High level representation of stored data. */
         static Pawn(link, Pawn) {
             const land = this.Land(link.land());
             return land.Pawn(Pawn).Head(link.head());
@@ -15948,6 +16743,7 @@ var $;
         static Seed() {
             const link = $giper_baza_flex_deck_link.lord();
             const seed = this.Pawn(link, $giper_baza_flex_seed);
+            // if( !$mol_wire_sync( seed ).meta() )
             this.boot();
             return seed;
         }
@@ -16111,6 +16907,50 @@ var $;
             }
             return $mol_wire_sync(this)[msg.method()](msg);
         }
+        // async OPTIONS( msg: $mol_rest_message ) {
+        // 	if( msg.type() !== 'application/sdp' ) return msg.reply( null )
+        // 	const { RTCPeerConnection } = await import( 'node-datachannel/polyfill' )
+        // 	const connection = new RTCPeerConnection
+        // 	const channel = connection.createDataChannel( msg.uri().toString(), { negotiated: true, id: 0 } )
+        // 	const port = $mol_rest_port_webrtc.make({ channel })
+        // 	$mol_wire_sync( this.$ ).$mol_log3_come({
+        // 		place: this,
+        // 		message: 'OPEN',
+        // 		url: msg.uri(),
+        // 		port: $mol_key( port ),
+        // 	})
+        // 	$mol_wire_sync( this ).REQUEST(
+        // 		msg.derive( 'OPEN', null )
+        // 	)
+        // 	channel.onmessage = event => {
+        // 		const message = msg.derive( 'POST', event.data )
+        // 		message.port = port
+        // 		this.$.$mol_log3_rise({
+        // 			place: this,
+        // 			message: message.method(),
+        // 			url: message.uri(),
+        // 			port: $mol_key( port ),
+        // 		})
+        // 		$mol_wire_async( this ).POST( message )
+        // 	}
+        // 	channel.onclose = ()=> {
+        // 		this.$.$mol_log3_done({
+        // 			place: this,
+        // 			message: 'CLOSE',
+        // 			url: msg.uri(),
+        // 			port: $mol_key( port ),
+        // 		})
+        // 		$mol_wire_sync( this ).REQUEST(
+        // 			msg.derive( 'CLOSE', null )
+        // 		)
+        // 	}
+        // 	const sdp = await $mol_wire_async( msg ).text()
+        // 	await connection.setRemoteDescription({ sdp, type: 'offer' })
+        // 	connection.setLocalDescription({ type: 'answer' })
+        // 	await new Promise( done => connection.onicecandidate = ({ candidate })=> done( candidate ) )
+        // 	msg.port.send_type( 'application/sdp' )
+        // 	msg.port.send_text( connection.localDescription!.sdp )
+        // }
         _protocols = [];
         OPEN(msg) {
             const protocols = msg.protocols();
@@ -16139,6 +16979,8 @@ var $;
                     server.root()._auto();
                 }
                 catch (error) {
+                    if ($mol_promise_like(error))
+                        $mol_fail_hidden(error);
                     $mol_fail_log(error);
                 }
             }).fresh();
@@ -16515,13 +17357,22 @@ var $;
                 if (!chunks)
                     this._ws_income_chunks.set(sock, chunks = []);
                 chunks.push(chunk);
-                const patial_size = chunks.reduce((sum, buf) => sum + buf.byteLength, 0);
                 let frame = $mol_websocket_frame.from(chunks[0]);
-                const msg_size = frame.size() + frame.data().size;
-                if (msg_size > patial_size) {
-                    setTimeout(() => sock.resume());
-                    return;
+                let header_size = frame.size();
+                if (chunks[0].byteLength < header_size) {
+                    if (chunks.length < 2)
+                        return setTimeout(() => sock.resume()), undefined;
+                    chunk = Buffer.from([...chunks[0], ...chunks[1]]);
+                    chunks.splice(0, 2, chunk);
+                    frame = $mol_websocket_frame.from(chunk);
+                    header_size = frame.size();
+                    if (chunk.byteLength < header_size)
+                        return setTimeout(() => sock.resume()), undefined;
                 }
+                const msg_size = header_size + frame.data().size;
+                const patial_size = chunks.reduce((sum, buf) => sum + buf.byteLength, 0);
+                if (msg_size > patial_size)
+                    return setTimeout(() => sock.resume()), undefined;
                 chunk = Buffer.alloc(patial_size);
                 let offset = 0;
                 for (const buf of chunks.splice(0)) {
@@ -16632,6 +17483,7 @@ var $;
 
 ;
 "use strict";
+/** @jsx $mol_jsx */
 var $;
 (function ($) {
     class $mol_rest_resource_fs extends $mol_rest_resource {
@@ -16691,6 +17543,430 @@ var $;
 
 ;
 "use strict";
+// namespace $ {
+// 	$mol_report_bugsnag = '18acf016ed2a2a4cc4445daa9dd2dd3c'
+// }
+
+;
+"use strict";
+var $;
+(function ($) {
+    /**
+     * Checks for some of given runtype or throws error.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_variant_demo
+     */
+    function $mol_data_variant(...sub) {
+        return $mol_data_setup((val) => {
+            const errors = [];
+            for (const type of sub) {
+                let hidden = $.$mol_fail_hidden;
+                try {
+                    $.$mol_fail = $.$mol_fail_hidden;
+                    return type(val);
+                }
+                catch (error) {
+                    $.$mol_fail = hidden;
+                    if (error instanceof $mol_data_error) {
+                        errors.push(error);
+                    }
+                    else {
+                        return $mol_fail_hidden(error);
+                    }
+                }
+            }
+            return $mol_fail(new $mol_data_error(`${val} is not any of variants`, {}, ...errors));
+        }, sub);
+    }
+    $.$mol_data_variant = $mol_data_variant;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /**
+     * Checks for string and returns string type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_string_demo
+     */
+    $.$mol_data_string = (val) => {
+        if (typeof val === 'string')
+            return val;
+        return $mol_fail(new $mol_data_error(`${val} is not a string`));
+    };
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /**
+     * Checks for undefined or passing given runtype.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_optional_demo
+     */
+    function $mol_data_optional(sub, fallback) {
+        return $mol_data_setup((val) => {
+            if (val === undefined) {
+                return fallback?.();
+            }
+            return sub(val);
+        }, { sub, fallback });
+    }
+    $.$mol_data_optional = $mol_data_optional;
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    /**
+     * Checks for record of given fields with by its runtypes and returns expected type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_record_demo
+     */
+    function $mol_data_record(sub) {
+        return $mol_data_setup((val) => {
+            let res = {};
+            for (const field in sub) {
+                try {
+                    res[field] =
+                        sub[field](val[field]);
+                }
+                catch (error) {
+                    if (error instanceof Promise)
+                        return $mol_fail_hidden(error);
+                    error.message = `[${JSON.stringify(field)}] ${error.message}`;
+                    return $mol_fail(error);
+                }
+            }
+            return res;
+        }, sub);
+    }
+    $.$mol_data_record = $mol_data_record;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /**
+     * Checks for array of given runtype and returns expected type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_array_demo
+     */
+    function $mol_data_array(sub) {
+        return $mol_data_setup((val) => {
+            if (!Array.isArray(val))
+                return $mol_fail(new $mol_data_error(`${val} is not an array`));
+            return val.map((item, index) => {
+                try {
+                    return sub(item);
+                }
+                catch (error) {
+                    if (error instanceof Promise)
+                        return $mol_fail_hidden(error);
+                    error.message = `[${index}] ${error.message}`;
+                    return $mol_fail(error);
+                }
+            });
+        }, sub);
+    }
+    $.$mol_data_array = $mol_data_array;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /**
+     * Checks for boolean and returns boolean type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_boolean_demo
+     */
+    $.$mol_data_boolean = (val) => {
+        if (typeof val === 'boolean')
+            return val;
+        return $mol_fail(new $mol_data_error(`${val} is not a boolean`));
+    };
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
+(function ($) {
+    const syntax = new $mol_syntax2({
+        'filter': /!?=/,
+        'range_separator': /@/,
+        'fetch_open': /\(/,
+        'fetch_separator': /[:;&\/?#]/,
+        'fetch_close': /\)/,
+    });
+    function $hyoo_harp_from_string(uri) {
+        let parent = {};
+        let prev = null;
+        let stack = [parent];
+        let range = null;
+        let values = null;
+        function fail_at(offset) {
+            const uri_marked = uri.substring(0, offset) + '\u035C' + uri.substring(offset);
+            $mol_fail(new Error(`Unexpected token at ${offset} of "${uri_marked}"`));
+        }
+        syntax.parse(uri, {
+            '': (text, chunks, offset) => {
+                if (values) {
+                    text = decodeURIComponent(text);
+                    range = (range && range.length > 1)
+                        ? [range[0], range[1] + text]
+                        : [(range?.[0] ?? '') + text];
+                }
+                else {
+                    let [, order, name] = /^([+-]?)(.*)$/.exec(text);
+                    prev = parent[decodeURIComponent(name)] = {};
+                    if (order)
+                        prev['+'] = order === '+';
+                    stack.push(parent);
+                }
+            },
+            'filter': (filter, chinks, offset) => {
+                if (values) {
+                    if (range) {
+                        if (filter === '!=')
+                            range.push(range.pop() + '!');
+                        values.push(range);
+                        range = null;
+                    }
+                    else {
+                        range = [filter];
+                    }
+                }
+                else if (prev) {
+                    values = prev[filter] = [];
+                }
+                else {
+                    values = [];
+                    parent[''] = values;
+                }
+            },
+            'range_separator': (found, chunks, offset) => {
+                if (!values)
+                    fail_at(offset);
+                range = [range?.[0] ?? '', ''];
+            },
+            'fetch_open': (found, chunks, offset) => {
+                if (range) {
+                    range[range.length - 1] += found;
+                }
+                else {
+                    if (!prev)
+                        fail_at(offset);
+                    parent = prev;
+                    values = null;
+                    prev = null;
+                }
+            },
+            'fetch_separator': (found, chunks, offset) => {
+                if (range) {
+                    values.push(range);
+                    range = null;
+                }
+                parent = stack.pop();
+                values = null;
+                prev = null;
+            },
+            'fetch_close': (found) => {
+                if (range) {
+                    range[range.length - 1] += found;
+                }
+                else {
+                    parent = stack.pop();
+                    values = null;
+                    prev = null;
+                }
+            },
+        });
+        if (range)
+            values.push(range);
+        return stack[0];
+    }
+    $.$hyoo_harp_from_string = $hyoo_harp_from_string;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    function $hyoo_harp_to_string(query) {
+        return Object.entries(query).map(([field, harp]) => {
+            if (field === '+')
+                return '';
+            if (field === '=')
+                return '';
+            if (field === '!=')
+                return '';
+            if (!harp)
+                return '';
+            const harp2 = harp;
+            const order = harp2['+'] === true ? '+' : harp2['+'] === false ? '-' : '';
+            const filter = harp2['='] ? '=' : harp2['!='] ? '!=' : '';
+            const name = encodeURIComponent(field);
+            let values = (harp2['='] || harp2['!='] || []).map(([min, max]) => {
+                if (max === undefined || min === max)
+                    return encodeURIComponent(String(min)) + '=';
+                min = (min === undefined) ? '' : encodeURIComponent(String(min));
+                max = (max === undefined) ? '' : encodeURIComponent(String(max));
+                return `${min}@${max}=`;
+            }).join('');
+            let fetch = $hyoo_harp_to_string(harp);
+            if (fetch)
+                fetch = `(${fetch})`;
+            return `${order}${name}${filter}${values}${fetch}`;
+        }).filter(Boolean).join(';');
+    }
+    $.$hyoo_harp_to_string = $hyoo_harp_to_string;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    const Int = $mol_data_pipe($mol_data_variant($mol_data_string, $mol_data_integer), Number);
+    function $hyoo_harp_scheme(sub, value = $mol_data_integer) {
+        const inner = $mol_data_optional($mol_data_record(sub));
+        const values = $mol_data_optional($mol_data_array($mol_data_array(value)));
+        const val = $mol_data_record({
+            ...sub,
+            '+': $mol_data_optional($mol_data_boolean),
+            '=': values,
+            '!=': values,
+            '_num': $mol_data_optional($mol_data_record({
+                '=': $mol_data_array($mol_data_array(Int))
+            })),
+            '_len': inner,
+            '_max': inner,
+            '_min': inner,
+            '_sum': inner,
+        });
+        return Object.assign(val, {
+            parse(str) {
+                return val($hyoo_harp_from_string(str));
+            },
+            build(query) {
+                return $hyoo_harp_to_string(query);
+            },
+        });
+    }
+    $.$hyoo_harp_scheme = $hyoo_harp_scheme;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    function $mol_offline() { }
+    $.$mol_offline = $mol_offline;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    try {
+        $mol_offline();
+    }
+    catch (error) {
+        console.error(error);
+    }
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $.$giper_baza_file_query = $hyoo_harp_scheme({
+        BAZA: $hyoo_harp_scheme({}),
+        file: $hyoo_harp_scheme({}, $mol_data_string),
+    });
+    class $giper_baza_file extends $giper_baza_dict.with({
+        /** File name */
+        Name: $giper_baza_atom_text,
+        /** File Content-Type */
+        Type: $giper_baza_atom_text,
+        /** File content in chunks - list of binaries */
+        Chunks: $giper_baza_list_bin,
+    }) {
+        /** Persistent URI to file content */
+        uri() {
+            return `?BAZA:file=${this.link()};name=${this.name()}`;
+        }
+        /** File name */
+        name(next) {
+            const ext = {
+                'text/plain': 'txt',
+                'application/json': 'json',
+            }[this.type()] ?? 'bin';
+            return this.Name(next)?.val(next) ?? `${this.link()}.${ext}`;
+        }
+        /** Mime type */
+        type(next) {
+            return this.Type(next)?.val(next) ?? 'application/octet-stream';
+        }
+        /** Blob, File etc. */
+        blob(next) {
+            if (!next)
+                return new $mol_blob(this.chunks(), { type: this.type() });
+            const buffer = new Uint8Array($mol_wire_sync(next).arrayBuffer());
+            this.buffer(buffer);
+            this.type(next.type);
+            if (next instanceof $mol_dom_context.File)
+                this.name(next.name);
+            return next;
+        }
+        /** Solid byte buffer. */
+        buffer(next) {
+            if (next) {
+                const chunks = [];
+                for (let offset = 0; offset < next.byteLength;) {
+                    chunks.push(next.slice(offset, offset += 2 ** 15)); // split by 32 KB
+                }
+                this.chunks(chunks);
+                return next;
+            }
+            else {
+                const chunks = this.chunks();
+                const size = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+                const res = new Uint8Array(size);
+                let offset = 0;
+                for (const chunk of chunks) {
+                    res.set(chunk, offset);
+                    offset += chunk.byteLength;
+                }
+                return res;
+            }
+        }
+        chunks(next) {
+            return (this.Chunks(next)?.items(next)?.filter($mol_guard_defined) ?? []);
+        }
+        str(next, type = 'text/plain') {
+            if (next === undefined)
+                return $mol_charset_decode(this.buffer());
+            this.buffer($mol_charset_encode(next));
+            this.type(type);
+            return next;
+        }
+        json(next, type = 'application/json') {
+            if (next === undefined)
+                return JSON.parse(this.str());
+            this.str(JSON.stringify(next), type);
+            return next;
+        }
+    }
+    $.$giper_baza_file = $giper_baza_file;
+})($ || ($ = {}));
+
+;
+"use strict";
 var $;
 (function ($) {
     class $giper_baza_app_home extends $giper_baza_flex_peer {
@@ -16740,6 +18016,20 @@ var $;
             return new $giper_baza_app_node_link;
         }
         _protocols = ['$giper_baza_yard'];
+        GET(msg) {
+            let id;
+            try {
+                id = $giper_baza_file_query.parse(msg.uri().search).file['=']?.[0][0];
+            }
+            catch { }
+            if (!id)
+                return super.GET(msg);
+            const link = new $giper_baza_link(id);
+            const file = this.$.$giper_baza_glob.Pawn(link, $giper_baza_file);
+            msg.port.send_code(file.filled() ? 200 : 404);
+            msg.port.send_type(file.type());
+            msg.port.send_bin(file.buffer());
+        }
         OPEN(msg) {
             const protocol = super.OPEN(msg);
             if (!protocol)
@@ -16789,6 +18079,7 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /** A single comment entry. Stored as a pawn inside the comment land. */
         class $bog_wysiwyg_model_comment extends $giper_baza_dict.with({
             Text: $giper_baza_atom_text,
             Author: $giper_baza_atom_text,
@@ -16887,6 +18178,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -16907,6 +18199,8 @@ var $;
             maxHeight: per(100),
             boxSizing: 'border-box',
             color: $mol_theme.text,
+            // backdropFilter: blur( `3px` ), enforces layering
+            // zIndex: 0 ,
             ':focus': {
                 outline: 'none',
             },
@@ -17031,6 +18325,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_button_open) = class $mol_button_open extends ($.$mol_button_minor) {
 		Icon(){
@@ -17100,6 +18395,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -17114,12 +18410,17 @@ var $;
                     return files;
                 }
                 catch (error) {
+                    // Calling actions from catch section, if throwing promise breaks idempotency
                     Promise.resolve().then(() => this.status([error]));
                     $mol_fail_hidden(error);
                 }
             }
         }
         $$.$mol_button_open = $mol_button_open;
+        /**
+         * File open button
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_button_demo
+         */
         class $mol_button_open_native extends $.$mol_button_open_native {
             dom_node() {
                 return super.dom_node();
@@ -17155,6 +18456,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_image) = class $mol_image extends ($.$mol_view) {
@@ -17215,6 +18517,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -17271,6 +18574,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$bog_blitz_lobby_players) = class $bog_blitz_lobby_players extends ($.$mol_list) {
@@ -17373,6 +18677,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -17559,6 +18864,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$bog_qr) = class $bog_qr extends ($.$mol_svg_root) {
 		stop_offset(id){
@@ -17730,6 +19036,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Dynamic sources import. */
     class $mol_import extends $mol_object2 {
         static module(uri) {
             $mol_wire_solid();
@@ -17781,6 +19088,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -18125,6 +19433,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -18144,6 +19453,7 @@ var $;
                     if (!session)
                         return;
                     session.Current_question('auto')?.val(0);
+                    // Publish multi_correct for first question
                     const key_link = session.Answers_key_land()?.val();
                     if (key_link) {
                         const key_land = this.$.$giper_baza_glob.Land(new $giper_baza_link(key_link));
@@ -18331,6 +19641,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -18501,6 +19812,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -18558,6 +19870,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -18675,6 +19988,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -18869,101 +20183,9 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    function $mol_offline() { }
-    $.$mol_offline = $mol_offline;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    try {
-        $mol_offline();
-    }
-    catch (error) {
-        console.error(error);
-    }
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    class $giper_baza_file extends $giper_baza_dict.with({
-        Name: $giper_baza_atom_text,
-        Type: $giper_baza_atom_text,
-        Chunks: $giper_baza_list_bin,
-    }) {
-        uri() {
-            return `?BAZA:file=${this.link()};name=${this.name()}`;
-        }
-        name(next) {
-            const ext = {
-                'text/plain': 'txt',
-                'application/json': 'json',
-            }[this.type()] ?? 'bin';
-            return this.Name(next)?.val(next) ?? `${this.link()}.${ext}`;
-        }
-        type(next) {
-            return this.Type(next)?.val(next) ?? 'application/octet-stream';
-        }
-        blob(next) {
-            if (!next)
-                return new $mol_blob(this.chunks(), { type: this.type() });
-            const buffer = new Uint8Array($mol_wire_sync(next).arrayBuffer());
-            this.buffer(buffer);
-            this.type(next.type);
-            if (next instanceof $mol_dom_context.File)
-                this.name(next.name);
-            return next;
-        }
-        buffer(next) {
-            if (next) {
-                const chunks = [];
-                for (let offset = 0; offset < next.byteLength;) {
-                    chunks.push(next.slice(offset, offset += 2 ** 15));
-                }
-                this.chunks(chunks);
-                return next;
-            }
-            else {
-                const chunks = this.chunks();
-                const size = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-                const res = new Uint8Array(size);
-                let offset = 0;
-                for (const chunk of chunks) {
-                    res.set(chunk, offset);
-                    offset += chunk.byteLength;
-                }
-                return res;
-            }
-        }
-        chunks(next) {
-            return (this.Chunks(next)?.items(next)?.filter($mol_guard_defined) ?? []);
-        }
-        str(next, type = 'text/plain') {
-            if (next === undefined)
-                return $mol_charset_decode(this.buffer());
-            this.buffer($mol_charset_encode(next));
-            this.type(type);
-            return next;
-        }
-        json(next, type = 'application/json') {
-            if (next === undefined)
-                return JSON.parse(this.str());
-            this.str(JSON.stringify(next), type);
-            return next;
-        }
-    }
-    $.$giper_baza_file = $giper_baza_file;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
     var $$;
     (function ($$) {
+        /** В session land — хост пишет Score, игрок регистрирует Answer_land */
         class $bog_blitz_player extends $giper_baza_dict.with({
             Score: $giper_baza_atom_real,
             Name: $giper_baza_atom_text,
@@ -18973,9 +20195,11 @@ var $;
         }) {
         }
         $$.$bog_blitz_player = $bog_blitz_player;
+        /** В собственном ленде игрока — только игрок пишет */
         class $bog_blitz_player_answers extends $giper_baza_dict.with({
             Answer: $giper_baza_atom_text,
             Answer_time: $giper_baza_atom_real,
+            Answer_question: $giper_baza_atom_real,
             React_heart: $giper_baza_atom_real,
             React_smile: $giper_baza_atom_real,
             React_fire: $giper_baza_atom_real,
@@ -18989,6 +20213,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -19316,6 +20541,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -19488,6 +20714,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -19953,6 +21180,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -20154,6 +21382,12 @@ var $;
                     return next;
                 return [];
             }
+            text_draft(next) {
+                this.current_question_index();
+                if (next !== undefined)
+                    return next;
+                return '';
+            }
             publish_question_meta(session, index) {
                 const keys = this.answers_key_data();
                 if (!keys)
@@ -20181,6 +21415,7 @@ var $;
                         return;
                     answers.Answer('auto')?.val(selected.sort().join(','));
                     answers.Answer_time('auto')?.val(Date.now());
+                    answers.Answer_question('auto')?.val(this.current_question_index());
                 }
             }
             answer_views() {
@@ -20207,6 +21442,7 @@ var $;
                         return;
                     answers.Answer('auto')?.val(draft);
                     answers.Answer_time('auto')?.val(Date.now());
+                    answers.Answer_question('auto')?.val(this.current_question_index());
                 }
             }
             text_input_enabled() {
@@ -20256,7 +21492,12 @@ var $;
             }
             my_answer() {
                 const answers = this.my_answers();
-                return answers?.Answer()?.val() ?? '';
+                if (!answers)
+                    return '';
+                const q = answers.Answer_question()?.val() ?? -1;
+                if (q !== this.current_question_index())
+                    return '';
+                return answers.Answer()?.val() ?? '';
             }
             has_answered() {
                 return this.my_answer() !== '';
@@ -20461,6 +21702,8 @@ var $;
                 const time_multiplier = quiz.Time_multiplier().val();
                 const answer_duration = this.duration();
                 const round_start = this.round_start();
+                const index = this.current_question_index();
+                // Publish correct answer for reveal
                 const session = this.session();
                 session?.Reveal_correct('auto')?.val(key.correct);
                 const dict = this.players_dict();
@@ -20476,8 +21719,10 @@ var $;
                     if (player.IsHost()?.val())
                         continue;
                     const pa = this.player_answers_data(player);
-                    const answer = pa?.Answer()?.val() ?? '';
-                    const answer_time = pa?.Answer_time()?.val() ?? 0;
+                    const pa_q = pa?.Answer_question()?.val() ?? -1;
+                    const is_current = pa_q === index;
+                    const answer = is_current ? (pa?.Answer()?.val() ?? '') : '';
+                    const answer_time = is_current ? (pa?.Answer_time()?.val() ?? 0) : 0;
                     const elapsed = answer_time && round_start ? (answer_time - round_start) / 1000 : answer_duration;
                     const time_ratio = Math.max(0, 1 - elapsed / answer_duration);
                     const base = points_base * (1 + time_ratio * time_multiplier);
@@ -20498,22 +21743,9 @@ var $;
                 }
             }
             reset_answers() {
-                const dict = this.players_dict();
-                if (!dict)
-                    return;
-                const keys = dict.keys() ?? [];
-                for (const key of keys) {
-                    if ($bog_blitz_session_fields.has(String(key)))
-                        continue;
-                    const player = dict.dive(key, $bog_blitz_player);
-                    if (!player)
-                        continue;
-                    const pa = this.player_answers_data(player);
-                    if (!pa)
-                        continue;
-                    pa.Answer('auto')?.val('');
-                    pa.Answer_time('auto')?.val(0);
-                }
+                // Player lands are write-protected — each player's has_answered()
+                // is gated by Answer_question matching current index, so stale data
+                // is ignored automatically. Only the session-land reveal needs clearing.
                 const session = this.session();
                 session?.Reveal_correct('auto')?.val('');
             }
@@ -20557,6 +21789,9 @@ var $;
         __decorate([
             $mol_mem
         ], $bog_blitz_lobby_game.prototype, "selected_options", null);
+        __decorate([
+            $mol_mem
+        ], $bog_blitz_lobby_game.prototype, "text_draft", null);
         __decorate([
             $mol_mem
         ], $bog_blitz_lobby_game.prototype, "submit_enabled", null);
@@ -20853,6 +22088,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -21054,6 +22290,21 @@ var $;
             gap: '0.25rem',
             align: { items: 'flex-end', self: 'stretch' },
             width: '95%',
+            // Mol_qr: {
+            // 	width: '9rem',
+            // 	height: '9rem',
+            // 	border: {
+            // 		radius: $mol_gap.round,
+            // 	},
+            // },
+            // GiperBaza_qr: {
+            // 	width: '9rem',
+            // 	height: '9rem',
+            // 	marginLeft: '4rem',
+            // 	border: {
+            // 		radius: $mol_gap.round,
+            // 	},
+            // },
             Spacer: {
                 flex: {
                     grow: 1,
@@ -21276,6 +22527,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -21359,10 +22611,12 @@ var $;
                 if (e) {
                     const player = this.my_player_create();
                     if (player) {
+                        // Write name from join form (no async deps)
                         const join_name = this.my_player_name();
                         if (join_name) {
                             player.Name('auto')?.val(join_name);
                         }
+                        // Write avatar from join form
                         const files = this.my_avatar_files();
                         if (files?.length) {
                             const store = player.Avatar(null).ensure(null);
@@ -21371,10 +22625,12 @@ var $;
                                 player.Avatar(null).remote(store);
                             }
                         }
+                        // Create answer land (may throw Promise on first run)
                         const answer_land = this.$.$giper_baza_glob.land_grab([
                             [null, $giper_baza_rank_read],
                         ]);
                         player.Answer_land('auto')?.val(answer_land.link().str);
+                        // Sync with profile (may throw Promise — runs after core data is written)
                         this.sync_profile(player, join_name, files);
                     }
                 }
@@ -21382,6 +22638,7 @@ var $;
             }
             sync_profile(player, join_name, files) {
                 const profile = this.profile_data();
+                // Fallback name from profile if join name was empty
                 if (!join_name) {
                     const profile_name = profile.Name()?.val() ?? '';
                     if (profile_name)
@@ -21390,6 +22647,7 @@ var $;
                 else {
                     profile.Name('auto')?.val(join_name);
                 }
+                // Sync avatar
                 if (files?.length) {
                     const profile_store = profile.Avatar(null).ensure(null);
                     if (profile_store) {
@@ -21674,12 +22932,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Root component for adaptivity to various screen sizes. Implements booklet UX.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_book2_demo
+         */
         class $mol_book2 extends $.$mol_book2 {
             pages_deep() {
                 let result = [];
@@ -21722,6 +22985,7 @@ var $;
                             left: p.offsetLeft + p.offsetWidth - b.offsetWidth,
                             behavior: 'smooth',
                         });
+                        // new this.$.$mol_after_timeout( 1000, ()=> n.bring() )
                     });
                     break;
                 }
@@ -21799,6 +23063,10 @@ var $;
             return false;
         return null;
     }
+    /**
+     * Switcher between light/dark themes (usually for `mol_theme_auto` plugin).
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_lights_demo
+     */
     function $mol_lights(next) {
         const arg = parse(this.$mol_state_arg.value('mol_lights'));
         const base = this.$mol_media.match('(prefers-color-scheme: light)');
@@ -21821,12 +23089,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * The [plugin](../../plugin/readme.md) which defines theme based on [mol_lights](../../lights/readme.md).
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_lights_demo
+         */
         class $mol_theme_auto extends $.$mol_theme_auto {
             theme() {
                 return this.$.$mol_lights() ? this.light() : this.dark();
@@ -21908,12 +23181,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Dynamic hyperlink. It can add, change or remove parameters. A link that leads to the current page has [mol_link_current] attribute set to true.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_link_demo
+         */
         class $mol_link extends $.$mol_link {
             uri_toggle() {
                 return this.current() ? this.uri_off() : this.uri();
@@ -22097,6 +23375,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -22221,14 +23500,19 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_frame_demo
+         */
         class $mol_frame extends $.$mol_frame {
             window() {
+                // if( this.html() ) return ( this.dom_node() as HTMLIFrameElement ).contentWindow!
                 return super.window();
             }
             allow() {
@@ -22273,6 +23557,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -22329,6 +23614,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_trash_can_outline) = class $mol_icon_trash_can_outline extends ($.$mol_icon) {
 		path(){
@@ -22339,6 +23625,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_icon_script) = class $mol_icon_script extends ($.$mol_icon) {
@@ -22351,6 +23638,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_script_text) = class $mol_icon_script_text extends ($.$mol_icon) {
 		path(){
@@ -22361,6 +23649,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_link_source) = class $mol_link_source extends ($.$mol_link) {
@@ -22381,6 +23670,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_gift) = class $mol_icon_gift extends ($.$mol_icon) {
 		path(){
@@ -22392,6 +23682,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_gift_outline) = class $mol_icon_gift_outline extends ($.$mol_icon) {
 		path(){
@@ -22402,6 +23693,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_link_donate) = class $mol_link_donate extends ($.$mol_link) {
@@ -22422,6 +23714,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_face) = class $mol_icon_face extends ($.$mol_icon) {
 		path(){
@@ -22433,6 +23726,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_face_agent) = class $mol_icon_face_agent extends ($.$mol_icon) {
 		path(){
@@ -22443,6 +23737,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_link_support) = class $mol_link_support extends ($.$mol_link) {
@@ -22462,6 +23757,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_check) = class $mol_check extends ($.$mol_button_minor) {
@@ -22543,12 +23839,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Checkbox UI component. See Variants for more concrete implementations.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_check_box_demo
+         */
         class $mol_check extends $.$mol_check {
             click(next) {
                 const event = next ? $mol_dom_event.wrap(next) : null;
@@ -22588,6 +23889,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_brightness_4) = class $mol_icon_brightness_4 extends ($.$mol_icon) {
 		path(){
@@ -22598,6 +23900,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_lights_toggle) = class $mol_lights_toggle extends ($.$mol_check_icon) {
@@ -22626,12 +23929,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Toggle for Switcher between light/dark themes (usually for `mol_theme_auto` plugin).
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_lights_demo
+         */
         class $mol_lights_toggle extends $.$mol_lights_toggle {
             lights(next) {
                 return this.$.$mol_lights(next);
@@ -22663,6 +23971,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -22712,6 +24021,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_chevron) = class $mol_icon_chevron extends ($.$mol_icon) {
 		path(){
@@ -22722,6 +24032,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_check_expand) = class $mol_check_expand extends ($.$mol_check) {
@@ -22759,12 +24070,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Expander for trees, lists, etc
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_check_expand_demo
+         */
         class $mol_check_expand extends $.$mol_check_expand {
             level_style() {
                 return `${this.level() * 1 - 1}rem`;
@@ -22989,6 +24305,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -23165,6 +24482,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -23174,6 +24492,7 @@ var $;
         class $mol_link_iconed extends $.$mol_link_iconed {
             icon() {
                 return `https://favicon.yandex.net/favicon/${this.host()}?color=0,0,0,0&size=32&stub=1`;
+                // return `https://api.faviconkit.com/${ this.host() }/16`
             }
             host() {
                 const base = this.$.$mol_state_arg.href();
@@ -23226,6 +24545,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_embed_service) = class $mol_embed_service extends ($.$mol_check) {
@@ -23284,6 +24604,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -23317,6 +24638,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -23357,6 +24679,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -23393,6 +24716,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -23478,6 +24802,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -23574,12 +24899,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Component which expands any content on title click.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_expander_demo
+         */
         class $mol_expander extends $.$mol_expander {
             rows() {
                 return [
@@ -23909,12 +25239,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Markdown visualizer.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_text_demo
+         */
         class $mol_text extends $.$mol_text {
             flow_tokens() {
                 const tokens = [];
@@ -24306,12 +25641,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Component that helps to upload files to server.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_attach_demo
+         */
         class $mol_attach extends $.$mol_attach {
             attach_new(files) {
                 this.items([
@@ -24358,6 +25698,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_bar) = class $mol_bar extends ($.$mol_view) {};
 
@@ -24372,6 +25713,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_chevron_left) = class $mol_icon_chevron_left extends ($.$mol_icon) {
 		path(){
@@ -24383,6 +25725,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_chevron_right) = class $mol_icon_chevron_right extends ($.$mol_icon) {
 		path(){
@@ -24393,6 +25736,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_paginator) = class $mol_paginator extends ($.$mol_bar) {
@@ -24465,12 +25809,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Paginator UI component
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_paginator_demo
+         */
         class $mol_paginator extends $.$mol_paginator {
             backward(event) {
                 if (event.defaultPrevented)
@@ -24498,36 +25847,12 @@ var $;
 
 ;
 "use strict";
-
-;
-"use strict";
 var $;
 (function ($) {
-    function $mol_data_record(sub) {
-        return $mol_data_setup((val) => {
-            let res = {};
-            for (const field in sub) {
-                try {
-                    res[field] =
-                        sub[field](val[field]);
-                }
-                catch (error) {
-                    if (error instanceof Promise)
-                        return $mol_fail_hidden(error);
-                    error.message = `[${JSON.stringify(field)}] ${error.message}`;
-                    return $mol_fail(error);
-                }
-            }
-            return res;
-        }, sub);
-    }
-    $.$mol_data_record = $mol_data_record;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
+    /**
+     * Checks for equality to given value and returns expected type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_const_demo
+     */
     function $mol_data_const(ref) {
         return $mol_data_setup((val) => {
             if ($mol_compare_deep(val, ref))
@@ -24542,70 +25867,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
-    $.$mol_data_string = (val) => {
-        if (typeof val === 'string')
-            return val;
-        return $mol_fail(new $mol_data_error(`${val} is not a string`));
-    };
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function $mol_data_variant(...sub) {
-        return $mol_data_setup((val) => {
-            const errors = [];
-            for (const type of sub) {
-                let hidden = $.$mol_fail_hidden;
-                try {
-                    $.$mol_fail = $.$mol_fail_hidden;
-                    return type(val);
-                }
-                catch (error) {
-                    $.$mol_fail = hidden;
-                    if (error instanceof $mol_data_error) {
-                        errors.push(error);
-                    }
-                    else {
-                        return $mol_fail_hidden(error);
-                    }
-                }
-            }
-            return $mol_fail(new $mol_data_error(`${val} is not any of variants`, {}, ...errors));
-        }, sub);
-    }
-    $.$mol_data_variant = $mol_data_variant;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function $mol_data_array(sub) {
-        return $mol_data_setup((val) => {
-            if (!Array.isArray(val))
-                return $mol_fail(new $mol_data_error(`${val} is not an array`));
-            return val.map((item, index) => {
-                try {
-                    return sub(item);
-                }
-                catch (error) {
-                    if (error instanceof Promise)
-                        return $mol_fail_hidden(error);
-                    error.message = `[${index}] ${error.message}`;
-                    return $mol_fail(error);
-                }
-            });
-        }, sub);
-    }
-    $.$mol_data_array = $mol_data_array;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
+    /**
+     * Checks for null or passing given runtype.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_nullable_demo
+     */
     function $mol_data_nullable(sub) {
         return $mol_data_setup((val) => {
             if (val === null)
@@ -24614,21 +25879,6 @@ var $;
         }, sub);
     }
     $.$mol_data_nullable = $mol_data_nullable;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function $mol_data_optional(sub, fallback) {
-        return $mol_data_setup((val) => {
-            if (val === undefined) {
-                return fallback?.();
-            }
-            return sub(val);
-        }, { sub, fallback });
-    }
-    $.$mol_data_optional = $mol_data_optional;
 })($ || ($ = {}));
 
 ;
@@ -24751,6 +26001,7 @@ var $;
             });
             return Object.assign(promise, {
                 destructor: () => {
+                    // Abort of done request breaks response parsing
                     if (!done && !controller.signal.aborted)
                         controller.abort();
                 },
@@ -24844,6 +26095,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    // Make new tokens: https://github.com/settings/personal-access-tokens/new?name=$mol_github_model&user_models=read
     $.$mol_github_model_keys = [
         '11AADME3A07jh1teLjee8r_O7MKyAF8rbdIlhk4OwsJHaCnh4CjDNxn1nLNAvW2Hy6OSTIYABWQyp0rOHt',
         '11AADME3A0q6w8EFz9G9aa_byqEpTuWUa63PKoSAwN1eVi2GyGJ4SxYhm9OhAc2DCTANK2ULBQpQgUu6D9',
@@ -24897,7 +26149,11 @@ var $;
         '11AZC2M3A0yK6fYUgjj79M_5yu4OE4RdeFk8IoY3kcOC1xemTvjB1B8tOzA1KPmqQSX37EDQIOIuRjf9jF',
     ].map(str => `github_pat_${str}`);
     $.$mol_github_model_polyglots = [
-        'openai/gpt-4.1-mini',
+        // 'openai/gpt-4.1', // 50/D too slow
+        // 'openai/gpt-4o', // 50/D bad resp
+        'openai/gpt-4.1-mini', // 150/D
+        // 'openai/gpt-4o-mini', // 150/D bad resp
+        // 'openai/gpt-4.1-nano', // 150/D bad resp
     ];
     const Text = $mol_data_record({
         type: $mol_data_const('text'),
@@ -24933,6 +26189,7 @@ var $;
     });
     const Tool = $mol_data_record({
         role: $mol_data_const('tool'),
+        // name: $mol_data_string,
         tool_call_id: $mol_data_string,
         content: Content,
     });
@@ -24954,39 +26211,55 @@ var $;
             return { type: 'image_url', image_url: { url: val } };
         return { type: 'text', text: val };
     }
+    /**
+     * Github hosted LLM API.
+     */
     class $mol_github_model extends $mol_object {
+        // STATIC STATE
+        /** Model names from https://github.com/marketplace/models */
         names() {
             return this.$.$mol_github_model_polyglots;
         }
+        /** System rules */
         rules() {
             return '';
         }
+        /** List of callable functions */
         tools() {
             return new Map();
         }
+        // DYNAMIC STATE
+        /** Actual system state */
         state(next) {
             $mol_wire_solid();
             return next ?? [];
         }
+        /** Additional model query params */
         params(next) {
             $mol_wire_solid();
             return next ?? {};
         }
+        /** Dialog history */
         history(next) {
             $mol_wire_solid();
             return next ?? [];
         }
+        // ACTIONS
+        /** Independent copy of current state. */
         fork() {
             const fork = $mol_github_model.make({
+                // static state
                 names: $mol_const(this.names()),
                 rules: $mol_const(this.rules()),
                 tools: $mol_const(this.tools()),
                 state: () => this.state(),
             });
+            // dynamic state
             fork.params(this.params());
             fork.history(this.history());
             return fork;
         }
+        /** One-shot stateless prompting */
         shot(prompt, context, params) {
             const fork = this.fork();
             if (params)
@@ -24996,6 +26269,7 @@ var $;
             fork.ask(prompt);
             return fork.response();
         }
+        /** Add user prompt */
         ask(chunks) {
             this.history([
                 ...this.history(),
@@ -25006,6 +26280,7 @@ var $;
             ]);
             return this;
         }
+        /** Add assistant context */
         tell(chunks) {
             this.history([
                 ...this.history(),
@@ -25016,6 +26291,7 @@ var $;
             ]);
             return this;
         }
+        /** Add tools answer */
         answer(id, chunks) {
             const history = this.history();
             const index = 1 + history.findIndex(msg => msg.role === 'tool' && msg.tool_call_id === id);
@@ -25032,6 +26308,7 @@ var $;
             ]);
             return this;
         }
+        // INFERENCE
         request_body(model) {
             return JSON.stringify({
                 model,
@@ -25064,6 +26341,7 @@ var $;
                 body: this.request_body(model)
             }));
         }
+        /** Last response from LLM */
         response() {
             const history = this.history();
             const last = history.at(-1);
@@ -25086,7 +26364,7 @@ var $;
                         if (!resp)
                             return $mol_fail_hidden(error);
                         if (resp.code() === 429)
-                            continue;
+                            continue; // rate limit
                         if (resp.code() === 400) {
                             const message = RespFail(resp.json()).error.message;
                             this.history([...history, { role: 'system', content: '📛 ' + message }]);
@@ -25175,6 +26453,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$giper_bot) = class $giper_bot extends ($.$mol_book2) {
@@ -25440,6 +26719,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Image processing. */
     class $mol_picture extends $mol_object2 {
         canvas;
         constructor(canvas) {
@@ -25519,6 +26799,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -25556,7 +26837,7 @@ var $;
                 const item = this.history()[index];
                 let text = [item.message, ...item.files.map(item => `""` + item + `""`)].join('\n');
                 if ('`#>|='.includes(text[0]))
-                    text = '\n' + text;
+                    text = '\n' + text; // markdown blocks
                 return this.message_name(index) + ' ' + text;
             }
             message_name(index) {
@@ -25579,6 +26860,7 @@ var $;
             rules() {
                 return super.rules()
                     .replaceAll('{lang}', this.$.$mol_locale.lang());
+                // .replaceAll( '{document}', this.result().replaceAll( /^/gm, '\t' ) )
             }
             context() {
                 return this.rules();
@@ -25759,6 +27041,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -25845,6 +27128,7 @@ Quiz generation rules:
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_share) = class $mol_icon_share extends ($.$mol_icon) {
 		path(){
@@ -25855,6 +27139,7 @@ Quiz generation rules:
 
 ;
 "use strict";
+
 
 ;
 	($.$bog_blitz_admin_quiz) = class $bog_blitz_admin_quiz extends ($.$mol_row) {
@@ -25961,6 +27246,7 @@ Quiz generation rules:
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -26043,6 +27329,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_check_box) = class $mol_check_box extends ($.$mol_check) {
 		Icon(){
@@ -26062,6 +27349,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_labeler) = class $mol_labeler extends ($.$mol_list) {
@@ -26100,6 +27388,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_number) = class $mol_number extends ($.$mol_view) {
@@ -26245,12 +27534,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Component for entering, incrementing and decrementing numeric values.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_number_demo
+         */
         class $mol_number extends $.$mol_number {
             value_limited(val) {
                 if (Number.isNaN(val))
@@ -26300,30 +27594,43 @@ var $;
                 }
             }
             value_string(next) {
+                // Вытягиваем value
+                // Если кто-то поменяет из вне value, value_string надо обновить
                 const current = this.round(this.value_limited());
                 if (next === undefined)
                     return current;
                 const precision = this.precision_view();
+                // Точку в конце поставить нельзя, если precision_view целое число > 0
                 if (precision - Math.floor(precision) === 0)
                     next = next.replace(/[.,]/g, '');
+                // Запятые меняем на точки, удаляем не-цифры и не-точки и лишние ноли в начале целой части.
+                // Минус получится ввести только в начале.
                 next = (this.value_min() < 0 && next.startsWith('-') ? '-' : '')
                     + next.replace(/,/g, '.').replace(/[^\d\.]/g, '').replace(/^0{2,}/, '0');
                 let dot_pos = next.indexOf('.');
                 if (dot_pos !== -1) {
                     const prev = $mol_wire_probe(() => this.value_string()) ?? '';
                     const dot_pos_prev = prev.indexOf('.');
+                    // Определяем где относительно предыдущей точки юзер поставил новую
                     if (dot_pos_prev === dot_pos)
                         dot_pos = next.lastIndexOf('.');
+                    // Из частей до и после новой точки старую точку удаляем
                     const frac = next.slice(dot_pos + 1).replace(/\./g, '');
+                    // Если точка идет первой, перед ней пишем 0, что бы форматирование выглядело нормально в mask
                     next = (next.slice(0, dot_pos) || '0').replace(/\./g, '') + '.' + frac;
                 }
+                // Оставляем старое значение в value есть сочетание, приводящие к NaN, например -.
                 if (Number.isNaN(Number(next)))
                     return next;
                 if (next.endsWith('.'))
                     return next;
                 if (next.endsWith('-'))
                     return next;
+                // Если пустая строка - сетим NaN
+                // Применяем округления.
                 this.value_limited(Number(next || Number.NaN));
+                // Возвращаем все-равно не нормализованное значение
+                // Иначе нельзя ввести будет 10, если min/max 5..10
                 return next;
             }
             dec_enabled() {
@@ -26391,12 +27698,18 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Pop-up display and hide by mouse click, also hide by unfocus.
+         * Based on [mol_pop](https://mol.hyoo.ru/#!section=demos/demo=mol_pop_demo) component.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_pick_demo
+         */
         class $mol_pick extends $.$mol_pick {
             keydown(event) {
                 if (!this.trigger_enabled())
@@ -26492,12 +27805,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Plugin which can navigate in list of items
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_nav_demo
+         */
         class $mol_nav extends $.$mol_nav {
             event_key(event) {
                 if (!event)
@@ -26749,12 +28067,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Search input with suggest and clear button.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_search_demo
+         */
         class $mol_search extends $.$mol_search {
             anchor_content() {
                 return [
@@ -26844,6 +28167,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_select) = class $mol_select extends ($.$mol_pick) {
@@ -26998,12 +28322,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Allow user to select value from various options and displays current value.
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_select_demo_colors
+         */
         class $mol_select extends $.$mol_select {
             filter_pattern(next) {
                 this.focused();
@@ -27248,6 +28577,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -27448,6 +28778,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -27809,6 +29140,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -28476,6 +29808,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -28718,9 +30051,11 @@ var $;
                 const quiz = this.quiz_by_key(key);
                 if (!quiz)
                     return;
+                // Session land — все могут писать (игроки регистрируются)
                 const session_land = this.$.$giper_baza_glob.land_grab([
                     [null, $giper_baza_rank_post('just')],
                 ]);
+                // Encrypted land — только хост читает правильные ответы
                 const key_land = this.$.$giper_baza_glob.land_grab([
                     [null, $giper_baza_rank_deny],
                 ]);
@@ -28964,435 +30299,6 @@ var $;
 })($ || ($ = {}));
 
 ;
-"use strict";
-var $;
-(function ($) {
-    class $bog_feedback2_entry extends $giper_baza_dict.with({
-        Text: $giper_baza_atom_text,
-        Contact: $giper_baza_atom_text,
-    }) {
-    }
-    $.$bog_feedback2_entry = $bog_feedback2_entry;
-})($ || ($ = {}));
-
-;
-	($.$mol_section) = class $mol_section extends ($.$mol_list) {
-		title_dom_name(){
-			return "h1";
-		}
-		Title(){
-			const obj = new this.$.$mol_view();
-			(obj.dom_name) = () => ((this.title_dom_name()));
-			(obj.sub) = () => ([(this.title())]);
-			return obj;
-		}
-		tools(){
-			return [];
-		}
-		Tools(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ((this.tools()));
-			return obj;
-		}
-		head(){
-			return [(this.Title()), (this.Tools())];
-		}
-		Head(){
-			const obj = new this.$.$mol_view();
-			(obj.sub) = () => ((this.head()));
-			return obj;
-		}
-		content(){
-			return [];
-		}
-		Content(){
-			const obj = new this.$.$mol_list();
-			(obj.rows) = () => ((this.content()));
-			return obj;
-		}
-		level(){
-			return 1;
-		}
-		rows(){
-			return [(this.Head()), (this.Content())];
-		}
-	};
-	($mol_mem(($.$mol_section.prototype), "Title"));
-	($mol_mem(($.$mol_section.prototype), "Tools"));
-	($mol_mem(($.$mol_section.prototype), "Head"));
-	($mol_mem(($.$mol_section.prototype), "Content"));
-
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        class $mol_section extends $.$mol_section {
-            title_dom_name() {
-                return 'h' + this.level();
-            }
-        }
-        $$.$mol_section = $mol_section;
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_attach("mol/section/section.view.css", "[mol_section_head] {\n\tjustify-content: space-between;\n\talign-items: flex-end;\n\tflex-wrap: wrap;\n}\n\n[mol_section_title] {\n\tmargin: 0;\n\tpadding: var(--mol_gap_text);\n\ttext-shadow: 0 0;\n\tfont-weight: normal;\n}\n\n[mol_section_title]:where(h1) {\n\tfont-size: 1.5rem;\n}\n\n[mol_section_title]:where(h2) {\n\tfont-size: 1.5rem;\n\tfont-style: italic;\n}\n\n[mol_section_title]:where(h3) {\n\tfont-size: 1.25rem;\n}\n\n[mol_section_title]:where(h4) {\n\tfont-size: 1.25rem;\n\tfont-style: italic;\n}\n\n[mol_section_title]:where(h5) {\n\tfont-size: 1rem;\n}\n\n[mol_section_title]:where(h6) {\n\tfont-size: 1rem;\n\tfont-style: italic;\n}\n");
-})($ || ($ = {}));
-
-;
-	($.$bog_feedback2_form) = class $bog_feedback2_form extends ($.$mol_page) {
-		Close(){
-			return null;
-		}
-		prompt(){
-			return "";
-		}
-		Prompt(){
-			const obj = new this.$.$mol_text();
-			(obj.text) = () => ((this.prompt()));
-			return obj;
-		}
-		draft_text(next){
-			if(next !== undefined) return next;
-			return "";
-		}
-		Entry_my(){
-			const obj = new this.$.$mol_textarea();
-			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_feedback2_form_Entry_my_hint")));
-			(obj.value) = (next) => ((this.draft_text(next)));
-			return obj;
-		}
-		draft_contact(next){
-			if(next !== undefined) return next;
-			return "";
-		}
-		Contact_field(){
-			const obj = new this.$.$mol_string();
-			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_feedback2_form_Contact_field_hint")));
-			(obj.value) = (next) => ((this.draft_contact(next)));
-			return obj;
-		}
-		submit_title(){
-			return "";
-		}
-		submit(next){
-			if(next !== undefined) return next;
-			return null;
-		}
-		Submit(){
-			const obj = new this.$.$mol_button_major();
-			(obj.title) = () => ((this.submit_title()));
-			(obj.click) = (next) => ((this.submit(next)));
-			return obj;
-		}
-		entry_row_contact(id){
-			return "";
-		}
-		entry_row_text(id){
-			return "";
-		}
-		Entry_row_text(id){
-			const obj = new this.$.$mol_text();
-			(obj.text) = () => ((this.entry_row_text(id)));
-			return obj;
-		}
-		Entry_row(id){
-			const obj = new this.$.$mol_section();
-			(obj.title) = () => ((this.entry_row_contact(id)));
-			(obj.content) = () => ([(this.Entry_row_text(id))]);
-			return obj;
-		}
-		entry_rows(){
-			return [(this.Entry_row("0"))];
-		}
-		Entries(){
-			const obj = new this.$.$mol_section();
-			(obj.title) = () => ((this.$.$mol_locale.text("$bog_feedback2_form_Entries_title")));
-			(obj.content) = () => ((this.entry_rows()));
-			return obj;
-		}
-		waiting_title(){
-			return (this.$.$mol_locale.text("$bog_feedback2_form_waiting_title"));
-		}
-		Head(){
-			return null;
-		}
-		feedback_id(){
-			return "";
-		}
-		registry_link(){
-			return "4o4ds4yH_SXDxOCPR";
-		}
-		title(){
-			return (this.$.$mol_locale.text("$bog_feedback2_form_title"));
-		}
-		tools(){
-			return [(this.Close())];
-		}
-		body(){
-			return [
-				(this.Prompt()), 
-				(this.Entry_my()), 
-				(this.Contact_field()), 
-				(this.Submit()), 
-				(this.Entries())
-			];
-		}
-		Not_configured(){
-			const obj = new this.$.$mol_status();
-			(obj.message) = () => ((this.$.$mol_locale.text("$bog_feedback2_form_Not_configured_message")));
-			return obj;
-		}
-		Waiting(){
-			const obj = new this.$.$mol_paragraph();
-			(obj.title) = () => ((this.waiting_title()));
-			return obj;
-		}
-	};
-	($mol_mem(($.$bog_feedback2_form.prototype), "Prompt"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "draft_text"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "Entry_my"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "draft_contact"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "Contact_field"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "submit"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "Submit"));
-	($mol_mem_key(($.$bog_feedback2_form.prototype), "Entry_row_text"));
-	($mol_mem_key(($.$bog_feedback2_form.prototype), "Entry_row"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "Entries"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "Not_configured"));
-	($mol_mem(($.$bog_feedback2_form.prototype), "Waiting"));
-
-
-;
-"use strict";
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
-        const Entries_dict = $giper_baza_dict_to($bog_feedback2_entry);
-        const Registry_dict = $giper_baza_dict_to($giper_baza_atom_text);
-        class $bog_feedback2_form extends $.$bog_feedback2_form {
-            registry_land() {
-                return this.$.$giper_baza_glob.Land(new $giper_baza_link(this.registry_link()));
-            }
-            registry_dict() {
-                return this.registry_land().Data(Registry_dict);
-            }
-            my_pass() {
-                return this.$.$giper_baza_auth.current().pass();
-            }
-            my_lord() {
-                return this.my_pass().lord().str;
-            }
-            feedback_land_link() {
-                const from_arg = this.$.$mol_state_arg.value('land');
-                if (from_arg)
-                    return from_arg;
-                return this.registry_dict().key(this.feedback_id())?.val() ?? null;
-            }
-            land() {
-                const link = this.feedback_land_link();
-                if (link)
-                    return this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
-                if (!this.is_owner())
-                    return null;
-                return this.land_ensure();
-            }
-            land_ensure() {
-                const land = this.$.$giper_baza_glob.land_grab([[null, $giper_baza_rank_post('just')]]);
-                const link = land.link().str;
-                const entry = this.registry_dict().key(this.feedback_id(), 'auto');
-                if (entry)
-                    entry.val(link);
-                return land;
-            }
-            entries_dict() {
-                return this.land()?.Data(Entries_dict) ?? null;
-            }
-            is_owner() {
-                const rank = this.registry_land().pass_rank(this.my_pass());
-                return $giper_baza_rank_tier_of(rank) >= $giper_baza_rank_tier.rule;
-            }
-            is_configured() {
-                return !!this.registry_link();
-            }
-            entry_mine() {
-                return this.entries_dict()?.key(this.my_lord()) ?? null;
-            }
-            entry_mine_or_create() {
-                return this.entries_dict()?.key(this.my_lord(), 'auto') ?? null;
-            }
-            prompt() {
-                return [
-                    '**Tell us what you think:**',
-                    '- What did you **like**?',
-                    '- What could be done **better**?',
-                    '- Any **suggestions** for the future?',
-                ].join('\n');
-            }
-            draft_text(next) {
-                if (next !== undefined)
-                    return next;
-                const entry = this.entry_mine();
-                return entry?.Text()?.val() ?? '';
-            }
-            draft_contact(next) {
-                if (next !== undefined)
-                    return next;
-                const entry = this.entry_mine();
-                return entry?.Contact()?.val() ?? '';
-            }
-            has_entry() {
-                return !!this.entry_mine();
-            }
-            submit_title() {
-                return this.has_entry() ? 'Update feedback' : 'Send feedback';
-            }
-            submit() {
-                const text = this.draft_text();
-                const contact = this.draft_contact();
-                if (!text)
-                    return;
-                const entry = this.entry_mine_or_create();
-                if (!entry)
-                    return;
-                entry.Text('auto').val(text);
-                if (contact)
-                    entry.Contact('auto').val(contact);
-            }
-            body() {
-                if (!this.is_configured())
-                    return [this.Not_configured()];
-                if (!this.land())
-                    return [this.Waiting()];
-                return [
-                    this.Prompt(),
-                    this.Entry_my(),
-                    this.Contact_field(),
-                    this.Submit(),
-                    ...(this.is_owner() ? [this.Entries()] : []),
-                ];
-            }
-            all_lords() {
-                return this.entries_dict()?.keys() ?? [];
-            }
-            entry_rows() {
-                return this.all_lords().map((_, i) => this.Entry_row(i));
-            }
-            entry_row_text(index) {
-                const lord = this.all_lords()[index];
-                if (!lord)
-                    return '';
-                const entry = this.entries_dict()?.key(lord);
-                return entry?.Text()?.val() ?? '';
-            }
-            entry_row_contact(index) {
-                const lord = this.all_lords()[index];
-                if (!lord)
-                    return '';
-                const entry = this.entries_dict()?.key(lord);
-                return entry?.Contact()?.val() ?? 'Anonymous';
-            }
-        }
-        __decorate([
-            $mol_action
-        ], $bog_feedback2_form.prototype, "land_ensure", null);
-        __decorate([
-            $mol_action
-        ], $bog_feedback2_form.prototype, "entry_mine_or_create", null);
-        __decorate([
-            $mol_mem
-        ], $bog_feedback2_form.prototype, "draft_text", null);
-        __decorate([
-            $mol_mem
-        ], $bog_feedback2_form.prototype, "draft_contact", null);
-        __decorate([
-            $mol_action
-        ], $bog_feedback2_form.prototype, "submit", null);
-        $$.$bog_feedback2_form = $bog_feedback2_form;
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_attach("bog/feedback2/form/form.view.css", "@keyframes bog_feedback2_form_pulse {\n\t0%, 100% { opacity: 0.3; }\n\t50% { opacity: 0.8; }\n}\n");
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_style_define($bog_feedback2_form, {
-        color: $mol_theme.text,
-        flex: {
-            basis: '40rem',
-        },
-        margin: [0, 'auto'],
-        Waiting: {
-            padding: $mol_gap.block,
-            textAlign: 'center',
-            opacity: 0.5,
-            animation: {
-                name: 'bog_feedback2_form_pulse',
-                duration: '1.5s',
-                iterationCount: 'infinite',
-                timingFunction: 'ease-in-out',
-            },
-        },
-        Prompt: {
-            padding: $mol_gap.block,
-        },
-        Contact_field: {
-            margin: {
-                top: $mol_gap.space,
-            },
-        },
-        Submit: {
-            margin: {
-                top: $mol_gap.block,
-            },
-        },
-        Entries: {
-            margin: {
-                top: $mol_gap.block,
-            },
-            Content: {
-                gap: $mol_gap.block,
-            },
-        },
-        Entry_row: {
-            background: {
-                color: $mol_theme.card,
-            },
-            border: {
-                radius: $mol_gap.round,
-            },
-            padding: $mol_gap.block,
-            boxShadow: `0 0 0 1px ${$mol_theme.line}`,
-            Head: {
-                font: {
-                    size: '1rem',
-                },
-            },
-        },
-    });
-})($ || ($ = {}));
-
-;
 	($.$mol_icon_menu) = class $mol_icon_menu extends ($.$mol_icon) {
 		path(){
 			return "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
@@ -29403,27 +30309,6 @@ var $;
 ;
 "use strict";
 
-;
-	($.$mol_icon_message) = class $mol_icon_message extends ($.$mol_icon) {
-		path(){
-			return "M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4C22,2.89 21.1,2 20,2Z";
-		}
-	};
-
-
-;
-"use strict";
-
-;
-	($.$mol_icon_message_draw) = class $mol_icon_message_draw extends ($.$mol_icon) {
-		path(){
-			return "M18,14H10.5L12.5,12H18M6,14V11.5L12.88,4.64C13.07,4.45 13.39,4.45 13.59,4.64L15.35,6.41C15.55,6.61 15.55,6.92 15.35,7.12L8.47,14M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4C22,2.89 21.1,2 20,2Z";
-		}
-	};
-
-
-;
-"use strict";
 
 ;
 	($.$mol_icon_cog) = class $mol_icon_cog extends ($.$mol_icon) {
@@ -29436,6 +30321,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_sync) = class $mol_icon_sync extends ($.$mol_icon) {
 		path(){
@@ -29447,6 +30333,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_sync_off) = class $mol_icon_sync_off extends ($.$mol_icon) {
 		path(){
@@ -29457,6 +30344,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$giper_baza_status) = class $giper_baza_status extends ($.$mol_select) {
@@ -29521,6 +30409,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -29531,6 +30420,7 @@ var $;
             message() {
                 try {
                     this.$.$giper_baza_glob.yard().master();
+                    // this.glob().yard().sync()
                     return this.hint();
                 }
                 catch (error) {
@@ -29543,6 +30433,7 @@ var $;
             link_content() {
                 try {
                     this.$.$giper_baza_glob.yard().master();
+                    // this.glob().yard().sync()
                     return [this.Well()];
                 }
                 catch (error) {
@@ -29552,6 +30443,10 @@ var $;
                     return [this.Fail()];
                 }
             }
+            // @ $mol_mem
+            // hint() {
+            // 	return super.hint() + ' ' + $hyoo_sync_revision
+            // }
             options() {
                 return this.$.$giper_baza_yard.masters();
             }
@@ -29593,6 +30488,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Theme css variables
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_textarea_demo
+     */
     $.$bog_theme = $mol_style_prop('mol_theme', [
         'back',
         'background',
@@ -29609,6 +30508,10 @@ var $;
         'image',
         'spirit',
     ]);
+    /**
+     * Available theme names.
+     * Add new theme to theme.css and add its name here.
+     */
     $.$bog_theme_names = [
         '$mol_theme_giper_smash_dark',
         '$mol_theme_giper_smash_light',
@@ -29670,6 +30573,9 @@ var $;
 			if(next !== undefined) return next;
 			return null;
 		}
+		is_light_now(){
+			return false;
+		}
 		attr(){
 			return {"mol_theme": (this.theme())};
 		}
@@ -29684,6 +30590,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -29694,13 +30601,39 @@ var $;
             themes_default() {
                 return this.$.$bog_theme_names;
             }
+            /** Stores current mode in localStorage. Defaults to 'system'.
+             *  При записи дёргает класс `.bog_theme_switching` на `<html>` —
+             *  это активирует CSS-transition'ы на цветах темы.
+             */
             mode(next) {
+                if (next !== undefined && typeof document !== 'undefined') {
+                    const root = document.documentElement;
+                    root.classList.add('bog_theme_switching');
+                    setTimeout(() => root.classList.remove('bog_theme_switching'), 350);
+                }
                 return this.$.$mol_state_local.value(`${this}.mode()`, next) ?? 'system';
             }
+            click_step(next) {
+                return this.$.$mol_state_session.value(`${this}.click_step()`, next) ?? 0;
+            }
+            /** 3-click cycle: opposite → back → system. */
             mode_next() {
-                const cycle = ['system', 'light', 'dark'];
-                const i = cycle.indexOf(this.mode());
-                this.mode(cycle[i === -1 ? 0 : (i + 1) % cycle.length]);
+                const step = (this.click_step() + 1) % 3;
+                this.click_step(step);
+                if (step === 0)
+                    this.mode('system');
+                else
+                    this.mode(this.is_light_now() ? 'dark' : 'light');
+            }
+            is_light_now() {
+                const mode = this.mode();
+                if (mode === 'light')
+                    return true;
+                if (mode === 'dark')
+                    return false;
+                if (mode === 'system')
+                    return this.$.$mol_lights();
+                return this.theme().toLowerCase().includes('light');
             }
             theme_index(next) {
                 const stored = this.$.$mol_state_local.value(`${this}.theme_index()`, next);
@@ -29729,6 +30662,7 @@ var $;
                         return this.theme_light();
                     return themes[index % themes.length];
                 }
+                // system — follow browser preference
                 return this.$.$mol_lights() ? this.theme_light() : this.theme_dark();
             }
             theme_next() {
@@ -29739,6 +30673,7 @@ var $;
                 const i = cycle.indexOf(this.mode());
                 this.mode(cycle[i <= 0 ? cycle.length - 1 : i - 1]);
             }
+            /** Called by picker. Sets mode to light/dark or custom for themed palettes. */
             theme_set(index) {
                 const themes = this.themes();
                 if (themes.length === 0)
@@ -29754,14 +30689,21 @@ var $;
                     this.mode('custom');
                     this.theme_index(index % themes.length);
                 }
+                this.click_step(0);
             }
         }
         __decorate([
             $mol_mem
         ], $bog_theme_auto.prototype, "mode", null);
         __decorate([
+            $mol_mem
+        ], $bog_theme_auto.prototype, "click_step", null);
+        __decorate([
             $mol_action
         ], $bog_theme_auto.prototype, "mode_next", null);
+        __decorate([
+            $mol_mem
+        ], $bog_theme_auto.prototype, "is_light_now", null);
         __decorate([
             $mol_mem
         ], $bog_theme_auto.prototype, "theme_index", null);
@@ -29782,6 +30724,13 @@ var $;
         ], $bog_theme_auto.prototype, "theme_set", null);
         $$.$bog_theme_auto = $bog_theme_auto;
     })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_attach("bog/theme/auto/auto.view.css", ".bog_theme_switching,\n.bog_theme_switching * {\n\ttransition: background-color 300ms ease, color 300ms ease, border-color 300ms ease, fill 300ms ease !important;\n}\n\n@media (prefers-reduced-motion: reduce) {\n\t.bog_theme_switching,\n\t.bog_theme_switching * {\n\t\ttransition: none !important;\n\t}\n}\n");
 })($ || ($ = {}));
 
 ;
@@ -29811,6 +30760,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -29934,12 +30884,16 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Theme picker popup with search and list
+         */
         class $bog_theme_picker extends $.$bog_theme_picker {
             theme_rows() {
                 const themes = this.filtered_themes();
@@ -29949,6 +30903,7 @@ var $;
                 const query = this.query().toLowerCase().trim();
                 const themes = this.$.$bog_theme_names;
                 const filtered = query ? themes.filter(name => name.toLowerCase().includes(query)) : [...themes];
+                // Reset focused index when filter changes
                 const current = this.focused_index();
                 if (current >= filtered.length) {
                     this.focused_index(-1);
@@ -29970,12 +30925,14 @@ var $;
                 if (global_index !== -1) {
                     this.theme_auto().theme_set(global_index);
                 }
+                // Close popup
                 this.close();
                 return null;
             }
             theme_hover(index, event) {
                 if (!event)
                     return null;
+                // Update focused index on hover (this will apply preview via theme_focused)
                 this.focused_index(index);
                 const themes = this.filtered_themes();
                 const theme_name = themes[index];
@@ -29994,6 +30951,7 @@ var $;
                     case 'ArrowDown':
                         event.preventDefault();
                         event.stopPropagation();
+                        // If focus is on search (-1), start from first item
                         if (current === -1) {
                             current = 0;
                         }
@@ -30006,6 +30964,7 @@ var $;
                     case 'ArrowUp':
                         event.preventDefault();
                         event.stopPropagation();
+                        // If focus is on search (-1), start from last item
                         if (current === -1) {
                             current = themes.length - 1;
                         }
@@ -30035,6 +30994,7 @@ var $;
                 if (global_index !== -1) {
                     this.theme_auto().theme_set(global_index);
                 }
+                // Close popup
                 this.close();
             }
             preview_theme(index) {
@@ -30093,6 +31053,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_weather_night) = class $mol_icon_weather_night extends ($.$mol_icon) {
 		path(){
@@ -30104,6 +31065,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_monitor) = class $mol_icon_monitor extends ($.$mol_icon) {
 		path(){
@@ -30114,6 +31076,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$bog_theme_toggle) = class $bog_theme_toggle extends ($.$mol_pop) {
@@ -30231,6 +31194,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -30331,6 +31295,7 @@ var $;
                         search.focused(true);
                     }
                     catch (e) {
+                        // Ignore focus errors
                     }
                 }, 100);
             }
@@ -30401,6 +31366,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$bog_blitz_radio) = class $bog_blitz_radio extends ($.$mol_pop) {
@@ -30520,6 +31486,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -30745,12 +31712,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * List of checkboxes
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_check_list_demo
+         */
         class $mol_check_list extends $.$mol_check_list {
             options() {
                 return {};
@@ -30807,12 +31779,17 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /**
+         * Buttons which switching the state
+         * @see https://mol.hyoo.ru/#!section=demos/demo=mol_switch_demo
+         */
         class $mol_switch extends $.$mol_switch {
             value(next) {
                 return $mol_state_session.value(`${this}.value()`, next) ?? '';
@@ -30842,11 +31819,6 @@ var $;
 			const obj = new this.$.$bog_blitz_profile_page();
 			return obj;
 		}
-		Feedback(){
-			const obj = new this.$.$bog_feedback2_form();
-			(obj.feedback_id) = () => ("blitz");
-			return obj;
-		}
 		screen(next){
 			if(next !== undefined) return next;
 			return "lobby";
@@ -30863,16 +31835,6 @@ var $;
 			const obj = new this.$.$mol_check();
 			(obj.checked) = (next) => ((this.mobile_menu_showed(next)));
 			(obj.sub) = () => ([(this.Mobile_menu_icon())]);
-			return obj;
-		}
-		Feedback_icon(){
-			const obj = new this.$.$mol_icon_message_draw();
-			return obj;
-		}
-		Feedback_link(){
-			const obj = new this.$.$mol_link();
-			(obj.arg) = () => ({"screen": "feedback"});
-			(obj.sub) = () => ([(this.Feedback_icon())]);
 			return obj;
 		}
 		Settings_icon(){
@@ -30935,8 +31897,7 @@ var $;
 			return {
 				"lobby": (this.Lobby()), 
 				"admin": (this.Admin()), 
-				"profile": (this.Profile()), 
-				"feedback": (this.Feedback())
+				"profile": (this.Profile())
 			};
 		}
 		nav_options(){
@@ -30966,11 +31927,7 @@ var $;
 			return obj;
 		}
 		tools(){
-			return [
-				(this.Feedback_link()), 
-				(this.Settings()), 
-				(this.Radio())
-			];
+			return [(this.Settings()), (this.Radio())];
 		}
 		head(){
 			return [
@@ -30990,13 +31947,10 @@ var $;
 	($mol_mem(($.$bog_blitz.prototype), "Lobby"));
 	($mol_mem(($.$bog_blitz.prototype), "Admin"));
 	($mol_mem(($.$bog_blitz.prototype), "Profile"));
-	($mol_mem(($.$bog_blitz.prototype), "Feedback"));
 	($mol_mem(($.$bog_blitz.prototype), "screen"));
 	($mol_mem(($.$bog_blitz.prototype), "mobile_menu_showed"));
 	($mol_mem(($.$bog_blitz.prototype), "Mobile_menu_icon"));
 	($mol_mem(($.$bog_blitz.prototype), "Mobile_menu_trigger"));
-	($mol_mem(($.$bog_blitz.prototype), "Feedback_icon"));
-	($mol_mem(($.$bog_blitz.prototype), "Feedback_link"));
 	($mol_mem(($.$bog_blitz.prototype), "Settings_icon"));
 	($mol_mem(($.$bog_blitz.prototype), "Status"));
 	($mol_mem(($.$bog_blitz.prototype), "Theme_toggle"));
@@ -31013,6 +31967,19 @@ var $;
 
 ;
 "use strict";
+var $;
+(function ($) {
+    /** Node-side stub. The real implementation lives in `path.web.ts`. */
+    class $bog_ui_router_path extends $mol_state_arg {
+        /** No-op в node — реальная установка path-routing'а в `path.web.ts`. */
+        static activate() { }
+    }
+    $.$bog_ui_router_path = $bog_ui_router_path;
+})($ || ($ = {}));
+
+;
+"use strict";
+
 
 ;
 "use strict";
@@ -31020,10 +31987,13 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
+        // Activate path-based URL routing (no `#!`).
+        $bog_ui_router_path.activate();
         class $bog_blitz extends $.$bog_blitz {
             tools() {
                 const is_host = this.Lobby().is_host();
-                return [is_host ? this.Radio() : null, this.Feedback_link(), this.Settings()];
+                // return [is_host ? this.Radio() : null, this.Feedback_link(), this.Settings()]
+                return [is_host ? this.Radio() : null, this.Settings()];
             }
             screen_body() {
                 const page = this.pages()[this.screen()];
@@ -31360,6 +32330,7 @@ var $;
             'Reveal_correct',
             'Multi_correct',
         ]);
+        /** Зашифрованный ленд — только хост читает. JSON с правильными ответами */
         class $bog_blitz_answers_key extends $giper_baza_dict.with({
             Data: $giper_baza_atom_text,
         }) {
@@ -31374,11 +32345,13 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /** Минимальная ссылка в home land — указывает на отдельный ленд с квизами */
         class $bog_blitz_home_ref extends $giper_baza_dict.with({
             Quizzes_land: $giper_baza_atom_text,
         }) {
         }
         $$.$bog_blitz_home_ref = $bog_blitz_home_ref;
+        /** Живёт в отдельном ленде, не в home land */
         class $bog_blitz_registry extends $giper_baza_dict.with({
             Quizzes: $giper_baza_list_link_to(() => $bog_blitz_quiz),
             Shared_quizzes: $giper_baza_list_link_to(() => $bog_blitz_quiz),
@@ -31420,6 +32393,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -31825,6 +32799,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -31854,12 +32829,14 @@ var $;
             comment_views() {
                 return this.comment_items().map((_, i) => this.Comment_row(i));
             }
+            /** Lord ID for avatar */
             comment_author_id(index) {
                 const item = this.comment_items()[index];
                 if (!item)
                     return '';
                 return item.Author()?.val() ?? '';
             }
+            /** Display name + date */
             comment_author(index) {
                 const item = this.comment_items()[index];
                 if (!item)
@@ -31870,6 +32847,7 @@ var $;
                 const date = time ? new Date(time).toLocaleString() : '';
                 return name + (date ? ' \u00b7 ' + date : '');
             }
+            /** Resolve lord ID to profile name */
             author_name(lord_id) {
                 if (!lord_id)
                     return '';
@@ -31934,7 +32912,10 @@ var $;
         flex: {
             direction: 'column',
             grow: 1,
+            shrink: 1,
         },
+        minWidth: 0,
+        minHeight: 0,
         gap: '0.5rem',
         padding: {
             top: '0.5rem',
@@ -31946,14 +32927,22 @@ var $;
             flex: {
                 direction: 'column',
                 grow: 1,
+                shrink: 1,
             },
+            minWidth: 0,
+            minHeight: 0,
             gap: '0.5rem',
-            overflow: 'auto',
+            overflow: {
+                x: 'hidden',
+                y: 'auto',
+            },
         },
         Comment_row: {
             flex: {
                 direction: 'column',
+                shrink: 0,
             },
+            minWidth: 0,
             padding: {
                 top: '0.375rem',
                 bottom: '0.375rem',
@@ -31973,6 +32962,7 @@ var $;
                 direction: 'row',
             },
             alignItems: 'center',
+            minWidth: 0,
             gap: '0.375rem',
         },
         Comment_avatar: {
@@ -31989,27 +32979,59 @@ var $;
                 weight: 600,
             },
             color: $mol_theme.shade,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
         },
         Comment_text: {
             font: {
                 size: '0.875rem',
             },
+            minWidth: 0,
+            maxWidth: '100%',
+            overflowWrap: 'anywhere',
         },
         Input_row: {
             flex: {
                 direction: 'row',
+                shrink: 0,
             },
+            minWidth: 0,
             gap: '0.25rem',
             alignItems: 'flex-end',
         },
         Input: {
             flex: {
                 grow: 1,
+                shrink: 1,
             },
+            minWidth: 0,
         },
         Send: {
             flex: {
                 shrink: 0,
+            },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                /** Composer stacks so the Send button keeps a full-size tap target */
+                Input_row: {
+                    flex: {
+                        direction: 'column',
+                    },
+                    alignItems: 'stretch',
+                    gap: '0.375rem',
+                },
+                Send: {
+                    justifyContent: 'center',
+                    padding: {
+                        top: '0.5rem',
+                        bottom: '0.5rem',
+                        left: '0.75rem',
+                        right: '0.75rem',
+                    },
+                },
             },
         },
     });
@@ -32116,6 +33138,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -32158,17 +33181,44 @@ var $;
 var $;
 (function ($) {
     $mol_style_define($bog_wysiwyg_comment, {
+        flex: {
+            shrink: 0,
+        },
         Comment_button: {
-            opacity: 0.4,
+            opacity: 0,
             transition: 'opacity 0.15s',
             cursor: 'pointer',
+            flex: {
+                shrink: 0,
+            },
             minWidth: '1.5rem',
             minHeight: '1.5rem',
+            justifyContent: 'center',
+            alignItems: 'center',
+            border: {
+                radius: $mol_gap.round,
+            },
             padding: {
                 top: '0.25rem',
                 bottom: '0.25rem',
                 left: '0.25rem',
                 right: '0.25rem',
+            },
+            ':focus-visible': {
+                opacity: 1,
+                outline: 'none',
+                box: {
+                    shadow: [
+                        {
+                            inset: true,
+                            x: 0,
+                            y: 0,
+                            blur: 0,
+                            spread: '2px',
+                            color: $mol_theme.focus,
+                        },
+                    ],
+                },
             },
         },
         Comment_count: {
@@ -32183,7 +33233,8 @@ var $;
                 direction: 'column',
             },
             width: '18rem',
-            maxWidth: '90vw',
+            minWidth: 0,
+            maxWidth: $mol_style_func.calc('100vw - 1rem'),
             maxHeight: '24rem',
             background: {
                 color: $mol_theme.card,
@@ -32191,14 +33242,27 @@ var $;
             border: {
                 radius: $mol_gap.round,
             },
-            boxShadow: `0 4px 16px 0 ${$mol_theme.shade}`,
+            box: {
+                shadow: [
+                    {
+                        inset: false,
+                        x: 0,
+                        y: '0.25rem',
+                        blur: '1rem',
+                        spread: 0,
+                        color: '#00000040',
+                    },
+                ],
+            },
         },
         Panel_head: {
             flex: {
                 direction: 'row',
+                shrink: 0,
             },
             justifyContent: 'space-between',
             alignItems: 'center',
+            minWidth: 0,
             padding: {
                 top: '0.5rem',
                 bottom: '0.25rem',
@@ -32217,11 +33281,17 @@ var $;
             font: {
                 weight: 600,
             },
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
         },
         Thread: {
             flex: {
                 grow: 1,
+                shrink: 1,
             },
+            minWidth: 0,
+            minHeight: 0,
             overflow: 'auto',
         },
         '@': {
@@ -32231,6 +33301,20 @@ var $;
                         opacity: 1,
                         color: $mol_theme.focus,
                     },
+                },
+            },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                Comment_button: {
+                    opacity: 1,
+                    minWidth: '2rem',
+                    minHeight: '2rem',
+                },
+                /** Full-width sheet instead of a narrow column next to the text */
+                Panel: {
+                    width: $mol_style_func.calc('100vw - 1rem'),
+                    maxHeight: '60vh',
                 },
             },
         },
@@ -32285,6 +33369,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -32292,6 +33377,7 @@ var $;
     var $$;
     (function ($$) {
         class $bog_wysiwyg_links extends $.$bog_wysiwyg_links {
+            /** Find pages that contain [[page_id]] linking to our page */
             backlink_pages() {
                 const target = this.page_id();
                 if (!target)
@@ -32347,6 +33433,12 @@ var $;
 var $;
 (function ($) {
     $mol_style_define($bog_wysiwyg_links, {
+        flex: {
+            direction: 'column',
+            shrink: 0,
+        },
+        minWidth: 0,
+        maxWidth: '100%',
         padding: {
             top: $mol_gap.block,
             bottom: $mol_gap.block,
@@ -32360,32 +33452,70 @@ var $;
                 color: $mol_theme.line,
             },
         },
-        margin: {
-            top: $mol_gap.block,
+        gap: '0.125rem',
+        ':empty': {
+            display: 'none',
         },
-        gap: $mol_gap.text,
         Header: {
             font: {
                 weight: 'bold',
                 size: '0.875rem',
             },
             color: $mol_theme.shade,
-            padding: {
-                left: $mol_gap.text,
-                right: $mol_gap.text,
+            padding: $mol_gap.text,
+        },
+        Links: {
+            flex: {
+                direction: 'column',
             },
+            minWidth: 0,
+            maxWidth: '100%',
+            gap: '0.125rem',
         },
         Link: {
-            padding: {
-                top: $mol_gap.text,
-                bottom: $mol_gap.text,
-                left: $mol_gap.text,
-                right: $mol_gap.text,
-            },
+            display: 'block',
+            minWidth: 0,
+            maxWidth: '100%',
+            padding: $mol_gap.text,
             color: $mol_theme.focus,
             cursor: 'pointer',
             border: {
                 radius: $mol_gap.round,
+            },
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ':hover': {
+                background: {
+                    color: $mol_theme.hover,
+                },
+            },
+            ':focus-visible': {
+                outline: 'none',
+                box: {
+                    shadow: [
+                        {
+                            inset: true,
+                            x: 0,
+                            y: 0,
+                            blur: 0,
+                            spread: '2px',
+                            color: $mol_theme.focus,
+                        },
+                    ],
+                },
+            },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                Link: {
+                    padding: {
+                        top: '0.625rem',
+                        bottom: '0.625rem',
+                        left: '0.5rem',
+                        right: '0.5rem',
+                    },
+                },
             },
         },
     });
@@ -32468,6 +33598,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -32530,18 +33661,40 @@ var $;
     $mol_style_define($bog_wysiwyg_menu, {
         position: 'fixed',
         zIndex: 100,
+        /**
+         * `top`/`left` come as inline styles from the caret position.
+         * Pinning the opposite edges plus `fit-content` limits keeps the popup
+         * inside the viewport: while the content fits it is sized by content and
+         * anchored at the caret, otherwise it stretches to the edge and scrolls.
+         */
+        bottom: '0.5rem',
+        right: '0.5rem',
+        maxHeight: 'fit-content',
+        maxWidth: 'fit-content',
+        overflow: {
+            x: 'hidden',
+            y: 'auto',
+        },
         background: {
             color: $mol_theme.back,
+        },
+        border: {
+            width: '1px',
+            style: 'solid',
+            color: $mol_theme.line,
         },
         borderRadius: '0.5rem',
         padding: {
             top: '0.25rem',
             bottom: '0.25rem',
+            left: '0.25rem',
+            right: '0.25rem',
         },
         minWidth: '12rem',
         flex: {
             direction: 'column',
         },
+        gap: '0.0625rem',
         box: {
             shadow: [
                 {
@@ -32558,10 +33711,50 @@ var $;
             display: 'none',
         },
         Option: {
+            flex: {
+                shrink: 0,
+            },
+            justifyContent: 'flex-start',
+            textAlign: 'left',
+            minWidth: 0,
+            borderRadius: '0.25rem',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ':focus-visible': {
+                outline: 'none',
+                box: {
+                    shadow: [
+                        {
+                            inset: true,
+                            x: 0,
+                            y: 0,
+                            blur: 0,
+                            spread: '2px',
+                            color: $mol_theme.focus,
+                        },
+                    ],
+                },
+            },
             '[bog_wysiwyg_menu_option_active]': {
                 'true': {
                     background: {
                         color: $mol_theme.hover,
+                    },
+                    color: $mol_theme.focus,
+                },
+            },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                /** Let the popup shrink near the right edge of a narrow screen */
+                minWidth: '9rem',
+                Option: {
+                    padding: {
+                        top: '0.625rem',
+                        bottom: '0.625rem',
+                        left: '0.75rem',
+                        right: '0.75rem',
                     },
                 },
             },
@@ -32669,6 +33862,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -32739,18 +33933,40 @@ var $;
     $mol_style_define($bog_wysiwyg_ai, {
         position: 'fixed',
         zIndex: 100,
+        /**
+         * `top`/`left` come as inline styles from the caret position.
+         * Pinning the opposite edges plus `fit-content` limits keeps the popup
+         * inside the viewport: while the content fits it is sized by content and
+         * anchored at the caret, otherwise it stretches to the edge and scrolls.
+         */
+        bottom: '0.5rem',
+        right: '0.5rem',
+        maxHeight: 'fit-content',
+        maxWidth: 'fit-content',
+        overflow: {
+            x: 'hidden',
+            y: 'auto',
+        },
         background: {
             color: $mol_theme.back,
+        },
+        border: {
+            width: '1px',
+            style: 'solid',
+            color: $mol_theme.line,
         },
         borderRadius: '0.5rem',
         padding: {
             top: '0.25rem',
             bottom: '0.25rem',
+            left: '0.25rem',
+            right: '0.25rem',
         },
         minWidth: '14rem',
         flex: {
             direction: 'column',
         },
+        gap: '0.0625rem',
         box: {
             shadow: [
                 {
@@ -32767,10 +33983,60 @@ var $;
             display: 'none',
         },
         Option: {
+            flex: {
+                shrink: 0,
+            },
+            justifyContent: 'flex-start',
+            textAlign: 'left',
+            minWidth: 0,
+            borderRadius: '0.25rem',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ':focus-visible': {
+                outline: 'none',
+                box: {
+                    shadow: [
+                        {
+                            inset: true,
+                            x: 0,
+                            y: 0,
+                            blur: 0,
+                            spread: '2px',
+                            color: $mol_theme.focus,
+                        },
+                    ],
+                },
+            },
             '[bog_wysiwyg_ai_option_active]': {
                 'true': {
                     background: {
                         color: $mol_theme.hover,
+                    },
+                    color: $mol_theme.focus,
+                },
+            },
+        },
+        /** Request in flight — dim the list and block a second pick */
+        '@': {
+            'bog_wysiwyg_ai_loading': {
+                'true': {
+                    opacity: 0.6,
+                    pointerEvents: 'none',
+                    cursor: 'progress',
+                },
+            },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                /** Let the popup shrink near the right edge of a narrow screen */
+                minWidth: '10rem',
+                Option: {
+                    padding: {
+                        top: '0.625rem',
+                        bottom: '0.625rem',
+                        left: '0.75rem',
+                        right: '0.75rem',
                     },
                 },
             },
@@ -32849,10 +34115,242 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    const { unicode_only, line_end, tab, repeat_greedy, optional, forbid_after, force_after, char_only, char_except } = $mol_regexp;
+    $.$giper_baza_text_tokens = $mol_regexp.from({
+        token: {
+            'line-break': line_end,
+            'indents': repeat_greedy(tab, 1),
+            'emoji': [
+                unicode_only('Extended_Pictographic'),
+                optional(unicode_only('Emoji_Modifier')),
+                repeat_greedy([
+                    unicode_only('Emoji_Component'),
+                    unicode_only('Extended_Pictographic'),
+                    optional(unicode_only('Emoji_Modifier')),
+                ]),
+            ],
+            'link': /\b(https?:\/\/[^\s,.;:!?")]+(?:[,.;:!?")][^\s,.;:!?")]+)+)/,
+            'Word': [
+                [char_only(' ', 0xA0)],
+                repeat_greedy(char_only([
+                    unicode_only('General_Category', 'Uppercase_Letter'),
+                    unicode_only('Diacritic'),
+                    unicode_only('General_Category', 'Number'),
+                ]), 1),
+                repeat_greedy(char_only([
+                    unicode_only('General_Category', 'Lowercase_Letter'),
+                    unicode_only('Diacritic'),
+                    unicode_only('General_Category', 'Number'),
+                ])),
+            ],
+            'word': [
+                [char_only(' ', 0xA0)],
+                repeat_greedy(char_only([
+                    unicode_only('General_Category', 'Lowercase_Letter'),
+                    unicode_only('Diacritic'),
+                    unicode_only('General_Category', 'Number'),
+                ]), 1),
+            ],
+            'spaces': [
+                forbid_after(line_end),
+                repeat_greedy(unicode_only('White_Space'), 1),
+                force_after(unicode_only('White_Space')),
+            ],
+            'space': [
+                forbid_after(line_end),
+                unicode_only('White_Space'),
+                forbid_after([
+                    unicode_only('White_Space'),
+                    unicode_only('General_Category', 'Uppercase_Letter'),
+                    unicode_only('General_Category', 'Lowercase_Letter'),
+                    unicode_only('Diacritic'),
+                    unicode_only('General_Category', 'Number'),
+                ]),
+            ],
+            'others': [
+                [char_only(' ', 0xA0)],
+                repeat_greedy(char_except([
+                    unicode_only('General_Category', 'Uppercase_Letter'),
+                    unicode_only('General_Category', 'Lowercase_Letter'),
+                    unicode_only('Diacritic'),
+                    unicode_only('General_Category', 'Number'),
+                    unicode_only('White_Space'),
+                ]), 1),
+            ],
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /** Mergeable text Pawn */
+    class $giper_baza_text extends $giper_baza_pawn {
+        static tag = $giper_baza_unit_sand_tag[$giper_baza_unit_sand_tag.vals];
+        value(next) {
+            return this.text(next);
+        }
+        /** Text representation. Based on list of rows. */
+        text(next) {
+            if (next !== undefined) {
+                const land = this.land();
+                const prev = this.units();
+                const lines = next.match(/.*\n|.+$/g) ?? [];
+                $mol_reconcile({
+                    prev,
+                    from: 0,
+                    to: prev.length,
+                    next: lines,
+                    equal: (next, prev) => {
+                        //if( typeof prev.data === 'string' ) return false // ???
+                        return land.Pawn($giper_baza_text).Head(prev.self()).str() === next;
+                    },
+                    drop: (prev, lead) => this.land().post(lead?.self() ?? $giper_baza_link.hole, prev.head(), prev.self(), null),
+                    insert: (next, lead) => {
+                        const sand = this.land().post(lead?.self() ?? $giper_baza_link.hole, this.head(), land.self_make(), 'p', 'vals');
+                        land.Pawn($giper_baza_text).Head(sand.self()).str(next);
+                        return sand;
+                    },
+                    replace: (next, prev, lead) => {
+                        land.Pawn($giper_baza_text).Head(prev.self()).str(next);
+                        return prev;
+                    },
+                });
+            }
+            return this.str();
+        }
+        /** Text representation. Based on list of tokens. */
+        str(next) {
+            if (next === undefined) {
+                let str = '';
+                const land = this.land();
+                for (const unit of this.units()) {
+                    if (unit.tag() === 'term')
+                        str += $mol_schema_string.cast(land.sand_decode(unit));
+                    else
+                        str += land.Pawn($giper_baza_text).Head(unit.self()).str();
+                }
+                return str;
+            }
+            else {
+                this.write(next, 0, -1);
+                return this.str();
+            }
+        }
+        write(next, str_from = -1, str_to = str_from) {
+            const land = this.land();
+            const list = this.units();
+            let from = str_from < 0 ? list.length : 0;
+            let word = '';
+            while (from < list.length) {
+                word = $mol_schema_string.cast(land.sand_decode(list[from]));
+                if (str_from <= word.length) {
+                    next = word.slice(0, str_from) + next;
+                    break;
+                }
+                str_from -= word.length;
+                if (str_to > 0)
+                    str_to -= word.length;
+                from++;
+            }
+            let to = str_to < 0 ? list.length : from;
+            while (to < list.length) {
+                word = $mol_schema_string.cast(land.sand_decode(list[to]));
+                to++;
+                if (str_to < word.length) {
+                    next = next + word.slice(str_to);
+                    break;
+                }
+                str_to -= word.length;
+            }
+            if (from && from === list.length) {
+                --from;
+                next = $mol_schema_string.cast(land.sand_decode(list[from])) + next;
+            }
+            const words = next.match($giper_baza_text_tokens) ?? [];
+            this.cast($giper_baza_list).splice(words, from, to);
+            return this;
+        }
+        point_by_offset(offset) {
+            const land = this.land();
+            let off = offset;
+            for (const unit of this.units()) {
+                if (unit.tag() === 'term') {
+                    const len = $mol_schema_string.cast(land.sand_decode(unit)).length;
+                    if (off <= len)
+                        return [unit.self().str, off, 0];
+                    else
+                        off -= len;
+                }
+                else {
+                    const found = land.Pawn($giper_baza_text).Head(unit.self()).point_by_offset(off);
+                    if (found[0])
+                        return found;
+                    off = found[1];
+                }
+            }
+            return ['', off, 0];
+        }
+        offset_by_point([self, offset]) {
+            const land = this.land();
+            for (const unit of this.units()) {
+                if (unit.self().str === self)
+                    return [self, offset];
+                if (unit.tag() === 'term') {
+                    offset += $mol_schema_string.cast(land.sand_decode(unit)).length;
+                }
+                else {
+                    const found = land.Pawn($giper_baza_text).Head(unit.self()).offset_by_point([self, offset, 0]);
+                    if (found[0])
+                        return [self, found[1]];
+                    offset = found[1];
+                }
+            }
+            return ['', offset];
+        }
+        selection(lord, next) {
+            const user = this.$.$giper_baza_glob.Land(lord).Data($giper_baza_flex_user);
+            if (next) {
+                user.caret(next.map(offset => this.point_by_offset(offset)));
+                return next;
+            }
+            else {
+                this.text(); // track text to recalc selection on its change
+                return user.caret()?.map(point => this.offset_by_point(point)[1]) ?? [0, 0];
+            }
+        }
+    }
+    __decorate([
+        $mol_mem
+    ], $giper_baza_text.prototype, "text", null);
+    __decorate([
+        $mol_mem
+    ], $giper_baza_text.prototype, "str", null);
+    __decorate([
+        $mol_action
+    ], $giper_baza_text.prototype, "write", null);
+    __decorate([
+        $mol_action
+    ], $giper_baza_text.prototype, "point_by_offset", null);
+    __decorate([
+        $mol_action
+    ], $giper_baza_text.prototype, "offset_by_point", null);
+    __decorate([
+        $mol_mem_key
+    ], $giper_baza_text.prototype, "selection", null);
+    $.$giper_baza_text = $giper_baza_text;
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
     var $$;
     (function ($$) {
+        /** A single block in a WYSIWYG page. Stored as a pawn inside the page land. */
         class $bog_wysiwyg_model_block extends $giper_baza_dict.with({
-            Type: $giper_baza_atom_text,
+            Type: $giper_baza_text,
             Level: $giper_baza_atom_real,
             Content: $giper_baza_atom_text,
         }) {
@@ -32867,10 +34365,13 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /** A WYSIWYG page. One page = one Land. Contains title + ordered list of blocks. */
         class $bog_wysiwyg_model_page extends $giper_baza_dict.with({
             Title: $giper_baza_atom_text,
             Blocks: $giper_baza_list_link_to(() => $bog_wysiwyg_model_block),
+            /** Links to forked lands (version snapshots), newest first */
             Versions: $giper_baza_list_link,
+            /** Mapping: block_id -> comment land link (as text atom) */
             Comments: $giper_baza_dict_to($giper_baza_atom_text),
         }) {
         }
@@ -32881,6 +34382,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -32888,18 +34390,21 @@ var $;
     var $$;
     (function ($$) {
         class $bog_wysiwyg_history extends $.$bog_wysiwyg_history {
+            /** Giper Baza land for the page. Do NOT put @$mol_mem here (land/pawn). */
             page_land() {
                 const link = this.page_land_link();
                 if (!link)
                     return null;
                 return this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
             }
+            /** Page data from the land. Do NOT put @$mol_mem here (land/pawn). */
             page_data() {
                 const land = this.page_land();
                 if (!land)
                     return null;
                 return land.Data($bog_wysiwyg_model_page);
             }
+            /** List of version land link strings, newest first */
             version_links() {
                 const data = this.page_data();
                 if (!data)
@@ -32907,24 +34412,26 @@ var $;
                 const versions = data.Versions();
                 if (!versions)
                     return [];
-                const items = versions.items_vary() ?? [];
-                return items
-                    .map(v => $giper_baza_vary_cast_link(v))
+                return (versions.items() ?? [])
                     .filter($mol_guard_defined)
                     .map(link => link.str);
             }
+            /** Create a true snapshot of the current page by copying all block data into a new land */
             save_version(event) {
                 if (!event)
                     return null;
                 const src_data = this.page_data();
                 if (!src_data)
                     return null;
+                // Create a new independent land for the snapshot
                 const snap_land = this.$.$giper_baza_glob.land_grab();
                 const snap_data = snap_land.Data($bog_wysiwyg_model_page);
+                // Copy title
                 const title_val = src_data.Title()?.val() ?? '';
                 if (title_val) {
                     snap_data.Title('auto')?.val(title_val);
                 }
+                // Copy all blocks into the snapshot land
                 const src_blocks = src_data.Blocks();
                 if (src_blocks) {
                     const blocks = src_blocks.remote_list() ?? [];
@@ -32932,15 +34439,16 @@ var $;
                     if (snap_blocks) {
                         for (const block of blocks) {
                             const snap_block = snap_blocks.make(null);
-                            const type_val = block.Type()?.val() ?? '';
+                            const type_val = $bog_wysiwyg_pawn_text(block.Type());
                             const level_val = block.Level()?.val() ?? 0;
                             const content_val = block.Content()?.val() ?? '';
-                            snap_block.Type('auto')?.val(type_val);
+                            $bog_wysiwyg_pawn_text(snap_block.Type('auto'), type_val);
                             snap_block.Level('auto')?.val(level_val);
                             snap_block.Content('auto')?.val(content_val);
                         }
                     }
                 }
+                // Add snapshot link to versions list (newest first)
                 const versions = src_data.Versions('auto');
                 if (!versions)
                     return null;
@@ -32948,9 +34456,11 @@ var $;
                 versions.items_vary([snap_land.link(), ...current]);
                 return event;
             }
+            /** Rows for the version list */
             version_rows() {
                 return this.version_links().map(link => this.Version(link));
             }
+            /** Title for a version entry */
             version_title(link) {
                 const land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
                 const data = land.Data($bog_wysiwyg_model_page);
@@ -32962,38 +34472,46 @@ var $;
                     ? `#${num} — ${title}`
                     : `${label} #${num}`;
             }
+            /** Which version link is currently selected */
             current_version(next) {
                 return next ?? null;
             }
+            /** Whether this version is currently being previewed */
             version_active(link) {
                 return this.current_version() === link;
             }
+            /** Restore content from a version snapshot into the current page */
             version_click(link, event) {
                 if (!event)
                     return null;
                 const dst_data = this.page_data();
                 if (!dst_data)
                     return null;
+                // Read blocks from the snapshot land
                 const snap_land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
                 const snap_data = snap_land.Data($bog_wysiwyg_model_page);
+                // Restore title
                 const snap_title = snap_data.Title()?.val() ?? '';
                 if (snap_title) {
                     dst_data.Title('auto')?.val(snap_title);
                 }
+                // Clear current blocks and copy from snapshot
                 const dst_blocks = dst_data.Blocks('auto');
                 const snap_blocks = snap_data.Blocks();
                 if (dst_blocks && snap_blocks) {
                     const src_list = snap_blocks.remote_list() ?? [];
+                    // Remove existing blocks
                     const existing = dst_blocks.remote_list() ?? [];
                     for (const block of existing) {
                         dst_blocks.cut(block.link());
                     }
+                    // Copy snapshot blocks into current land
                     for (const block of src_list) {
                         const new_block = dst_blocks.make(null);
-                        const type_val = block.Type()?.val() ?? '';
+                        const type_val = $bog_wysiwyg_pawn_text(block.Type());
                         const level_val = block.Level()?.val() ?? 0;
                         const content_val = block.Content()?.val() ?? '';
-                        new_block.Type('auto')?.val(type_val);
+                        $bog_wysiwyg_pawn_text(new_block.Type('auto'), type_val);
                         new_block.Level('auto')?.val(level_val);
                         new_block.Content('auto')?.val(content_val);
                     }
@@ -33028,18 +34546,30 @@ var $;
     $mol_style_define($bog_wysiwyg_history, {
         flex: {
             direction: 'column',
+            shrink: 0,
         },
+        minWidth: 0,
+        maxWidth: '100%',
         padding: {
-            top: '0.5rem',
-            bottom: '0.5rem',
-            left: '0.5rem',
-            right: '0.5rem',
+            top: '0.75rem',
+            bottom: '0.75rem',
+            left: '0.75rem',
+            right: '0.75rem',
         },
         gap: '0.5rem',
+        background: {
+            color: $mol_theme.card,
+        },
+        border: {
+            radius: $mol_gap.round,
+        },
         ':not([bog_wysiwyg_history_showed])': {
             display: 'none',
         },
         Save_button: {
+            flex: {
+                shrink: 0,
+            },
             justifyContent: 'center',
             fontWeight: 'bold',
             background: {
@@ -33054,15 +34584,55 @@ var $;
             flex: {
                 direction: 'column',
             },
+            minWidth: 0,
+            maxWidth: '100%',
+            maxHeight: '18rem',
+            overflow: {
+                x: 'hidden',
+                y: 'auto',
+            },
             gap: '0.125rem',
         },
-        Version: {
-            border: {
-                radius: $mol_gap.round,
+        '@media': {
+            '(max-width: 640px)': {
+                padding: {
+                    top: '0.5rem',
+                    bottom: '0.5rem',
+                    left: '0.5rem',
+                    right: '0.5rem',
+                },
+                Version_list: {
+                    maxHeight: '12rem',
+                },
             },
         },
     });
     $mol_style_define($bog_wysiwyg_history_version, {
+        justifyContent: 'flex-start',
+        textAlign: 'left',
+        minWidth: 0,
+        maxWidth: '100%',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        border: {
+            radius: $mol_gap.round,
+        },
+        ':focus-visible': {
+            outline: 'none',
+            box: {
+                shadow: [
+                    {
+                        inset: true,
+                        x: 0,
+                        y: 0,
+                        blur: 0,
+                        spread: '2px',
+                        color: $mol_theme.focus,
+                    },
+                ],
+            },
+        },
         '@': {
             'bog_wysiwyg_history_version_active': {
                 'true': {
@@ -33105,6 +34675,26 @@ var $;
 			return null;
 		}
 		block_remove(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		block_split(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		block_merge_prev(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		block_merge_next(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		block_nav(id, next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		block_input(id, next){
 			if(next !== undefined) return next;
 			return null;
 		}
@@ -33305,6 +34895,11 @@ var $;
 			(obj.ai_open) = () => ((this.ai_showed()));
 			(obj.on_enter) = (next) => ((this.block_enter(id, next)));
 			(obj.on_remove) = (next) => ((this.block_remove(id, next)));
+			(obj.on_split) = (next) => ((this.block_split(id, next)));
+			(obj.on_merge_prev) = (next) => ((this.block_merge_prev(id, next)));
+			(obj.on_merge_next) = (next) => ((this.block_merge_next(id, next)));
+			(obj.on_nav) = (next) => ((this.block_nav(id, next)));
+			(obj.on_input) = (next) => ((this.block_input(id, next)));
 			(obj.on_slash) = (next) => ((this.block_slash(id, next)));
 			(obj.on_menu_key) = (next) => ((this.block_menu_key(id, next)));
 			(obj.on_image) = (next) => ((this.block_image(id, next)));
@@ -33368,6 +34963,11 @@ var $;
 	($mol_mem(($.$bog_wysiwyg.prototype), "ai_showed"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_enter"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_remove"));
+	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_split"));
+	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_merge_prev"));
+	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_merge_next"));
+	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_nav"));
+	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_input"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_slash"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_menu_key"));
 	($mol_mem_key(($.$bog_wysiwyg.prototype), "block_image"));
@@ -33412,6 +35012,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -33433,11 +35034,26 @@ var $;
         return text;
     }
     $.$bog_wysiwyg_html_to_md = $bog_wysiwyg_html_to_md;
+    /**
+     * Read or write a text field of a Baza model.
+     * An atomic register exposes `val`, a mergeable text pawn exposes `text`.
+     */
+    function $bog_wysiwyg_pawn_text(pawn, next) {
+        if (!pawn)
+            return next ?? '';
+        if (pawn.text)
+            return pawn.text(next) ?? '';
+        if (pawn.val)
+            return pawn.val(next) ?? '';
+        return next ?? '';
+    }
+    $.$bog_wysiwyg_pawn_text = $bog_wysiwyg_pawn_text;
 })($ || ($ = {}));
 (function ($) {
     var $$;
     (function ($$) {
         class $bog_wysiwyg extends $.$bog_wysiwyg {
+            /** Block row content: hide drag handle and comments when readonly */
             block_row_sub(id) {
                 if (this.readonly()) {
                     return [this.Block(id)];
@@ -33448,24 +35064,30 @@ var $;
                     this.Block_comment(id),
                 ];
             }
+            // === Giper Baza integration ===
+            /** Whether this editor is connected to a Giper Baza page */
             has_baza() {
                 return !!this.page_land_link();
             }
+            /** Giper Baza land for this page. Do NOT put @$mol_mem here (land/pawn). */
             page_land() {
                 const link = this.page_land_link();
                 if (!link)
                     return null;
                 return this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
             }
+            /** Page data (dict) from the land. Do NOT put @$mol_mem here (land/pawn). */
             page_data() {
                 const land = this.page_land();
                 if (!land)
                     return null;
                 return land.Data($bog_wysiwyg_model_page);
             }
+            /** Get a Baza block model by its link string. Do NOT put @$mol_mem here. */
             baza_block(link_str) {
                 return this.$.$giper_baza_glob.Pawn(new $giper_baza_link(link_str), $bog_wysiwyg_model_block);
             }
+            /** Read page title from Baza */
             page_title(next) {
                 if (!this.has_baza())
                     return next ?? '';
@@ -33478,6 +35100,7 @@ var $;
                 }
                 return data.Title()?.val() ?? '';
             }
+            // === Block management ===
             generate_id() {
                 return Math.random().toString(36).slice(2, 10);
             }
@@ -33491,18 +35114,21 @@ var $;
                 if (!blocks_list)
                     return next ?? [this.generate_id()];
                 if (next !== undefined) {
+                    // Rebuild the Baza list to match new link order
                     const links = next.map(id => new $giper_baza_link(id));
                     blocks_list.items_vary(links);
                     return next;
                 }
                 const blocks = blocks_list.remote_list();
                 if (!blocks.length) {
+                    // Auto-create first empty block
                     const block = blocks_list.make(null);
-                    block.Type('auto')?.val('paragraph');
+                    $.$bog_wysiwyg_pawn_text(block.Type('auto'), 'paragraph');
                     return [block.link().str];
                 }
                 return blocks.map((b) => b.link().str);
             }
+            /** Override block_html to sync with Baza when connected */
             block_html(id, next) {
                 if (!this.has_baza())
                     return super.block_html(id, next);
@@ -33513,16 +35139,18 @@ var $;
                 }
                 return block.Content()?.val() ?? '';
             }
+            /** Override block_type to sync with Baza when connected */
             block_type(id, next) {
                 if (!this.has_baza())
                     return super.block_type(id, next);
                 const block = this.baza_block(id);
                 if (next !== undefined) {
-                    block.Type('auto')?.val(next);
+                    $.$bog_wysiwyg_pawn_text(block.Type('auto'), next);
                     return next;
                 }
-                return block.Type()?.val() ?? 'paragraph';
+                return $.$bog_wysiwyg_pawn_text(block.Type()) || 'paragraph';
             }
+            /** Override block_level to sync with Baza when connected */
             block_level(id, next) {
                 if (!this.has_baza())
                     return super.block_level(id, next);
@@ -33542,12 +35170,52 @@ var $;
             active_block_id(next) {
                 return next ?? '';
             }
-            focus_block(id) {
+            /** Block view with its caret API */
+            block_view(id) {
+                return this.Block(id);
+            }
+            /** Blocks that hold no editable text and can not be glued with neighbours */
+            block_is_static(id) {
+                const type = this.block_type(id);
+                if (type === 'image' || type === 'embed' || type === 'divider')
+                    return true;
+                return !!$bog_wysiwyg_plugin_registry.get(type)?.render;
+            }
+            /** Allocate an id for a new block, creating the Baza pawn when connected */
+            make_block_id() {
+                if (this.has_baza()) {
+                    const blocks_list = this.page_data()?.Blocks('auto');
+                    if (blocks_list) {
+                        const pawn = blocks_list.make(null);
+                        $.$bog_wysiwyg_pawn_text(pawn.Type('auto'), 'paragraph');
+                        return pawn.link().str;
+                    }
+                }
+                return this.generate_id();
+            }
+            /** Drop blocks from the page and from Baza. Callers keep at least one alive. */
+            drop_blocks(drop) {
+                const ids = this.block_ids().filter(id => !drop.includes(id));
+                this.block_ids(ids);
+                if (!this.has_baza())
+                    return;
+                const blocks_list = this.page_data()?.Blocks('auto');
+                if (!blocks_list)
+                    return;
+                for (const id of drop)
+                    blocks_list.cut(new $giper_baza_link(id));
+            }
+            focus_block(id, offset) {
                 setTimeout(() => {
                     try {
-                        const node = this.Block(id).dom_node();
+                        const block = this.block_view(id);
+                        const node = block.dom_node();
                         node.focus();
-                        const sel = window.getSelection();
+                        if (offset !== undefined) {
+                            block.focus_at(offset);
+                            return;
+                        }
+                        const sel = node.ownerDocument.defaultView?.getSelection();
                         if (sel) {
                             sel.selectAllChildren(node);
                             sel.collapseToEnd();
@@ -33563,35 +35231,18 @@ var $;
                     return null;
                 if (this.readonly())
                     return null;
-                if (this.has_baza()) {
-                    const data = this.page_data();
-                    const blocks_list = data?.Blocks('auto');
-                    if (blocks_list) {
-                        const block = blocks_list.make(null);
-                        block.Type('auto')?.val('paragraph');
-                        const new_id = block.link().str;
-                        const ids = [...this.block_ids()];
-                        const index = ids.indexOf(id);
-                        ids.splice(index + 1, 0, new_id);
-                        this.block_ids(ids);
-                        this.focus_block(new_id);
-                        return event;
-                    }
-                }
+                this.history_record();
+                const done = this.block_enter_apply(id, event);
+                this.history_record();
+                return done;
+            }
+            block_enter_apply(id, event) {
                 const ids = [...this.block_ids()];
                 const index = ids.indexOf(id);
-                const new_id = this.generate_id();
+                const new_id = this.make_block_id();
                 ids.splice(index + 1, 0, new_id);
                 this.block_ids(ids);
-                setTimeout(() => {
-                    try {
-                        const node = this.Block(new_id).dom_node();
-                        node.focus();
-                    }
-                    catch (e) {
-                        $mol_fail_log(e);
-                    }
-                }, 0);
+                this.focus_block(new_id, 0);
                 return event;
             }
             block_remove(id, event) {
@@ -33602,18 +35253,109 @@ var $;
                 const ids = [...this.block_ids()];
                 if (ids.length <= 1)
                     return null;
+                this.history_record();
                 const index = ids.indexOf(id);
-                ids.splice(index, 1);
-                this.block_ids(ids);
-                if (this.has_baza()) {
-                    const data = this.page_data();
-                    const blocks_list = data?.Blocks('auto');
-                    if (blocks_list) {
-                        blocks_list.cut(new $giper_baza_link(id));
-                    }
-                }
-                const prev_id = ids[Math.max(0, index - 1)];
+                this.drop_blocks([id]);
+                const rest = this.block_ids();
+                const prev_id = rest[Math.max(0, index - 1)];
                 this.focus_block(prev_id);
+                this.history_record();
+                return event;
+            }
+            // === Block boundaries ===
+            /** Enter in the middle: the tail moves into a fresh block of the same kind */
+            block_split(id, parts) {
+                if (!parts)
+                    return null;
+                if (this.readonly())
+                    return null;
+                this.history_record();
+                const type = this.block_type(id);
+                const level = this.block_level(id);
+                const ids = [...this.block_ids()];
+                const index = ids.indexOf(id);
+                const new_id = this.make_block_id();
+                ids.splice(index + 1, 0, new_id);
+                this.block_html(id, parts.head);
+                this.block_ids(ids);
+                this.block_type(new_id, type);
+                this.block_level(new_id, level);
+                this.block_html(new_id, parts.tail);
+                this.focus_block(new_id, 0);
+                this.history_record();
+                return parts;
+            }
+            /** Backspace at the start: glue the block into the previous one */
+            block_merge_prev(id, event) {
+                if (!event)
+                    return null;
+                if (this.readonly())
+                    return null;
+                const ids = this.block_ids();
+                const index = ids.indexOf(id);
+                if (index <= 0)
+                    return event;
+                const prev_id = ids[index - 1];
+                this.history_record();
+                if (this.block_is_static(prev_id)) {
+                    // Nothing to glue text into: the neighbour just goes away
+                    this.drop_blocks([prev_id]);
+                    this.focus_block(id, 0);
+                    this.history_record();
+                    return event;
+                }
+                const prev_html = this.block_html(prev_id);
+                const caret = $bog_wysiwyg_html_text(this.$.$mol_dom_context.document, prev_html).length;
+                this.block_html(prev_id, prev_html + this.block_html(id));
+                this.drop_blocks([id]);
+                this.focus_block(prev_id, caret);
+                this.history_record();
+                return event;
+            }
+            /** Delete at the end: pull the next block into this one */
+            block_merge_next(id, event) {
+                if (!event)
+                    return null;
+                if (this.readonly())
+                    return null;
+                const ids = this.block_ids();
+                const index = ids.indexOf(id);
+                if (index < 0 || index >= ids.length - 1)
+                    return event;
+                const next_id = ids[index + 1];
+                this.history_record();
+                const own_html = this.block_html(id);
+                const caret = $bog_wysiwyg_html_text(this.$.$mol_dom_context.document, own_html).length;
+                if (!this.block_is_static(next_id)) {
+                    this.block_html(id, own_html + this.block_html(next_id));
+                }
+                this.drop_blocks([next_id]);
+                this.focus_block(id, caret);
+                this.history_record();
+                return event;
+            }
+            /** Desired horizontal caret position kept while walking with arrows */
+            nav_column = null;
+            /** ArrowUp / ArrowDown on the edge line: move the caret to the neighbour block */
+            block_nav(id, nav) {
+                if (!nav)
+                    return null;
+                const ids = this.block_ids();
+                const index = ids.indexOf(id);
+                const target = nav.dir === 'up' ? ids[index - 1] : ids[index + 1];
+                if (!target)
+                    return nav;
+                const column = this.nav_column ?? { x: nav.x, offset: nav.offset };
+                this.nav_column = column;
+                this.block_view(target).focus_column(column.x, column.offset, nav.dir === 'down');
+                return nav;
+            }
+            /** Text of a block changed from the keyboard */
+            block_input(id, event) {
+                if (!event)
+                    return null;
+                this.nav_column = null;
+                this.history_schedule();
                 return event;
             }
             block_slash(id, event) {
@@ -33637,6 +35379,7 @@ var $;
                     this.menu_showed(false);
                     return event;
                 }
+                // Any printable character: close menu, let character through
                 if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
                     this.menu_showed(false);
                     return event;
@@ -33662,6 +35405,11 @@ var $;
                 const id = this.active_block_id();
                 if (!id)
                     return;
+                this.history_record();
+                this.apply_menu_command_run(cmd, id);
+                this.history_record();
+            }
+            apply_menu_command_run(cmd, id) {
                 const plugin = $bog_wysiwyg_plugin_registry.get(cmd);
                 if (plugin) {
                     if (plugin.on_select) {
@@ -33700,10 +35448,13 @@ var $;
             block_paste_blocks(id, val) {
                 if (!val || !val.length)
                     return null;
+                this.history_record();
+                // First block replaces the current one
                 this.block_type(id, val[0].type);
                 this.block_html(id, val[0].content);
                 if (val[0].level)
                     this.block_level(id, val[0].level);
+                // Remaining blocks are inserted after
                 const ids = [...this.block_ids()];
                 const index = ids.indexOf(id);
                 let last_id = id;
@@ -33715,7 +35466,7 @@ var $;
                         const blocks_list = data?.Blocks('auto');
                         if (blocks_list) {
                             const pawn = blocks_list.make(null);
-                            pawn.Type('auto')?.val(block.type);
+                            $.$bog_wysiwyg_pawn_text(pawn.Type('auto'), block.type);
                             pawn.Content('auto')?.val(block.content);
                             if (block.level)
                                 pawn.Level('auto')?.val(block.level);
@@ -33733,6 +35484,7 @@ var $;
                     last_id = new_id;
                 }
                 this.block_ids(ids);
+                // Set data for non-baza blocks
                 if (!this.has_baza()) {
                     let pos = index + 1;
                     for (let i = 1; i < val.length; i++) {
@@ -33745,13 +35497,16 @@ var $;
                     }
                 }
                 this.focus_block(last_id);
+                this.history_record();
                 return val;
             }
             block_image(id, src) {
                 if (!src)
                     return null;
+                this.history_record();
                 this.block_type(id, 'image');
                 this.block_html(id, '<img src="' + src.replace(/"/g, '&quot;') + '">');
+                this.history_record();
                 return src;
             }
             menu_picked(next) {
@@ -33761,6 +35516,7 @@ var $;
                 this.apply_menu_command(val);
                 return val;
             }
+            // === AI ===
             block_ai(id, event) {
                 if (!event)
                     return null;
@@ -33826,12 +35582,15 @@ var $;
                 this.focus_block(id);
                 return text;
             }
+            // === Comments ===
+            /** Dict mapping block_id -> comment land link string. Do NOT put @$mol_mem here. */
             comments_dict() {
                 const data = this.page_data();
                 if (!data)
                     return null;
                 return data.Comments('auto');
             }
+            /** Get existing comment land link for a block, or empty string */
             block_comment_land_link(id) {
                 if (!this.has_baza())
                     return '';
@@ -33840,6 +35599,7 @@ var $;
                     return '';
                 return dict.key(id)?.val() ?? '';
             }
+            /** When comment panel opens, ensure a comment land exists for this block */
             block_comment_open(id, next) {
                 if (next === undefined)
                     return false;
@@ -33848,6 +35608,7 @@ var $;
                 }
                 return next;
             }
+            /** Create a comment land for a block and store its link in the registry */
             comment_land_ensure(block_id) {
                 const dict = this.comments_dict();
                 if (!dict)
@@ -33857,13 +35618,148 @@ var $;
                 if (atom)
                     atom.val(land.link().str);
             }
+            // === Undo / redo ===
+            //
+            // The browser history is useless here: auto() rewrites innerHTML behind its back.
+            // So the page keeps its own snapshot stack, in memory only, never in Baza.
+            history_states = [];
+            history_pos = -1;
+            history_timer = null;
+            /** Snapshots are not taken while an older one is being applied */
+            history_locked = false;
+            history_limit() {
+                return 100;
+            }
+            history_delay() {
+                return 500;
+            }
+            history_snapshot() {
+                const blocks = this.block_ids().map(id => ({
+                    id,
+                    type: this.block_type(id),
+                    level: this.block_level(id),
+                    content: this.block_html(id),
+                }));
+                return { blocks, caret: this.caret_state() };
+            }
+            /** Block and text offset the caret is currently at */
+            caret_state() {
+                for (const id of this.block_ids()) {
+                    const offset = this.block_view(id).caret_offset();
+                    if (offset >= 0)
+                        return { id, offset };
+                }
+                return { id: '', offset: 0 };
+            }
+            /** Remember the state before the first edit of a fresh page */
+            history_ensure() {
+                if (this.history_states.length)
+                    return;
+                this.history_states.push(this.history_snapshot());
+                this.history_pos = 0;
+            }
+            history_cancel() {
+                this.history_timer?.destructor();
+                this.history_timer = null;
+            }
+            /** Group a burst of keystrokes into a single undo step */
+            history_schedule() {
+                if (this.history_locked)
+                    return;
+                this.history_cancel();
+                this.history_timer = new this.$.$mol_after_timeout(this.history_delay(), () => {
+                    this.history_timer = null;
+                    this.history_record();
+                });
+            }
+            /** Put the current state on the stack unless it is already there */
+            history_record() {
+                if (this.history_locked)
+                    return;
+                this.history_cancel();
+                const next = this.history_snapshot();
+                const prev = this.history_states[this.history_pos];
+                if (prev && $mol_compare_deep(prev.blocks, next.blocks))
+                    return;
+                this.history_states.length = this.history_pos + 1;
+                this.history_states.push(next);
+                if (this.history_states.length > this.history_limit())
+                    this.history_states.shift();
+                this.history_pos = this.history_states.length - 1;
+            }
+            history_undo() {
+                this.history_record();
+                if (this.history_pos <= 0)
+                    return false;
+                this.history_pos -= 1;
+                this.history_apply(this.history_states[this.history_pos]);
+                return true;
+            }
+            history_redo() {
+                // Text typed after an undo must not be thrown away by a redo
+                this.history_record();
+                if (this.history_pos < 0)
+                    return false;
+                if (this.history_pos >= this.history_states.length - 1)
+                    return false;
+                this.history_pos += 1;
+                this.history_apply(this.history_states[this.history_pos]);
+                return true;
+            }
+            history_apply(state) {
+                this.history_locked = true;
+                try {
+                    this.block_ids(state.blocks.map(block => block.id));
+                    for (const block of state.blocks) {
+                        this.block_type(block.id, block.type);
+                        this.block_level(block.id, block.level);
+                        this.block_html(block.id, block.content);
+                    }
+                }
+                finally {
+                    this.history_locked = false;
+                }
+                this.nav_column = null;
+                if (state.caret.id)
+                    this.focus_block(state.caret.id, state.caret.offset);
+            }
+            // === Select All & Copy as Markdown ===
             editor_keydown(event) {
                 if (!event)
                     return null;
-                if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
+                const cmd = event.ctrlKey || event.metaKey;
+                const editable = !this.readonly();
+                if (cmd && editable && (event.key === 'z' || event.key === 'Z')) {
+                    event.preventDefault();
+                    if (event.shiftKey)
+                        this.history_redo();
+                    else
+                        this.history_undo();
+                    return event;
+                }
+                if (cmd && editable && (event.key === 'y' || event.key === 'Y')) {
+                    event.preventDefault();
+                    this.history_redo();
+                    return event;
+                }
+                // Any key but a vertical step drops the remembered column
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')
+                    this.nav_column = null;
+                if (cmd && event.key === 'a') {
                     event.preventDefault();
                     this.select_all_blocks();
                     return event;
+                }
+                if (!editable)
+                    return event;
+                this.history_ensure();
+                const printable = event.key.length === 1 && !cmd && !event.altKey;
+                if (event.key === 'Backspace' || event.key === 'Delete' || printable) {
+                    if (this.selection_spans_blocks()) {
+                        event.preventDefault();
+                        this.delete_selection(printable ? event.key : '');
+                        return event;
+                    }
                 }
                 if (event.key === 'Backspace' || event.key === 'Delete') {
                     const selected = this.selected_block_ids();
@@ -33874,6 +35770,67 @@ var $;
                     }
                 }
                 return event;
+            }
+            /** Block owning a DOM node, empty string when the node is outside the editor */
+            block_of_node(node) {
+                if (!node)
+                    return '';
+                for (const id of this.block_ids()) {
+                    const el = this.Block(id).dom_node();
+                    if (el === node || el.contains(node))
+                        return id;
+                }
+                return '';
+            }
+            /** Whether the current selection crosses a block border */
+            selection_spans_blocks() {
+                const doc = this.$.$mol_dom_context.document;
+                const sel = doc.defaultView?.getSelection();
+                if (!sel || sel.isCollapsed || sel.rangeCount === 0)
+                    return false;
+                const range = sel.getRangeAt(0);
+                const from = this.block_of_node(range.startContainer);
+                const to = this.block_of_node(range.endContainer);
+                return !!from && !!to && from !== to;
+            }
+            /**
+             * Wipe a selection spanning several blocks: the head of the first block
+             * and the tail of the last one survive glued together, optionally with
+             * the typed character between them.
+             */
+            delete_selection(insert = '') {
+                if (this.readonly())
+                    return false;
+                const doc = this.$.$mol_dom_context.document;
+                const sel = doc.defaultView?.getSelection();
+                if (!sel || sel.isCollapsed || sel.rangeCount === 0)
+                    return false;
+                const range = sel.getRangeAt(0);
+                const start_id = this.block_of_node(range.startContainer);
+                const end_id = this.block_of_node(range.endContainer);
+                if (!start_id || !end_id || start_id === end_id)
+                    return false;
+                const ids = this.block_ids();
+                const from = ids.indexOf(start_id);
+                const to = ids.indexOf(end_id);
+                if (from < 0 || to <= from)
+                    return false;
+                const start_block = this.block_view(start_id);
+                const end_block = this.block_view(end_id);
+                const start_offset = $bog_wysiwyg_offset_of(start_block.dom_node(), range.startContainer, range.startOffset);
+                const end_offset = $bog_wysiwyg_offset_of(end_block.dom_node(), range.endContainer, range.endOffset);
+                if (start_offset < 0 || end_offset < 0)
+                    return false;
+                const head = start_block.html_before(start_offset);
+                const tail = end_block.html_after(end_offset);
+                this.history_record();
+                sel.removeAllRanges();
+                this.block_html(start_id, head + $bog_wysiwyg_escape_html(insert) + tail);
+                this.drop_blocks(ids.slice(from + 1, to + 1));
+                this.nav_column = null;
+                this.focus_block(start_id, start_offset + insert.length);
+                this.history_record();
+                return true;
             }
             selected_block_ids() {
                 const sel = this.$.$mol_dom_context.document.defaultView?.getSelection();
@@ -33886,6 +35843,7 @@ var $;
                 });
             }
             delete_blocks(selected) {
+                this.history_record();
                 const ids = [...this.block_ids()];
                 for (const id of selected) {
                     const index = ids.indexOf(id);
@@ -33906,7 +35864,7 @@ var $;
                         const blocks_list = data?.Blocks('auto');
                         if (blocks_list) {
                             const block = blocks_list.make(null);
-                            block.Type('auto')?.val('paragraph');
+                            $.$bog_wysiwyg_pawn_text(block.Type('auto'), 'paragraph');
                             ids.push(block.link().str);
                         }
                     }
@@ -33916,6 +35874,7 @@ var $;
                 }
                 this.block_ids(ids);
                 this.focus_block(ids[0]);
+                this.history_record();
             }
             select_all_blocks() {
                 const ids = this.block_ids();
@@ -33978,6 +35937,7 @@ var $;
                     event.preventDefault();
                     const md = md_parts.join('\n\n');
                     event.clipboardData?.setData('text/plain', md);
+                    // Also set HTML for rich paste targets
                     const html = ids
                         .filter(id => sel.containsNode(this.Block(id).dom_node(), true))
                         .map(id => this.Block(id).dom_node().outerHTML)
@@ -33986,6 +35946,7 @@ var $;
                 }
                 return event;
             }
+            // === Drag & Drop ===
             row_is_drag_over(id) {
                 return this.drag_over_id() === id && this.drag_source_id() !== id;
             }
@@ -34053,9 +36014,11 @@ var $;
                 const to = ids.indexOf(to_id);
                 if (to < 0)
                     return;
+                this.history_record();
                 const insert = position === 'before' ? to : to + 1;
                 ids.splice(insert, 0, from_id);
                 this.block_ids(ids);
+                this.history_record();
             }
         }
         __decorate([
@@ -34165,22 +36128,43 @@ var $;
         flex: {
             direction: 'column',
             grow: 1,
+            shrink: 1,
         },
+        /** Readable column: 40rem of text plus 3rem margins on both sides */
+        alignSelf: 'center',
+        width: '100%',
+        minWidth: 0,
+        maxWidth: '46rem',
+        gap: '1rem',
         padding: {
-            top: '2rem',
-            bottom: '2rem',
+            top: '2.5rem',
+            bottom: '6rem',
             left: '3rem',
             right: '3rem',
         },
-        maxWidth: '50rem',
-        alignSelf: 'center',
-        width: '100%',
+        Status: {
+            flex: {
+                shrink: 0,
+            },
+            minWidth: 0,
+        },
+        Block_list: {
+            flex: {
+                shrink: 1,
+            },
+            minWidth: 0,
+            maxWidth: '100%',
+        },
         Block_row: {
             position: 'relative',
             flex: {
                 direction: 'row',
+                shrink: 1,
             },
             alignItems: 'flex-start',
+            minWidth: 0,
+            maxWidth: '100%',
+            gap: '0.125rem',
             '@': {
                 'bog_wysiwyg_dragging': {
                     'true': {
@@ -34218,12 +36202,20 @@ var $;
         Drag_handle: {
             flex: {
                 shrink: 0,
+                grow: 0,
             },
             width: '1.5rem',
             cursor: 'grab',
-            opacity: 0.4,
+            opacity: 0,
             transition: 'opacity 0.15s',
-            alignSelf: 'center',
+            alignSelf: 'flex-start',
+            justifyContent: 'center',
+            padding: {
+                top: '0.25rem',
+                bottom: '0.25rem',
+                left: 0,
+                right: 0,
+            },
             textAlign: 'center',
             color: $mol_theme.shade,
             userSelect: 'none',
@@ -34236,6 +36228,7 @@ var $;
         Block: {
             flex: {
                 grow: 1,
+                shrink: 1,
             },
             minWidth: 0,
             width: '0px',
@@ -34244,13 +36237,49 @@ var $;
             flex: {
                 shrink: 0,
             },
-            alignSelf: 'center',
+            alignSelf: 'flex-start',
+            padding: {
+                top: '0.125rem',
+                bottom: 0,
+                left: 0,
+                right: 0,
+            },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                maxWidth: '100%',
+                gap: '0.75rem',
+                padding: {
+                    top: '1rem',
+                    bottom: '4rem',
+                    left: '0.75rem',
+                    right: '0.75rem',
+                },
+                /** No drag&drop on touch — reclaim the gutter for text */
+                Drag_handle: {
+                    display: 'none',
+                },
+            },
         },
     });
+    /**
+     * Row gutter controls appear on hover of the whole row.
+     * Raw css because the comment button belongs to $bog_wysiwyg_comment and
+     * $mol_style_define on a foreign component would wipe its own styles.
+     */
     $mol_style_attach('bog_wysiwyg_hover', `
-		.bog_wysiwyg_block_row:hover > .bog_wysiwyg_drag_handle,
-		.bog_wysiwyg_block_row:hover > .bog_wysiwyg_comment .bog_wysiwyg_comment_comment_button {
+		[bog_wysiwyg_block_row]:hover [bog_wysiwyg_drag_handle],
+		[bog_wysiwyg_block_row]:focus-within [bog_wysiwyg_drag_handle],
+		[bog_wysiwyg_block_row]:hover [bog_wysiwyg_comment_comment_button],
+		[bog_wysiwyg_block_row]:focus-within [bog_wysiwyg_comment_comment_button] {
 			opacity: 1;
+		}
+
+		@media ( hover: none ), ( max-width: 640px ) {
+			[bog_wysiwyg_drag_handle],
+			[bog_wysiwyg_comment_comment_button] {
+				opacity: 1;
+			}
 		}
 	`);
 })($ || ($ = {}));
@@ -34266,6 +36295,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_notebook_multiple) = class $mol_icon_notebook_multiple extends ($.$mol_icon) {
 		path(){
@@ -34276,6 +36306,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_icon_history) = class $mol_icon_history extends ($.$mol_icon) {
@@ -34288,6 +36319,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_graph) = class $mol_icon_graph extends ($.$mol_icon) {
 		path(){
@@ -34298,6 +36330,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_icon_graph_outline) = class $mol_icon_graph_outline extends ($.$mol_icon) {
@@ -34310,6 +36343,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_shield) = class $mol_icon_shield extends ($.$mol_icon) {
 		path(){
@@ -34320,6 +36354,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$mol_icon_shield_lock) = class $mol_icon_shield_lock extends ($.$mol_icon) {
@@ -34332,6 +36367,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_account) = class $mol_icon_account extends ($.$mol_icon) {
 		path(){
@@ -34342,6 +36378,982 @@ var $;
 
 ;
 "use strict";
+
+
+;
+	($.$mol_icon_export) = class $mol_icon_export extends ($.$mol_icon) {
+		path(){
+			return "M23,12L19,8V11H10V13H19V16M1,18V6C1,4.89 1.9,4 3,4H15A2,2 0 0,1 17,6V9H15V6H3V18H15V15H17V18A2,2 0 0,1 15,20H3A2,2 0 0,1 1,18Z";
+		}
+	};
+
+
+;
+"use strict";
+
+
+;
+	($.$bog_wysiwyg_export) = class $bog_wysiwyg_export extends ($.$mol_pick) {
+		Trigger_icon(){
+			const obj = new this.$.$mol_icon_export();
+			return obj;
+		}
+		dialect_options(){
+			return {
+				"common": (this.$.$mol_locale.text("$bog_wysiwyg_export_dialect_options_common")), 
+				"habr": (this.$.$mol_locale.text("$bog_wysiwyg_export_dialect_options_habr")), 
+				"devto": (this.$.$mol_locale.text("$bog_wysiwyg_export_dialect_options_devto")), 
+				"telegram": (this.$.$mol_locale.text("$bog_wysiwyg_export_dialect_options_telegram"))
+			};
+		}
+		Dialect(){
+			const obj = new this.$.$mol_select();
+			(obj.value) = (next) => ((this.dialect(next)));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_export_Dialect_hint")));
+			(obj.dictionary) = () => ((this.dialect_options()));
+			return obj;
+		}
+		Images_apart(){
+			const obj = new this.$.$mol_check_box();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_export_Images_apart_title")));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_export_Images_apart_hint")));
+			(obj.checked) = (next) => ((this.images_apart(next)));
+			return obj;
+		}
+		Copy(){
+			const obj = new this.$.$mol_button_copy();
+			(obj.title) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_export_Copy_title")));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_export_Copy_hint")));
+			(obj.text) = () => ((this.markdown_shown()));
+			return obj;
+		}
+		Head(){
+			const obj = new this.$.$mol_view();
+			(obj.sub) = () => ([
+				(this.Dialect()), 
+				(this.Images_apart()), 
+				(this.Copy())
+			]);
+			return obj;
+		}
+		Note(){
+			const obj = new this.$.$mol_paragraph();
+			(obj.title) = () => ((this.note()));
+			return obj;
+		}
+		part_options(){
+			return {};
+		}
+		Parts(){
+			const obj = new this.$.$mol_select();
+			(obj.value) = (next) => ((this.part_current(next)));
+			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_export_Parts_hint")));
+			(obj.dictionary) = () => ((this.part_options()));
+			return obj;
+		}
+		Output(){
+			const obj = new this.$.$mol_text_code();
+			(obj.text) = () => ((this.markdown_shown()));
+			(obj.sidebar_showed) = () => (false);
+			return obj;
+		}
+		Body(){
+			const obj = new this.$.$mol_scroll();
+			(obj.sub) = () => ([(this.Output())]);
+			return obj;
+		}
+		blocks(){
+			return [];
+		}
+		page_title(){
+			return "";
+		}
+		tags(){
+			return [];
+		}
+		cover(){
+			return "";
+		}
+		base_uri(){
+			return "https://baza.87.120.36.150.ip.giper.dev/";
+		}
+		dialect(next){
+			if(next !== undefined) return next;
+			return "common";
+		}
+		images_apart(next){
+			if(next !== undefined) return next;
+			return false;
+		}
+		part(next){
+			if(next !== undefined) return next;
+			return "0";
+		}
+		part_current(next){
+			if(next !== undefined) return next;
+			return "0";
+		}
+		markdown(){
+			return "";
+		}
+		markdown_shown(){
+			return "";
+		}
+		note(){
+			return "";
+		}
+		label_image(){
+			return (this.$.$mol_locale.text("$bog_wysiwyg_export_label_image"));
+		}
+		label_images(){
+			return (this.$.$mol_locale.text("$bog_wysiwyg_export_label_images"));
+		}
+		note_length(){
+			return (this.$.$mol_locale.text("$bog_wysiwyg_export_note_length"));
+		}
+		note_parts(){
+			return (this.$.$mol_locale.text("$bog_wysiwyg_export_note_parts"));
+		}
+		hint(){
+			return (this.$.$mol_locale.text("$bog_wysiwyg_export_hint"));
+		}
+		trigger_content(){
+			return [(this.Trigger_icon())];
+		}
+		bubble_content(){
+			return [
+				(this.Head()), 
+				(this.Note()), 
+				(this.Parts()), 
+				(this.Body())
+			];
+		}
+	};
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Trigger_icon"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Dialect"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Images_apart"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Copy"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Head"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Note"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Parts"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Output"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "Body"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "dialect"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "images_apart"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "part"));
+	($mol_mem(($.$bog_wysiwyg_export.prototype), "part_current"));
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    /** Telegram refuses messages longer than this. */
+    $.$bog_wysiwyg_export_telegram_limit = 4096;
+    const dialects = {
+        common: {
+            escape: true,
+            headings: true,
+            heading_shift: 0,
+            heading_max: 6,
+            tables: true,
+            bullet: '-',
+            divider: '---',
+            italic: '*',
+            strike: '~~',
+            line_break: '  \n',
+            underline: 'html',
+            images: 'md',
+            limit: Infinity,
+        },
+        /** Habr renders no markdown tables, and `#` collides with the article title */
+        habr: {
+            escape: true,
+            headings: true,
+            heading_shift: 1,
+            heading_max: 6,
+            tables: false,
+            bullet: '-',
+            divider: '---',
+            italic: '*',
+            strike: '~~',
+            line_break: '  \n',
+            underline: 'drop',
+            images: 'md',
+            limit: Infinity,
+        },
+        devto: {
+            escape: true,
+            headings: true,
+            heading_shift: 0,
+            heading_max: 6,
+            tables: true,
+            bullet: '-',
+            divider: '---',
+            italic: '*',
+            strike: '~~',
+            line_break: '  \n',
+            underline: 'html',
+            images: 'md',
+            limit: Infinity,
+        },
+        /** Telegram clients know bold, italic, strike, code, links and quotes. Nothing else. */
+        telegram: {
+            escape: false,
+            headings: false,
+            heading_shift: 0,
+            heading_max: 6,
+            tables: false,
+            bullet: '•',
+            divider: '————————',
+            italic: '__',
+            strike: '~~',
+            line_break: '\n',
+            underline: 'drop',
+            images: 'url',
+            limit: $.$bog_wysiwyg_export_telegram_limit,
+        },
+    };
+    /** Message length the dialect can carry, `Infinity` when unlimited. */
+    function $bog_wysiwyg_export_limit(dialect) {
+        return (dialects[dialect] ?? dialects.common).limit;
+    }
+    $.$bog_wysiwyg_export_limit = $bog_wysiwyg_export_limit;
+    const tag_pattern = /<(\/?)([a-zA-Z][\w-]*)((?:\s+[^\s=\/>]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/g;
+    const attr_pattern = /([^\s=\/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
+    const entities = {
+        amp: '&',
+        lt: '<',
+        gt: '>',
+        quot: '"',
+        apos: "'",
+        nbsp: ' ',
+        mdash: '—',
+        ndash: '–',
+        hellip: '…',
+        laquo: '«',
+        raquo: '»',
+        copy: '©',
+        middot: '·',
+    };
+    function decode(text) {
+        return text.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z]+);/g, (all, body) => {
+            if (body[0] !== '#')
+                return entities[body] ?? all;
+            const hex = body[1] === 'x' || body[1] === 'X';
+            const code = parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10);
+            if (!Number.isFinite(code) || code <= 0 || code > 0x10FFFF)
+                return all;
+            return String.fromCodePoint(code);
+        });
+    }
+    function attrs_of(source) {
+        const res = {};
+        attr_pattern.lastIndex = 0;
+        let found;
+        while ((found = attr_pattern.exec(source))) {
+            res[found[1].toLowerCase()] = decode(found[2] ?? found[3] ?? found[4] ?? '');
+        }
+        return res;
+    }
+    /** Punctuation that would otherwise start inline markup. */
+    function escape(text) {
+        return text.replace(/([\\`*_\[\]~])/g, '\\$1');
+    }
+    /** Punctuation that only means something at the very beginning of a line. */
+    function escape_start(text) {
+        return text
+            .replace(/^(\s*)(#{1,6}|>|[-+])(\s|$)/, '$1\\$2$3')
+            .replace(/^(\s*)(\d{1,9})([.)])(\s|$)/, '$1$2\\$3$4');
+    }
+    /** Markdown link targets break on spaces and unbalanced parens. */
+    function uri_md(uri) {
+        return uri.replace(/[ ()<>]/g, char => ({
+            ' ': '%20',
+            '(': '%28',
+            ')': '%29',
+            '<': '%3C',
+            '>': '%3E',
+        })[char] ?? char);
+    }
+    /**
+     * Absolute address of a file for an outside platform.
+     * Giper Baza serves files at a relative `?BAZA:file=<link>;name=<name>` uri,
+     * which only resolves against the master node origin.
+     */
+    function $bog_wysiwyg_export_uri(src, base) {
+        const uri = (src ?? '').trim();
+        if (!uri)
+            return '';
+        // http:, https:, data:, blob: and friends are already absolute
+        if (/^[a-zA-Z][\w+.-]*:/.test(uri))
+            return uri;
+        if (uri.startsWith('//'))
+            return uri;
+        // An anchor stays inside whatever page the reader is on
+        if (uri[0] === '#')
+            return uri;
+        const origin = (base ?? '').trim();
+        if (!origin)
+            return uri;
+        if (uri[0] === '/')
+            return origin.replace(/\/+$/, '') + uri;
+        return origin.replace(/[?#].*$/, '').replace(/\/*$/, '/') + uri;
+    }
+    $.$bog_wysiwyg_export_uri = $bog_wysiwyg_export_uri;
+    /** Tags stripped, entities decoded, `<br>` and block ends turned into newlines. */
+    function $bog_wysiwyg_export_plain(html) {
+        return decode((html ?? '')
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/(?:p|div|tr|li|h[1-6]|blockquote)\s*>/gi, '\n')
+            .replace(/<[^>]*>/g, ''))
+            .replace(/[ \t]+$/gm, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    }
+    $.$bog_wysiwyg_export_plain = $bog_wysiwyg_export_plain;
+    /** Inline HTML of a single block turned into inline markdown. */
+    function inline(html, ctx) {
+        const t = ctx.traits;
+        const stack = [];
+        const lists = [];
+        let out = '';
+        let pos = 0;
+        let raw = 0;
+        const at_line_start = () => !out || out.endsWith('\n');
+        const put_text = (source) => {
+            if (!source)
+                return;
+            let text = decode(source);
+            if (raw > 0) {
+                out += text;
+                return;
+            }
+            text = text.replace(/\s+/g, ' ');
+            if (at_line_start())
+                text = text.replace(/^ +/, '');
+            if (!text)
+                return;
+            if (t.escape) {
+                text = escape(text);
+                if (at_line_start())
+                    text = escape_start(text);
+            }
+            out += text;
+        };
+        /** Structural newline: starts a list item, an image or a fence on its own line */
+        const put_line = () => {
+            if (at_line_start())
+                return;
+            out += '\n';
+        };
+        /** Visible line break the reader should see, `<br>` and closing block tags make one */
+        const put_break = () => {
+            if (at_line_start())
+                return;
+            out += t.line_break;
+        };
+        const open = (name, start, close, code = false) => {
+            if (code)
+                raw += 1;
+            else
+                out += start;
+            stack.push({ name, close, mark: out.length, code });
+        };
+        const close = (name) => {
+            for (let i = stack.length - 1; i >= 0; --i) {
+                if (stack[i].name !== name)
+                    continue;
+                for (let j = stack.length - 1; j >= i; --j) {
+                    const frame = stack[j];
+                    if (!frame.code) {
+                        out += frame.close;
+                        continue;
+                    }
+                    raw -= 1;
+                    const body = out.slice(frame.mark);
+                    if (!body)
+                        continue;
+                    const runs = body.match(/`+/g) ?? [];
+                    const fence = '`'.repeat(runs.reduce((max, run) => Math.max(max, run.length), 0) + 1);
+                    const pad = /^`|`$/.test(body) ? ' ' : '';
+                    out = out.slice(0, frame.mark) + fence + pad + body + pad + fence;
+                }
+                stack.length = i;
+                return;
+            }
+        };
+        const put_image = (attrs) => {
+            const uri = $bog_wysiwyg_export_uri(attrs.src ?? '', ctx.base);
+            if (!uri)
+                return;
+            const alt = (attrs.alt ?? attrs.title ?? '').replace(/[\[\]]/g, '').trim();
+            if (ctx.images_apart) {
+                ctx.images.push({ uri, alt });
+                out += '[' + ctx.labels.image + ' ' + ctx.images.length + ']';
+                return;
+            }
+            if (t.images === 'url') {
+                put_line();
+                out += uri;
+                return;
+            }
+            out += '![' + alt + '](' + uri_md(uri) + ')';
+        };
+        const put_item = () => {
+            put_line();
+            const list = lists[lists.length - 1];
+            const indent = '  '.repeat(Math.max(lists.length - 1, 0));
+            if (!list) {
+                out += indent + t.bullet + ' ';
+                return;
+            }
+            list.index += 1;
+            out += indent + (list.ordered ? list.index + '.' : t.bullet) + ' ';
+        };
+        tag_pattern.lastIndex = 0;
+        let found;
+        while ((found = tag_pattern.exec(html))) {
+            put_text(html.slice(pos, found.index));
+            pos = found.index + found[0].length;
+            const closing = !!found[1];
+            const name = found[2].toLowerCase();
+            if (closing) {
+                switch (name) {
+                    case 'b':
+                    case 'strong':
+                    case 'i':
+                    case 'em':
+                    case 's':
+                    case 'del':
+                    case 'strike':
+                    case 'code':
+                    case 'kbd':
+                    case 'samp':
+                    case 'tt':
+                    case 'u':
+                    case 'ins':
+                    case 'sup':
+                    case 'sub':
+                    case 'a':
+                        close(name);
+                        break;
+                    case 'ul':
+                    case 'ol':
+                        lists.pop();
+                        put_line();
+                        break;
+                    case 'li':
+                        put_line();
+                        break;
+                    case 'p':
+                    case 'div':
+                    case 'blockquote':
+                    case 'h1':
+                    case 'h2':
+                    case 'h3':
+                    case 'h4':
+                    case 'h5':
+                    case 'h6':
+                        put_break();
+                        break;
+                    case 'pre':
+                        raw -= 1;
+                        put_line();
+                        break;
+                }
+                continue;
+            }
+            switch (name) {
+                case 'br':
+                    out += t.line_break;
+                    break;
+                case 'img':
+                    put_image(attrs_of(found[3] ?? ''));
+                    break;
+                case 'hr':
+                    put_line();
+                    out += t.divider + '\n';
+                    break;
+                case 'b':
+                case 'strong':
+                    open(name, '**', '**');
+                    break;
+                case 'i':
+                case 'em':
+                    open(name, t.italic, t.italic);
+                    break;
+                case 's':
+                case 'del':
+                case 'strike':
+                    open(name, t.strike, t.strike);
+                    break;
+                case 'code':
+                case 'kbd':
+                case 'samp':
+                case 'tt':
+                    open(name, '', '', true);
+                    break;
+                // No markdown syntax exists for these, so either raw html or nothing
+                case 'u':
+                case 'ins':
+                    if (t.underline === 'html')
+                        open(name, '<u>', '</u>');
+                    else
+                        open(name, '', '');
+                    break;
+                case 'sup':
+                case 'sub':
+                    if (t.underline === 'html')
+                        open(name, `<${name}>`, `</${name}>`);
+                    else
+                        open(name, '', '');
+                    break;
+                case 'a': {
+                    const attrs = attrs_of(found[3] ?? '');
+                    const wiki = attrs['data-wiki-link'];
+                    const href = wiki ? '#' + wiki : (attrs.href ?? '');
+                    if (!href)
+                        break;
+                    open('a', '[', '](' + uri_md($bog_wysiwyg_export_uri(href, ctx.base)) + ')');
+                    break;
+                }
+                case 'ul':
+                case 'ol':
+                    lists.push({ ordered: name === 'ol', index: 0 });
+                    put_line();
+                    break;
+                case 'li':
+                    put_item();
+                    break;
+                case 'pre':
+                    raw += 1;
+                    put_line();
+                    break;
+                case 'p':
+                case 'div':
+                case 'blockquote':
+                case 'h1':
+                case 'h2':
+                case 'h3':
+                case 'h4':
+                case 'h5':
+                case 'h6':
+                    put_line();
+                    break;
+            }
+        }
+        put_text(html.slice(pos));
+        while (stack.length)
+            close(stack[stack.length - 1].name);
+        // Trailing spaces are the markdown hard break, so only the very edges get trimmed
+        return out.replace(/\n{3,}/g, '\n\n').replace(/^\s+/, '').replace(/\s+$/, '');
+    }
+    const row_pattern = /<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/gi;
+    const cell_pattern = /<(t[hd])\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
+    function parse_table(html, ctx) {
+        const rows = [];
+        let headed = false;
+        row_pattern.lastIndex = 0;
+        let row;
+        while ((row = row_pattern.exec(html))) {
+            const cells = [];
+            cell_pattern.lastIndex = 0;
+            let cell;
+            while ((cell = cell_pattern.exec(row[1]))) {
+                if (cell[1].toLowerCase() === 'th' && !rows.length)
+                    headed = true;
+                cells.push(inline(cell[2], ctx).replace(/\n+/g, ' ').trim());
+            }
+            if (cells.length)
+                rows.push(cells);
+        }
+        if (!rows.length) {
+            // A table pasted as plain markdown text still deserves to be reformatted
+            const lines = $bog_wysiwyg_export_plain(html).split('\n')
+                .map(line => line.trim())
+                .filter(Boolean);
+            for (const line of lines) {
+                if (!line.includes('|'))
+                    continue;
+                if (/^\|?[\s:|-]+\|[\s:|-]*$/.test(line)) {
+                    if (rows.length === 1)
+                        headed = true;
+                    continue;
+                }
+                rows.push(line.replace(/^\|/, '').replace(/\|$/, '')
+                    .split('|').map(part => part.trim()));
+            }
+        }
+        if (!rows.length)
+            return null;
+        return headed
+            ? { head: rows[0], body: rows.slice(1) }
+            : { head: null, body: rows };
+    }
+    function table_grid(table) {
+        const head = table.head ?? table.body[0] ?? [];
+        const body = table.head ? table.body : table.body.slice(1);
+        const width = table.body.reduce((max, row) => Math.max(max, row.length), head.length);
+        const line = (cells) => '| ' + Array.from({ length: width }, (_, i) => (cells[i] ?? '').replace(/\|/g, '\\|') || ' ').join(' | ') + ' |';
+        return [
+            line(head),
+            '| ' + Array.from({ length: width }, () => '---').join(' | ') + ' |',
+            ...body.map(line),
+        ].join('\n');
+    }
+    /** Habr and Telegram both ignore markdown tables, so a table becomes a nested list. */
+    function table_list(table, ctx) {
+        const bullet = ctx.traits.bullet;
+        const head = table.head;
+        if (!head) {
+            return table.body.map(row => bullet + ' ' + row.filter(Boolean).join(' — ')).join('\n');
+        }
+        return table.body.map(row => {
+            const lines = [bullet + ' **' + (row[0] ?? '') + '**'];
+            for (let i = 1; i < Math.max(head.length, row.length); ++i) {
+                const title = head[i];
+                const value = row[i] ?? '';
+                if (!value)
+                    continue;
+                lines.push('  ' + bullet + ' ' + (title ? title + ': ' : '') + value);
+            }
+            return lines.join('\n');
+        }).join('\n');
+    }
+    function block_md(block, ctx) {
+        const t = ctx.traits;
+        const type = block.type || 'paragraph';
+        const html = block.content ?? '';
+        switch (type) {
+            case 'divider':
+                return t.divider;
+            case 'code': {
+                const code = $bog_wysiwyg_export_plain(html);
+                if (!code)
+                    return null;
+                const runs = code.match(/`{3,}/g) ?? [];
+                const fence = '`'.repeat(runs.reduce((max, run) => Math.max(max, run.length), 2) + 1);
+                return fence + '\n' + code + '\n' + fence;
+            }
+            case 'heading': {
+                const text = inline(html, ctx).replace(/\s*\n\s*/g, ' ').trim();
+                if (!text)
+                    return null;
+                if (!t.headings)
+                    return '**' + text + '**';
+                const level = Math.min(Math.max(Math.round(block.level ?? 1), 1) + t.heading_shift, t.heading_max);
+                return '#'.repeat(level) + ' ' + text;
+            }
+            case 'quote': {
+                const text = inline(html, ctx);
+                if (!text)
+                    return null;
+                return text.split('\n').map(line => line ? '> ' + line : '>').join('\n');
+            }
+            case 'list': {
+                const text = inline(html, ctx);
+                if (!text)
+                    return null;
+                // `<li>` inside the content already produced its own bullets
+                if (/<li\b/i.test(html))
+                    return text;
+                const indent = ' '.repeat(t.bullet.length + 1);
+                return t.bullet + ' ' + text.split('\n').join('\n' + indent);
+            }
+            case 'table':
+                return table_md(html, ctx);
+            default: {
+                const text = inline(html, ctx);
+                return text || null;
+            }
+        }
+    }
+    function table_md(html, ctx) {
+        const table = parse_table(html, ctx);
+        if (!table)
+            return null;
+        return ctx.traits.tables ? table_grid(table) : table_list(table, ctx);
+    }
+    function yaml_str(text) {
+        return '"' + text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ') + '"';
+    }
+    function front_matter(config) {
+        const tags = (config.tags ?? [])
+            .map(tag => tag.trim().replace(/[^\p{L}\p{N}]/gu, '').toLowerCase())
+            .filter(Boolean)
+            .slice(0, 4);
+        const lines = [
+            '---',
+            'title: ' + yaml_str(config.title ?? ''),
+            'published: ' + (config.published ? 'true' : 'false'),
+            'tags: ' + tags.join(', '),
+        ];
+        const cover = $bog_wysiwyg_export_uri(config.cover ?? '', config.base);
+        if (cover)
+            lines.push('cover_image: ' + yaml_str(cover));
+        lines.push('---');
+        return lines.join('\n') + '\n\n';
+    }
+    function images_md(ctx) {
+        const title = ctx.traits.headings
+            ? '## ' + ctx.labels.images
+            : '**' + ctx.labels.images + '**';
+        const lines = ctx.images.map((image, i) => `${i + 1}. ${image.alt ? image.alt + ' — ' : ''}${image.uri}`);
+        return title + '\n\n' + lines.join('\n');
+    }
+    /**
+     * Pure serializer: plain blocks in, markdown string out.
+     * Knows nothing about Giper Baza, the DOM or $mol.
+     */
+    function $bog_wysiwyg_export_markdown(blocks, config = {}) {
+        const dialect = config.dialect ?? 'common';
+        const traits = dialects[dialect] ?? dialects.common;
+        const ctx = {
+            traits,
+            base: config.base ?? '',
+            images_apart: !!config.images_apart,
+            images: [],
+            labels: {
+                image: config.labels?.image || 'Image',
+                images: config.labels?.images || 'Images',
+            },
+        };
+        const parts = [];
+        for (const block of blocks ?? []) {
+            const md = block_md(block, ctx);
+            if (md === null || md === '')
+                continue;
+            parts.push({ type: block.type, md });
+        }
+        let body = '';
+        for (let i = 0; i < parts.length; ++i) {
+            // Neighbour list items must stay in one markdown list, so a single newline joins them
+            if (i)
+                body += parts[i].type === 'list' && parts[i - 1].type === 'list' ? '\n' : '\n\n';
+            body += parts[i].md;
+        }
+        if (ctx.images.length)
+            body += (body ? '\n\n' : '') + images_md(ctx);
+        const head = dialect === 'devto' ? front_matter(config) : '';
+        return (head + body).trim();
+    }
+    $.$bog_wysiwyg_export_markdown = $bog_wysiwyg_export_markdown;
+    /**
+     * Cuts markdown into messages no longer than `limit`, preferring block boundaries.
+     * Telegram needs it, everybody else gets a single chunk.
+     */
+    function $bog_wysiwyg_export_split(text, limit = $.$bog_wysiwyg_export_telegram_limit) {
+        const source = (text ?? '').trim();
+        if (!source)
+            return [];
+        if (!Number.isFinite(limit) || limit < 1 || source.length <= limit)
+            return [source];
+        const parts = [];
+        let current = '';
+        const flush = () => {
+            if (current.trim())
+                parts.push(current.trim());
+            current = '';
+        };
+        const put = (chunk, separator) => {
+            if (!current) {
+                current = chunk;
+                return;
+            }
+            if (current.length + separator.length + chunk.length <= limit) {
+                current += separator + chunk;
+                return;
+            }
+            flush();
+            current = chunk;
+        };
+        for (const block of source.split('\n\n')) {
+            if (block.length <= limit) {
+                put(block, '\n\n');
+                continue;
+            }
+            for (const line of block.split('\n')) {
+                if (line.length <= limit) {
+                    put(line, '\n');
+                    continue;
+                }
+                flush();
+                for (let i = 0; i < line.length; i += limit)
+                    parts.push(line.slice(i, i + limit));
+            }
+        }
+        flush();
+        return parts;
+    }
+    $.$bog_wysiwyg_export_split = $bog_wysiwyg_export_split;
+})($ || ($ = {}));
+
+;
+"use strict";
+
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        /**
+         * Exports a page as markdown for an outside platform.
+         * All the serialization lives in the pure `$bog_wysiwyg_export_markdown`,
+         * this component only unwraps Giper Baza data into plain blocks and shows the result.
+         */
+        class $bog_wysiwyg_export extends $.$bog_wysiwyg_export {
+            dialect_current() {
+                const value = this.dialect();
+                if (value === 'habr' || value === 'devto' || value === 'telegram')
+                    return value;
+                return 'common';
+            }
+            limit() {
+                return $bog_wysiwyg_export_limit(this.dialect_current());
+            }
+            markdown() {
+                return $bog_wysiwyg_export_markdown(this.blocks(), {
+                    dialect: this.dialect_current(),
+                    title: this.page_title(),
+                    tags: this.tags(),
+                    cover: this.cover(),
+                    base: this.base_uri(),
+                    images_apart: this.images_apart(),
+                    labels: {
+                        image: this.label_image(),
+                        images: this.label_images(),
+                    },
+                });
+            }
+            parts() {
+                const markdown = this.markdown();
+                const limit = this.limit();
+                if (!Number.isFinite(limit))
+                    return [markdown];
+                return $bog_wysiwyg_export_split(markdown, limit);
+            }
+            /** Index of the shown message, clamped to the currently available parts */
+            part_current(next) {
+                if (next !== undefined) {
+                    this.part(next);
+                    return next;
+                }
+                const index = Number(this.part());
+                const count = this.parts().length;
+                return String(Number.isFinite(index) && index >= 0 && index < count ? index : 0);
+            }
+            part_options() {
+                const parts = this.parts();
+                const res = {};
+                parts.forEach((_, index) => {
+                    res[String(index)] = `${index + 1} / ${parts.length}`;
+                });
+                return res;
+            }
+            markdown_shown() {
+                const parts = this.parts();
+                if (parts.length < 2)
+                    return this.markdown();
+                return parts[Number(this.part_current())] ?? parts[0];
+            }
+            note() {
+                const total = this.markdown().length;
+                const parts = this.parts();
+                const head = `${this.note_length()}: ${total}`;
+                if (parts.length < 2)
+                    return head;
+                return `${head} · ${this.note_parts()}: ${parts.length} × ${this.limit()}`;
+            }
+            bubble_content() {
+                return [
+                    this.Head(),
+                    this.Note(),
+                    ...this.parts().length > 1 ? [this.Parts()] : [],
+                    this.Body(),
+                ];
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_export.prototype, "markdown", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_export.prototype, "parts", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_export.prototype, "part_current", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_export.prototype, "part_options", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_export.prototype, "markdown_shown", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_export.prototype, "note", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_export.prototype, "bubble_content", null);
+        $$.$bog_wysiwyg_export = $bog_wysiwyg_export;
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_style_define($bog_wysiwyg_export, {
+        Bubble: {
+            flex: { direction: 'column' },
+            gap: $mol_gap.block,
+            padding: $mol_gap.block,
+            minWidth: '16rem',
+            maxWidth: '48rem',
+        },
+        Head: {
+            flex: { wrap: 'wrap' },
+            align: { items: 'center' },
+            gap: $mol_gap.text,
+            minWidth: 0,
+        },
+        Dialect: {
+            flex: { grow: 1 },
+            minWidth: '10rem',
+        },
+        Note: {
+            color: $mol_theme.shade,
+            font: { size: '0.75rem' },
+            padding: { left: $mol_gap.text, right: $mol_gap.text },
+        },
+        Body: {
+            background: { color: $mol_theme.card },
+            borderRadius: '0.5rem',
+            minWidth: 0,
+            minHeight: '6rem',
+            maxHeight: '50vh',
+        },
+        Output: {
+            minWidth: 0,
+            padding: $mol_gap.text,
+            font: { size: '0.8125rem' },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                Bubble: {
+                    minWidth: 0,
+                    gap: $mol_gap.text,
+                    padding: $mol_gap.text,
+                },
+                Dialect: {
+                    minWidth: 0,
+                },
+            },
+        },
+    });
+})($ || ($ = {}));
 
 ;
 	($.$bog_ui_sidebar) = class $bog_ui_sidebar extends ($.$mol_view) {
@@ -34452,6 +37464,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -34503,6 +37516,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -34628,13 +37642,16 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /** Wiki link pattern: [[page_id]] or [[page_id|display text]] */
         const wiki_link_re = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+        /** Wiki link already converted to HTML: data-wiki-link="page_id" */
         const wiki_attr_re = /data-wiki-link="([^"]+)"/g;
         class $bog_wysiwyg_graph extends $.$bog_wysiwyg_graph {
             sub() {
@@ -34647,6 +37664,7 @@ var $;
                     node.textContent = 'No pages yet';
                     return;
                 }
+                // Ensure canvas exists
                 let canvas = node.querySelector('canvas');
                 if (!canvas) {
                     node.textContent = '';
@@ -34700,6 +37718,7 @@ var $;
                     vy: 0,
                 }));
             }
+            /** Extract [[wiki_link]] edges from all pages' block content */
             edges() {
                 const pages = this.pages();
                 const page_ids = new Set(pages.map(p => p.id()));
@@ -34710,6 +37729,7 @@ var $;
                     const seen = new Set();
                     for (const bid of page.block_ids()) {
                         const html = page.block_html(bid) ?? '';
+                        // Extract from data-wiki-link attributes (already converted links)
                         let match;
                         wiki_attr_re.lastIndex = 0;
                         while ((match = wiki_attr_re.exec(html)) !== null) {
@@ -34719,6 +37739,7 @@ var $;
                                 result.push({ source: page.id(), target });
                             }
                         }
+                        // Extract from raw [[wiki_link]] text (not yet converted)
                         const text = html.replace(/<[^>]*>/g, '');
                         wiki_link_re.lastIndex = 0;
                         while ((match = wiki_link_re.exec(text)) !== null) {
@@ -34794,6 +37815,7 @@ var $;
                 }
                 return result;
             }
+            /** Find node at (x, y) in CSS pixel coords */
             node_at(x, y) {
                 const nodes = this._sim_cache;
                 for (let i = nodes.length - 1; i >= 0; i--) {
@@ -34885,9 +37907,11 @@ var $;
         flex: {
             direction: 'column',
             grow: 1,
+            shrink: 1,
         },
         position: 'relative',
         minWidth: 0,
+        maxWidth: '100%',
         height: '30rem',
         overflow: 'hidden',
         border: {
@@ -34895,6 +37919,13 @@ var $;
         },
         background: {
             color: $mol_theme.card,
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                /** Canvas keeps a usable share of the screen instead of a fixed 30rem block */
+                height: '60vh',
+                minHeight: '16rem',
+            },
         },
     });
 })($ || ($ = {}));
@@ -34946,6 +37977,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -34966,11 +37998,15 @@ var $;
 var $;
 (function ($) {
     $mol_style_define($bog_wysiwyg_profile, {
+        minWidth: 0,
+        maxWidth: '100%',
         Id_row: {
             flex: {
                 direction: 'row',
+                wrap: 'wrap',
             },
             justifyContent: 'center',
+            minWidth: 0,
             gap: '0.25rem',
             padding: {
                 top: '0.5rem',
@@ -34980,17 +38016,36 @@ var $;
             },
         },
         Id_label: {
+            flex: {
+                shrink: 0,
+            },
             font: {
                 size: '0.75rem',
             },
             color: $mol_theme.shade,
         },
         Id_value: {
+            minWidth: 0,
+            maxWidth: '100%',
             font: {
                 size: '0.75rem',
                 family: 'monospace',
             },
             color: $mol_theme.shade,
+            overflowWrap: 'anywhere',
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                Id_row: {
+                    justifyContent: 'flex-start',
+                    padding: {
+                        top: '0.5rem',
+                        bottom: '0.5rem',
+                        left: '0.5rem',
+                        right: '0.5rem',
+                    },
+                },
+            },
         },
     });
 })($ || ($ = {}));
@@ -35006,6 +38061,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 	($.$mol_icon_check) = class $mol_icon_check extends ($.$mol_icon) {
 		path(){
@@ -35016,6 +38072,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 	($.$bog_wysiwyg_app) = class $bog_wysiwyg_app extends ($.$mol_page) {
@@ -35100,6 +38157,18 @@ var $;
 			(obj.Icon) = () => ((this.Profile_icon()));
 			(obj.hint) = () => ((this.$.$mol_locale.text("$bog_wysiwyg_app_Profile_toggle_hint")));
 			(obj.checked) = (next) => ((this.profile_showed(next)));
+			return obj;
+		}
+		export_blocks(){
+			return [];
+		}
+		export_page_title(){
+			return "";
+		}
+		Export(){
+			const obj = new this.$.$bog_wysiwyg_export();
+			(obj.blocks) = () => ((this.export_blocks()));
+			(obj.page_title) = () => ((this.export_page_title()));
 			return obj;
 		}
 		Lights(){
@@ -35384,6 +38453,7 @@ var $;
 				(this.Graph_toggle()), 
 				(this.Permissions_toggle()), 
 				(this.Profile_toggle()), 
+				(this.Export()), 
 				(this.Lights())
 			];
 		}
@@ -35429,6 +38499,7 @@ var $;
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Profile_icon"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "profile_showed"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Profile_toggle"));
+	($mol_mem(($.$bog_wysiwyg_app.prototype), "Export"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Lights"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "Registry_title"));
 	($mol_mem(($.$bog_wysiwyg_app.prototype), "registry_create"));
@@ -35591,6 +38662,7 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /** User data stored in home land. Contains list of registry links. */
         class $bog_wysiwyg_model_user_data extends $giper_baza_dict.with({
             Registries: $giper_baza_list_link,
         }) {
@@ -35605,6 +38677,7 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /** A registry — dict with Title + list of page links. One land = one registry. */
         class $bog_wysiwyg_model_registry extends $giper_baza_dict.with({
             Title: $giper_baza_atom_text,
             Pages: $giper_baza_list_link,
@@ -35685,6 +38758,26 @@ var $;
 			return null;
 		}
 		on_remove(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_split(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_merge_prev(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_merge_next(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_nav(next){
+			if(next !== undefined) return next;
+			return null;
+		}
+		on_input(next){
 			if(next !== undefined) return next;
 			return null;
 		}
@@ -35774,6 +38867,11 @@ var $;
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "level"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_enter"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_remove"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_split"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_merge_prev"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_merge_next"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_nav"));
+	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_input"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_slash"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_menu_key"));
 	($mol_mem(($.$bog_wysiwyg_block.prototype), "on_image"));
@@ -35789,6 +38887,7 @@ var $;
 
 ;
 "use strict";
+
 
 ;
 "use strict";
@@ -35863,24 +38962,89 @@ var $;
     function md_escape_html(text) {
         return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
+    /** Escape plain text to be safely embedded into HTML */
+    function $bog_wysiwyg_escape_html(text) {
+        return md_escape_html(text);
+    }
+    $.$bog_wysiwyg_escape_html = $bog_wysiwyg_escape_html;
+    /** DOM position (node + offset) for a plain text offset inside a root node */
+    function $bog_wysiwyg_point_at(root, offset) {
+        const doc = root.ownerDocument ?? root;
+        const walker = doc.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+        let rest = Math.max(0, offset);
+        let last = null;
+        let node = walker.nextNode();
+        while (node) {
+            const len = node.data.length;
+            if (rest <= len)
+                return { node, offset: rest };
+            rest -= len;
+            last = node;
+            node = walker.nextNode();
+        }
+        if (last)
+            return { node: last, offset: last.data.length };
+        return { node: root, offset: 0 };
+    }
+    $.$bog_wysiwyg_point_at = $bog_wysiwyg_point_at;
+    /** Plain text offset of a DOM position inside a root node. -1 when the position is outside. */
+    function $bog_wysiwyg_offset_of(root, node, offset) {
+        if (root !== node && !root.contains(node))
+            return -1;
+        const doc = root.ownerDocument ?? root;
+        const range = doc.createRange();
+        range.selectNodeContents(root);
+        range.setEnd(node, offset);
+        return range.toString().length;
+    }
+    $.$bog_wysiwyg_offset_of = $bog_wysiwyg_offset_of;
+    /** Plain text of an HTML fragment */
+    function $bog_wysiwyg_html_text(doc, html) {
+        const box = doc.createElement('div');
+        box.innerHTML = html;
+        return box.textContent ?? '';
+    }
+    $.$bog_wysiwyg_html_text = $bog_wysiwyg_html_text;
+    /** Collapsed Range under a viewport point, when the engine is able to tell */
+    function $bog_wysiwyg_caret_from_point(doc, x, y) {
+        const legacy = Reflect.get(doc, 'caretRangeFromPoint');
+        if (typeof legacy === 'function')
+            return legacy.call(doc, x, y) ?? null;
+        const modern = Reflect.get(doc, 'caretPositionFromPoint');
+        if (typeof modern === 'function') {
+            const pos = modern.call(doc, x, y);
+            if (!pos)
+                return null;
+            const range = doc.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+            return range;
+        }
+        return null;
+    }
+    $.$bog_wysiwyg_caret_from_point = $bog_wysiwyg_caret_from_point;
 })($ || ($ = {}));
 (function ($) {
     var $$;
     (function ($$) {
         const markdown_patterns = [
             {
+                // **bold** → <b>bold</b>
                 regex: /\*\*(.+?)\*\*/,
                 tag: 'b',
             },
             {
+                // *italic* → <i>italic</i> — but NOT inside ** sequences
                 regex: /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/,
                 tag: 'i',
             },
             {
+                // `code` → <code>code</code>
                 regex: /`(.+?)`/,
                 tag: 'code',
             },
             {
+                // ~~strike~~ → <s>strike</s>
                 regex: /~~(.+?)~~/,
                 tag: 's',
             },
@@ -35919,11 +39083,164 @@ var $;
                 const plugin = $bog_wysiwyg_plugin_registry.get(this.type());
                 return !!plugin?.render;
             }
+            // === Caret ===
+            /** Editable root of this block */
+            node_el() {
+                return this.dom_node();
+            }
+            /** Plain text of the block as it is rendered right now */
+            text_content() {
+                return this.node_el().textContent ?? '';
+            }
+            selection() {
+                return this.node_el().ownerDocument.defaultView?.getSelection() ?? null;
+            }
+            selection_collapsed() {
+                const sel = this.selection();
+                return !sel || sel.isCollapsed;
+            }
+            /** Text offset of the caret inside this block. -1 when the caret is elsewhere. */
+            caret_offset() {
+                const sel = this.selection();
+                if (!sel || sel.rangeCount === 0)
+                    return -1;
+                const focus = sel.focusNode;
+                if (!focus)
+                    return -1;
+                return $.$bog_wysiwyg_offset_of(this.node_el(), focus, sel.focusOffset);
+            }
+            /** Put a collapsed caret at a plain text offset. Survives innerHTML rewrites. */
+            caret_place(offset) {
+                const node = this.node_el();
+                const sel = this.selection();
+                if (!sel)
+                    return;
+                const point = $.$bog_wysiwyg_point_at(node, offset);
+                const range = node.ownerDocument.createRange();
+                range.setStart(point.node, point.offset);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+            /** Focus the block and place the caret at a text offset (end of text by default) */
+            focus_at(offset) {
+                const node = this.node_el();
+                node.focus();
+                const len = (node.textContent ?? '').length;
+                this.caret_place(offset === undefined ? len : Math.max(0, Math.min(offset, len)));
+            }
+            /** HTML of the content before a text offset */
+            html_before(offset) {
+                const node = this.node_el();
+                const doc = node.ownerDocument;
+                const point = $.$bog_wysiwyg_point_at(node, offset);
+                const range = doc.createRange();
+                range.selectNodeContents(node);
+                range.setEnd(point.node, point.offset);
+                const box = doc.createElement('div');
+                box.appendChild(range.cloneContents());
+                return box.innerHTML;
+            }
+            /** HTML of the content after a text offset */
+            html_after(offset) {
+                const node = this.node_el();
+                const doc = node.ownerDocument;
+                const point = $.$bog_wysiwyg_point_at(node, offset);
+                const range = doc.createRange();
+                range.selectNodeContents(node);
+                range.setStart(point.node, point.offset);
+                const box = doc.createElement('div');
+                box.appendChild(range.cloneContents());
+                return box.innerHTML;
+            }
+            /** Drop the selected content when the whole selection lies inside this block */
+            delete_range() {
+                const node = this.node_el();
+                const sel = this.selection();
+                if (!sel || sel.isCollapsed || sel.rangeCount === 0)
+                    return false;
+                const range = sel.getRangeAt(0);
+                if (!node.contains(range.startContainer) || !node.contains(range.endContainer))
+                    return false;
+                const offset = $.$bog_wysiwyg_offset_of(node, range.startContainer, range.startOffset);
+                range.deleteContents();
+                this.html(node.innerHTML);
+                this.caret_place(offset);
+                return true;
+            }
+            /** Bounding box of a text range. Null when the engine gives no layout. */
+            range_rect(from, to) {
+                const node = this.node_el();
+                const doc = node.ownerDocument;
+                const start = $.$bog_wysiwyg_point_at(node, from);
+                const end = $.$bog_wysiwyg_point_at(node, to);
+                const range = doc.createRange();
+                range.setStart(start.node, start.offset);
+                range.setEnd(end.node, end.offset);
+                if (typeof range.getBoundingClientRect !== 'function')
+                    return null;
+                return range.getBoundingClientRect();
+            }
+            /** Box of the character the caret sticks to */
+            caret_rect() {
+                const len = this.text_content().length;
+                const offset = this.caret_offset();
+                if (offset < 0 || len === 0)
+                    return null;
+                return offset < len ? this.range_rect(offset, offset + 1) : this.range_rect(offset - 1, offset);
+            }
+            /** Whether the caret sits on the first / last visual line of the block */
+            caret_lines() {
+                const len = this.text_content().length;
+                const offset = this.caret_offset();
+                if (offset < 0 || len === 0)
+                    return { first: true, last: true };
+                const cur = this.caret_rect();
+                const head = this.range_rect(0, 1);
+                const tail = this.range_rect(len - 1, len);
+                // No layout engine (server side render, tests): the block is a single line
+                if (!cur || !head || !tail || !cur.height)
+                    return { first: true, last: true };
+                return {
+                    first: cur.top <= head.top + 1,
+                    last: cur.bottom >= tail.bottom - 1,
+                };
+            }
+            /** Horizontal position of the caret in viewport pixels. 0 when unknown. */
+            caret_x() {
+                const rect = this.caret_rect();
+                if (!rect)
+                    return 0;
+                const len = this.text_content().length;
+                return this.caret_offset() < len ? rect.left : rect.right;
+            }
+            /** Enter the block from a neighbour keeping the horizontal position */
+            focus_column(x, offset, from_top) {
+                const node = this.node_el();
+                node.focus();
+                const box = typeof node.getBoundingClientRect === 'function' ? node.getBoundingClientRect() : null;
+                if (x > 0 && box && box.height > 0) {
+                    const doc = node.ownerDocument;
+                    const y = from_top ? box.top + 2 : box.bottom - 2;
+                    const range = $.$bog_wysiwyg_caret_from_point(doc, x, y);
+                    if (range && node.contains(range.startContainer)) {
+                        const sel = this.selection();
+                        if (sel) {
+                            range.collapse(true);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                            return;
+                        }
+                    }
+                }
+                this.focus_at(offset);
+            }
             static render_cache = new WeakMap();
             auto() {
                 const node = this.dom_node();
                 const doc = this.$.$mol_dom_context.document;
                 const readonly = this.readonly();
+                // Plugin with custom render
                 const plugin = $bog_wysiwyg_plugin_registry.get(this.type());
                 if (plugin?.render) {
                     node.contentEditable = 'false';
@@ -35943,7 +39260,7 @@ var $;
                         }
                         catch (error) {
                             if (error instanceof Promise)
-                                throw error;
+                                throw error; // let $mol retry
                             node.textContent = String(error);
                         }
                     }
@@ -35961,11 +39278,13 @@ var $;
                     return;
                 }
                 node.contentEditable = 'true';
-                if (node !== doc.activeElement) {
-                    const html = this.html();
-                    if (node.innerHTML !== html) {
-                        node.innerHTML = html;
-                    }
+                const html = this.html();
+                if (node.innerHTML !== html) {
+                    // Nodes are recreated wholesale, so the caret is remembered by text offset
+                    const offset = node === doc.activeElement ? this.caret_offset() : -1;
+                    node.innerHTML = html;
+                    if (offset >= 0)
+                        this.caret_place(offset);
                 }
             }
             input_event(event) {
@@ -35976,6 +39295,7 @@ var $;
                 const node = event.target;
                 this.try_markdown(node);
                 this.html(node.innerHTML);
+                this.on_input(event);
                 return event;
             }
             try_markdown(container) {
@@ -35985,9 +39305,10 @@ var $;
                     return;
                 const cursor = sel.getRangeAt(0);
                 const text_node = cursor.startContainer;
-                if (text_node.nodeType !== 3)
+                if (text_node.nodeType !== 3 /* Node.TEXT_NODE */)
                     return;
                 const text = text_node.textContent ?? '';
+                // Try link pattern first: [text](url)
                 const link_match = link_pattern.exec(text);
                 if (link_match) {
                     const link_text = link_match[1];
@@ -36000,6 +39321,7 @@ var $;
                         return;
                     }
                 }
+                // Try wiki link pattern: [[page_id]]
                 const wiki_match = wiki_link_pattern.exec(text);
                 if (wiki_match) {
                     const page_id = wiki_match[1];
@@ -36013,6 +39335,7 @@ var $;
                         return;
                     }
                 }
+                // Try inline formatting patterns
                 for (const pattern of markdown_patterns) {
                     const match = pattern.regex.exec(text);
                     if (!match)
@@ -36034,6 +39357,7 @@ var $;
                 range.setEnd(text_node, end);
                 range.deleteContents();
                 range.insertNode(el);
+                // Place cursor after the inserted element
                 const after = text_node.ownerDocument.createRange();
                 after.setStartAfter(el);
                 after.collapse(true);
@@ -36161,7 +39485,8 @@ var $;
                     return null;
                 if (this.readonly())
                     return event;
-                const node = event.target;
+                const node = this.node_el();
+                // Static rendered blocks (image, plugin render): only Backspace/Enter
                 if (this.is_image() || $bog_wysiwyg_plugin_registry.get(this.type())?.render) {
                     if (event.key === 'Backspace' || event.key === 'Delete') {
                         event.preventDefault();
@@ -36175,6 +39500,7 @@ var $;
                     }
                     return event;
                 }
+                // When AI menu is open, delegate navigation keys
                 if (this.ai_open()) {
                     if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
                         event.preventDefault();
@@ -36186,42 +39512,88 @@ var $;
                         return event;
                     }
                 }
+                // When menu is open, delegate navigation keys
                 if (this.menu_open()) {
                     if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
                         event.preventDefault();
                         this.on_menu_key(event);
                         return event;
                     }
+                    // Any printable character: close menu and let character through
                     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
                         this.on_menu_key(event);
                         return event;
                     }
                 }
+                const collapsed = this.selection_collapsed();
+                const text = node.textContent ?? '';
+                // ArrowUp / ArrowDown on the edge line: step into the neighbour block
+                if (collapsed && !event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+                    const up = event.key === 'ArrowUp';
+                    const lines = this.caret_lines();
+                    if (up ? lines.first : lines.last) {
+                        event.preventDefault();
+                        this.on_nav({
+                            dir: up ? 'up' : 'down',
+                            x: this.caret_x(),
+                            offset: Math.max(0, this.caret_offset()),
+                        });
+                        return event;
+                    }
+                }
+                // Enter: split the block at the caret, or append an empty one at the tail
                 if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
+                    // A selection inside this block goes away first
+                    const wiped = collapsed ? false : this.delete_range();
+                    const offset = this.caret_offset();
+                    if ((collapsed || wiped) && offset >= 0 && offset < this.text_content().length) {
+                        this.on_split({
+                            head: this.html_before(offset),
+                            tail: this.html_after(offset),
+                        });
+                        return event;
+                    }
                     this.on_enter(event);
                     return event;
                 }
-                if (event.key === 'Backspace' && !node.textContent?.trim()) {
+                // Backspace on empty: remove block
+                if (event.key === 'Backspace' && collapsed && !text.trim()) {
                     event.preventDefault();
                     this.on_remove(event);
                     return event;
                 }
-                if (event.key === '/' && !node.textContent?.trim()) {
+                // Backspace at the very start: glue with the previous block
+                if (event.key === 'Backspace' && collapsed && this.caret_offset() === 0) {
+                    event.preventDefault();
+                    this.on_merge_prev(event);
+                    return event;
+                }
+                // Delete at the very end: pull the next block in
+                if (event.key === 'Delete' && collapsed && this.caret_offset() === text.length) {
+                    event.preventDefault();
+                    this.on_merge_next(event);
+                    return event;
+                }
+                // Slash on empty: open slash menu
+                if (event.key === '/' && !text.trim()) {
                     event.preventDefault();
                     this.on_slash(event);
                     return event;
                 }
+                // @ : open AI menu
                 if (event.key === '@') {
                     event.preventDefault();
                     this.on_ai(event);
                     return event;
                 }
+                // Ctrl/Cmd+J: open AI menu
                 if (event.key === 'j' && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
                     event.preventDefault();
                     this.on_ai(event);
                     return event;
                 }
+                // Ctrl/Cmd+K: insert link
                 if (event.key === 'k' && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
                     this.link_exec(event);
                     return event;
@@ -36243,27 +39615,44 @@ var $;
     $mol_style_define($bog_wysiwyg_block, {
         display: 'block',
         outline: 'none',
+        position: 'relative',
+        minWidth: 0,
+        maxWidth: '100%',
+        minHeight: '1.5em',
+        lineHeight: '1.6',
+        borderRadius: '0.25rem',
+        cursor: 'text',
         padding: {
             top: '0.25rem',
             bottom: '0.25rem',
             left: '0.5rem',
             right: '0.5rem',
         },
-        minHeight: '1.5em',
-        lineHeight: '1.6',
-        borderRadius: '0.25rem',
-        cursor: 'text',
-        position: 'relative',
-        overflowWrap: 'break-word',
+        /** `anywhere` also shrinks min-content width, so a long word cannot push the page sideways */
+        overflowWrap: 'anywhere',
+        transition: 'background-color 0.15s, box-shadow 0.15s',
         ':hover': {
             background: {
                 color: $mol_theme.hover,
             },
         },
+        /** Focused block keeps the hover tint plus an accent bar so the caret position is obvious */
         ':focus': {
             outline: 'none',
             background: {
                 color: $mol_theme.hover,
+            },
+            box: {
+                shadow: [
+                    {
+                        inset: true,
+                        x: '2px',
+                        y: 0,
+                        blur: 0,
+                        spread: 0,
+                        color: $mol_theme.focus,
+                    },
+                ],
             },
         },
         '[bog_wysiwyg_block_empty]': {
@@ -36273,6 +39662,12 @@ var $;
                     color: $mol_theme.shade,
                     pointerEvents: 'none',
                     position: 'absolute',
+                    /** Same line box as the first text line, so nothing shifts once typing starts */
+                    lineHeight: 'inherit',
+                    maxWidth: $mol_style_func.calc('100% - 1rem'),
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                 },
             },
         },
@@ -36282,22 +39677,22 @@ var $;
                     '1': {
                         font: { size: '2rem', weight: 700 },
                         lineHeight: '1.2',
-                        margin: { top: '1rem' },
+                        margin: { top: '2rem', bottom: '0.5rem' },
                     },
                     '2': {
                         font: { size: '1.5rem', weight: 700 },
                         lineHeight: '1.3',
-                        margin: { top: '0.75rem' },
+                        margin: { top: '1.5rem', bottom: '0.25rem' },
                     },
                     '3': {
                         font: { size: '1.25rem', weight: 600 },
                         lineHeight: '1.4',
-                        margin: { top: '0.5rem' },
+                        margin: { top: '1rem', bottom: '0.25rem' },
                     },
                 },
             },
             code: {
-                font: { family: 'monospace' },
+                font: { family: 'monospace', size: '0.875rem' },
                 background: { color: $mol_theme.card },
                 padding: {
                     top: '1rem',
@@ -36305,8 +39700,11 @@ var $;
                     left: '1rem',
                     right: '1rem',
                 },
+                margin: { top: '0.5rem', bottom: '0.5rem' },
                 borderRadius: '0.5rem',
                 whiteSpace: 'pre-wrap',
+                /** Own scroll container: an unbreakable line scrolls here, never the page */
+                overflow: { x: 'auto', y: 'hidden' },
             },
             quote: {
                 border: {
@@ -36317,6 +39715,7 @@ var $;
                     },
                 },
                 padding: { left: '1rem' },
+                margin: { top: '0.5rem', bottom: '0.5rem' },
                 color: $mol_theme.shade,
                 font: { style: 'italic' },
             },
@@ -36335,7 +39734,7 @@ var $;
                     left: 0,
                     right: 0,
                 },
-                margin: { top: '0.5rem', bottom: '0.5rem' },
+                margin: { top: '1rem', bottom: '1rem' },
                 pointerEvents: 'none',
             },
             image: {
@@ -36346,11 +39745,67 @@ var $;
                     left: 0,
                     right: 0,
                 },
+                margin: { top: '0.5rem', bottom: '0.5rem' },
                 textAlign: 'center',
+            },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                padding: {
+                    top: '0.25rem',
+                    bottom: '0.25rem',
+                    left: '0.375rem',
+                    right: '0.375rem',
+                },
+                '[bog_wysiwyg_block_type]': {
+                    heading: {
+                        '[bog_wysiwyg_block_level]': {
+                            '1': {
+                                font: { size: '1.5rem' },
+                                margin: { top: '1.25rem', bottom: '0.375rem' },
+                            },
+                            '2': {
+                                font: { size: '1.25rem' },
+                                margin: { top: '1rem', bottom: '0.25rem' },
+                            },
+                            '3': {
+                                font: { size: '1.125rem' },
+                                margin: { top: '0.75rem', bottom: '0.25rem' },
+                            },
+                        },
+                    },
+                    code: {
+                        font: { size: '0.8125rem' },
+                        padding: {
+                            top: '0.75rem',
+                            bottom: '0.75rem',
+                            left: '0.75rem',
+                            right: '0.75rem',
+                        },
+                    },
+                    quote: {
+                        padding: { left: '0.75rem' },
+                    },
+                },
             },
         },
     });
     $mol_style_attach('bog_wysiwyg_block_inner', `
+		[bog_wysiwyg_block] img {
+			max-width: 100%;
+			height: auto;
+		}
+
+		[bog_wysiwyg_block] a {
+			overflow-wrap: anywhere;
+		}
+
+		[bog_wysiwyg_block] pre,
+		[bog_wysiwyg_block] table {
+			max-width: 100%;
+			overflow-x: auto;
+		}
+
 		[bog_wysiwyg_block_type="image"] img {
 			max-width: 100%;
 			height: auto;
@@ -36371,6 +39826,9 @@ var $;
 
 		[bog_wysiwyg_block_type="image"][bog_wysiwyg_block_empty="true"]::before {
 			content: "\\1F5BC  \\0414\\043E\\0431\\0430\\0432\\044C\\0442\\0435 \\043A\\0430\\0440\\0442\\0438\\043D\\043A\\0443";
+			position: static;
+			max-width: 100%;
+			white-space: normal;
 		}
 
 		.bog_wysiwyg_wiki_link {
@@ -36378,6 +39836,7 @@ var $;
 			text-decoration: none;
 			border-bottom: 1px dashed var(--mol_theme_focus);
 			cursor: pointer;
+			overflow-wrap: anywhere;
 		}
 
 		.bog_wysiwyg_wiki_link:hover {
@@ -36490,6 +39949,7 @@ var $;
 ;
 "use strict";
 
+
 ;
 "use strict";
 var $;
@@ -36497,6 +39957,7 @@ var $;
     var $$;
     (function ($$) {
         class $bog_wysiwyg_app extends $.$bog_wysiwyg_app {
+            /** Current page land link from URL */
             page_land_link(next) {
                 if (next !== undefined) {
                     this.$.$mol_state_arg.value('page', next || null);
@@ -36504,6 +39965,7 @@ var $;
                 }
                 return this.$.$mol_state_arg.value('page') ?? '';
             }
+            /** Registry land link from URL */
             registry_land_link(next) {
                 if (next !== undefined) {
                     this.$.$mol_state_arg.value('registry', next || null);
@@ -36511,12 +39973,14 @@ var $;
                 }
                 return this.$.$mol_state_arg.value('registry') ?? '';
             }
+            /** User data from home land. Do NOT put @$mol_mem. */
             user_data() {
                 const home = this.$.$giper_baza_glob.home();
                 if (!home)
                     return null;
                 return home.land().Data($bog_wysiwyg_model_user_data);
             }
+            /** List of registry link strings from home land */
             user_registry_links() {
                 const data = this.user_data();
                 if (!data)
@@ -36524,12 +39988,11 @@ var $;
                 const list = data.Registries();
                 if (!list)
                     return [];
-                const items = list.items_vary() ?? [];
-                return items
-                    .map(v => $giper_baza_vary_cast_link(v))
+                return (list.items() ?? [])
                     .filter($mol_guard_defined)
                     .map(link => link.str);
             }
+            /** Add a registry link to user's home land */
             user_registries_add(link_str) {
                 const data = this.user_data();
                 if (!data)
@@ -36540,6 +40003,7 @@ var $;
                 const current = list.items_vary() ?? [];
                 list.items_vary([...current, new $giper_baza_link(link_str)]);
             }
+            /** Registry data (dict with Title + Pages). Do NOT put @$mol_mem. */
             registry_data() {
                 const link = this.registry_land_link();
                 if (!link)
@@ -36547,6 +40011,7 @@ var $;
                 const land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
                 return land.Data($bog_wysiwyg_model_registry);
             }
+            /** Create registry land if none exists, return registry data */
             registry_ensure() {
                 let data = this.registry_data();
                 if (data)
@@ -36557,6 +40022,7 @@ var $;
                 this.user_registries_add(link_str);
                 return land.Data($bog_wysiwyg_model_registry);
             }
+            /** All page land link strings from registry */
             page_links() {
                 const data = this.registry_data();
                 if (!data)
@@ -36564,17 +40030,17 @@ var $;
                 const list = data.Pages();
                 if (!list)
                     return [];
-                const items = list.items_vary() ?? [];
-                return items
-                    .map(v => $giper_baza_vary_cast_link(v))
+                return (list.items() ?? [])
                     .filter($mol_guard_defined)
                     .map(link => link.str);
             }
+            /** Read page title from a land link */
             page_title_by_link(link) {
                 const land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
                 const data = land.Data($bog_wysiwyg_model_page);
                 return data.Title()?.val() ?? '';
             }
+            /** Read block IDs from a page land */
             page_block_ids(link) {
                 const land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
                 const data = land.Data($bog_wysiwyg_model_page);
@@ -36583,10 +40049,32 @@ var $;
                     return [];
                 return blocks.remote_list().map((b) => b.link().str);
             }
+            /** Read block HTML content */
             page_block_html(link, block_link) {
                 const block = this.$.$giper_baza_glob.Pawn(new $giper_baza_link(block_link), $bog_wysiwyg_model_block);
                 return block.Content()?.val() ?? '';
             }
+            /**
+             * Current page unwrapped into plain blocks for the markdown exporter.
+             * Read through the editor, so the Baza schema stays in one place
+             * and the serializer never sees a land, a pawn or an atom.
+             */
+            export_blocks() {
+                if (!this.page_land_link())
+                    return [];
+                const editor = this.Editor();
+                return editor.block_ids().map((id) => ({
+                    type: editor.block_type(id),
+                    level: editor.block_level(id),
+                    content: editor.block_html(id),
+                }));
+            }
+            /** Page title for the dev.to front matter */
+            export_page_title() {
+                const link = this.page_land_link();
+                return link ? this.page_title_by_link(link) : '';
+            }
+            /** All pages info for backlinks */
             all_pages_info() {
                 return this.page_links().map(link => ({
                     id: link,
@@ -36594,20 +40082,25 @@ var $;
                     blocks_html: this.page_block_ids(link).map(bid => this.page_block_html(link, bid)),
                 }));
             }
+            /** Read registry title from a land link */
             registry_title_by_link(link) {
                 const land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
                 const data = land.Data($bog_wysiwyg_model_registry);
                 return data.Title()?.val() ?? '';
             }
+            // === Permissions ===
+            /** Current user's lord link. Do NOT put @$mol_mem. */
             my_lord() {
                 return this.$.$giper_baza_auth.current().pass().lord();
             }
+            /** Get the Giper Baza land for the current page. Do NOT put @$mol_mem. */
             current_page_land() {
                 const link = this.page_land_link();
                 if (!link)
                     return null;
                 return this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
             }
+            /** Current user's tier on the current page land */
             page_tier() {
                 const land = this.current_page_land();
                 if (!land)
@@ -36615,15 +40108,19 @@ var $;
                 const auth = this.$.$giper_baza_auth.current();
                 return $giper_baza_rank_tier_of(land.pass_rank(auth.pass()));
             }
+            /** Whether current user can edit the current page */
             can_edit() {
                 return this.page_tier() >= $giper_baza_rank_tier.post;
             }
+            /** Whether current user is owner (rule) of the current page */
             is_owner() {
                 return this.page_tier() >= $giper_baza_rank_tier.rule;
             }
+            /** Editor is readonly when user cannot edit */
             editor_readonly() {
                 return !this.can_edit();
             }
+            /** Label showing current user's role */
             permissions_role_label() {
                 const tier = this.page_tier();
                 if (tier >= $giper_baza_rank_tier.rule)
@@ -36634,6 +40131,7 @@ var $;
                     return 'You: Viewer';
                 return 'You: No access';
             }
+            /** List known lords (gift recipients) in current page land */
             page_gift_lords() {
                 const land = this.current_page_land();
                 if (!land)
@@ -36645,11 +40143,13 @@ var $;
                 }
                 return lords;
             }
+            /** Permissions member rows */
             permissions_member_rows() {
                 if (!this.is_owner())
                     return [];
                 return this.page_gift_lords().map((_, i) => this.Permissions_member(i));
             }
+            /** Lord title for member row */
             permissions_member_lord_title(index) {
                 const lords = this.page_gift_lords();
                 const lord = lords[index];
@@ -36660,6 +40160,7 @@ var $;
                     return lord + ' (you)';
                 return lord;
             }
+            /** Role value for member row */
             permissions_member_role_value(index, next) {
                 const lords = this.page_gift_lords();
                 const lord_str = lords[index];
@@ -36692,6 +40193,7 @@ var $;
                     return 'editor';
                 return 'viewer';
             }
+            /** Add a user to the current page land */
             permissions_add_click(event) {
                 if (!event)
                     return null;
@@ -36713,6 +40215,7 @@ var $;
                 this.permissions_add_link('');
                 return event;
             }
+            /** Hide add-member controls for non-owners */
             permissions_add_content() {
                 if (!this.is_owner())
                     return [];
@@ -36722,6 +40225,7 @@ var $;
                     this.Permissions_add_button(),
                 ];
             }
+            // === Sidebar: hide New page button for viewers ===
             sidebar_head_content() {
                 const parts = [this.Sidebar_title()];
                 if (this.can_edit()) {
@@ -36729,12 +40233,15 @@ var $;
                 }
                 return parts;
             }
+            // === Page item: hide rename for viewers ===
             page_item_can_edit(index) {
                 return this.can_edit();
             }
+            /** Registry rows for panel */
             registry_rows() {
                 return this.user_registry_links().map((_, i) => this.Registry_item(i));
             }
+            /** Title for registry item */
             registry_item_title(index) {
                 const link = this.user_registry_links()[index];
                 if (!link)
@@ -36742,45 +40249,51 @@ var $;
                 const title = this.registry_title_by_link(link);
                 return title || `Registry ${index + 1}`;
             }
+            /** Is this registry currently active? */
             registry_item_active(index) {
                 return this.user_registry_links()[index] === this.registry_land_link();
             }
+            /** Click registry in panel — switch to it */
             registry_item_click(index, event) {
                 if (!event)
                     return null;
                 const link = this.user_registry_links()[index];
                 if (link) {
                     this.registry_land_link(link);
+                    // Auto-select first page
                     const land = this.$.$giper_baza_glob.Land(new $giper_baza_link(link));
                     const data = land.Data($bog_wysiwyg_model_registry);
                     const pages = data.Pages();
                     if (pages) {
-                        const items = pages.items_vary() ?? [];
-                        const first = items[0];
-                        if (first) {
-                            const first_link = $giper_baza_vary_cast_link(first);
-                            if (first_link)
-                                this.page_land_link(first_link.str);
-                        }
+                        const first = (pages.items() ?? [])[0];
+                        if (first)
+                            this.page_land_link(first.str);
                     }
                 }
                 return event;
             }
+            /** Create new registry land, add to home, switch to it */
             registry_create(event) {
                 if (!event)
                     return null;
                 const land = this.$.$giper_baza_glob.land_grab([[null, $giper_baza_rank_post('just')]]);
+                // Init registry with empty title
                 const data = land.Data($bog_wysiwyg_model_registry);
                 data.Title('auto')?.val('');
                 const link_str = land.link().str;
+                // Add to home
                 this.user_registries_add(link_str);
+                // Switch to it
                 this.registry_land_link(link_str);
+                // Create first page
                 this.page_create(new Event('auto'));
                 return event;
             }
+            /** Page rows for sidebar */
             page_rows() {
                 return this.page_links().map((link, i) => this.Page_item(i));
             }
+            /** Title for page item in sidebar */
             page_item_title(index) {
                 const link = this.page_links()[index];
                 if (!link)
@@ -36788,9 +40301,11 @@ var $;
                 const title = this.page_title_by_link(link);
                 return title || `Page ${index + 1}`;
             }
+            /** Is this page currently active? */
             page_item_active(index) {
                 return this.page_links()[index] === this.page_land_link();
             }
+            /** Click page in sidebar — navigate */
             page_item_click(index, event) {
                 if (!event)
                     return null;
@@ -36799,6 +40314,7 @@ var $;
                     this.page_land_link(link);
                 return event;
             }
+            /** Rename page title in Baza */
             page_item_rename(index, val) {
                 if (val === undefined)
                     return null;
@@ -36810,27 +40326,34 @@ var $;
                 data.Title('auto')?.val(val);
                 return val;
             }
+            /** Create new page land and add to registry */
             page_create(event) {
                 if (!event)
                     return null;
                 const reg = this.registry_ensure();
                 const land = this.$.$giper_baza_glob.land_grab([[null, $giper_baza_rank_post('just')]]);
+                // Init page with empty title
                 const data = land.Data($bog_wysiwyg_model_page);
                 data.Title('auto')?.val('');
+                // Add to registry via Pages
                 const pages = reg.Pages('auto');
                 if (pages) {
                     const current = pages.items_vary() ?? [];
                     pages.items_vary([...current, land.link()]);
                 }
+                // Navigate to new page
                 this.page_land_link(land.link().str);
                 return event;
             }
+            /** Navigate to a page (from graph click) */
             page_navigate(id) {
                 if (id)
                     this.page_land_link(id);
                 return id ?? null;
             }
+            /** Auto-init: ensure registry + page on first visit */
             auto() {
+                // If registry is set in URL, just auto-select first page
                 const reg_link = this.registry_land_link();
                 if (reg_link) {
                     const current = this.page_land_link();
@@ -36842,14 +40365,17 @@ var $;
                     }
                     return;
                 }
+                // No registry in URL — check home for saved registries
                 const saved = this.user_registry_links();
                 if (saved.length > 0) {
                     this.registry_land_link(saved[0]);
                     return;
                 }
+                // Nothing saved — create fresh registry + page
                 this.registry_ensure();
                 this.page_create(new Event('auto'));
             }
+            /** Layout content depends on panels */
             layout_content() {
                 const parts = [];
                 if (this.registry_panel_showed()) {
@@ -36873,6 +40399,7 @@ var $;
                 }
                 return parts;
             }
+            /** Graph pages */
             graph_pages() {
                 const self = this;
                 return this.page_links().map(link => ({
@@ -36901,6 +40428,9 @@ var $;
         __decorate([
             $mol_mem
         ], $bog_wysiwyg_app.prototype, "page_links", null);
+        __decorate([
+            $mol_mem
+        ], $bog_wysiwyg_app.prototype, "export_blocks", null);
         __decorate([
             $mol_mem
         ], $bog_wysiwyg_app.prototype, "all_pages_info", null);
@@ -37004,54 +40534,88 @@ var $;
 var $;
 (function ($) {
     $mol_style_define($bog_wysiwyg_app, {
-        Editor: {
-            margin: {
-                top: '3rem'
-            }
-        },
         Layout: {
             flex: {
                 direction: 'row',
                 grow: 1,
+                shrink: 1,
             },
+            minWidth: 0,
+            minHeight: 0,
+            alignItems: 'stretch',
+            overflow: 'hidden',
         },
         Registry_panel: {
             flex: {
                 direction: 'column',
                 shrink: 0,
             },
-            overflow: {
-                y: 'auto',
-            },
             minWidth: '12rem',
             maxWidth: '16rem',
+            gap: '0.25rem',
+            padding: {
+                top: '0.5rem',
+                bottom: '0.5rem',
+                left: '0.5rem',
+                right: '0.5rem',
+            },
+            overflow: {
+                x: 'hidden',
+                y: 'auto',
+            },
         },
         Registry_head: {
             flex: {
                 direction: 'row',
+                wrap: 'wrap',
+                shrink: 0,
             },
             justifyContent: 'space-between',
             alignItems: 'center',
+            minWidth: 0,
+            gap: '0.25rem',
         },
         Registry_title: {
             font: {
                 weight: 'bold',
             },
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+        },
+        Registry_list: {
+            minWidth: 0,
+            maxWidth: '100%',
         },
         Registry_item: {
             textAlign: 'left',
         },
+        /** $bog_ui_sidebar sizes itself by content — cap it so long titles cannot widen the page */
+        Sidebar: {
+            flex: {
+                shrink: 0,
+            },
+            minWidth: 0,
+            maxWidth: '16rem',
+        },
         Sidebar_head: {
             flex: {
                 direction: 'row',
+                wrap: 'wrap',
+                shrink: 0,
             },
             justifyContent: 'space-between',
             alignItems: 'center',
+            minWidth: 0,
+            gap: '0.25rem',
         },
         Sidebar_title: {
             font: {
                 weight: 'bold',
             },
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
         },
         Page_item: {
             textAlign: 'left',
@@ -37060,46 +40624,91 @@ var $;
             flex: {
                 direction: 'column',
                 grow: 1,
+                shrink: 1,
             },
             minWidth: 0,
+            minHeight: 0,
             width: '0px',
+            /** Keeps a long word inside the column instead of pushing over the sidebar */
             overflow: {
+                x: 'hidden',
                 y: 'auto',
             },
         },
-        Graph_panel: {
+        Editor: {
             flex: {
                 grow: 1,
+                shrink: 1,
             },
             minWidth: 0,
-            overflow: 'hidden',
         },
-        Permissions_panel: {
+        Graph_panel: {
             flex: {
                 direction: 'column',
-                shrink: 0,
+                grow: 1,
+                shrink: 1,
             },
+            minWidth: 0,
+            minHeight: 0,
             padding: {
                 top: '1rem',
                 bottom: '1rem',
                 left: '1rem',
                 right: '1rem',
             },
-            minWidth: '16rem',
-            maxWidth: '24rem',
+            overflow: 'hidden',
+        },
+        Profile_panel: {
+            flex: {
+                direction: 'column',
+                grow: 1,
+                shrink: 1,
+            },
+            minWidth: 0,
+            minHeight: 0,
+            maxWidth: '32rem',
+            padding: {
+                top: '1rem',
+                bottom: '1rem',
+                left: '1rem',
+                right: '1rem',
+            },
             overflow: {
+                x: 'hidden',
+                y: 'auto',
+            },
+        },
+        Permissions_panel: {
+            flex: {
+                direction: 'column',
+                grow: 1,
+                shrink: 1,
+            },
+            minWidth: 0,
+            minHeight: 0,
+            maxWidth: '32rem',
+            gap: '0.5rem',
+            padding: {
+                top: '1rem',
+                bottom: '1rem',
+                left: '1rem',
+                right: '1rem',
+            },
+            overflow: {
+                x: 'hidden',
                 y: 'auto',
             },
         },
         Permissions_head: {
             flex: {
                 direction: 'row',
+                wrap: 'wrap',
+                shrink: 0,
             },
             justifyContent: 'space-between',
             alignItems: 'center',
-            margin: {
-                bottom: '0.5rem',
-            },
+            minWidth: 0,
+            gap: '0.5rem',
         },
         Permissions_title: {
             font: {
@@ -37112,11 +40721,17 @@ var $;
                 size: '0.85rem',
             },
         },
+        Permissions_members: {
+            minWidth: 0,
+            maxWidth: '100%',
+        },
         Permissions_member: {
             flex: {
                 direction: 'row',
+                wrap: 'wrap',
             },
             alignItems: 'center',
+            minWidth: 0,
             gap: '0.5rem',
             padding: {
                 top: '0.25rem',
@@ -37127,6 +40742,7 @@ var $;
         },
         Permissions_member_lord: {
             flex: {
+                grow: 1,
                 shrink: 1,
             },
             minWidth: 0,
@@ -37143,10 +40759,11 @@ var $;
                 direction: 'row',
                 wrap: 'wrap',
             },
+            minWidth: 0,
             gap: '0.5rem',
             alignItems: 'center',
             margin: {
-                top: '1rem',
+                top: '0.5rem',
             },
             padding: {
                 top: '0.5rem',
@@ -37165,20 +40782,135 @@ var $;
         Permissions_add_input: {
             flex: {
                 grow: 1,
+                shrink: 1,
             },
             minWidth: '8rem',
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                Head: {
+                    minHeight: '3rem',
+                    padding: {
+                        top: '0.5rem',
+                        bottom: '0.5rem',
+                        left: '0.5rem',
+                        right: '0.5rem',
+                    },
+                },
+                /** Panels stack instead of splitting the screen horizontally */
+                Layout: {
+                    flex: {
+                        direction: 'column',
+                    },
+                },
+                Registry_panel: {
+                    width: '100%',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    maxHeight: '9rem',
+                    border: {
+                        bottom: {
+                            width: '1px',
+                            style: 'solid',
+                            color: $mol_theme.line,
+                        },
+                    },
+                },
+                Sidebar: {
+                    width: '100%',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    maxHeight: '10rem',
+                    border: {
+                        bottom: {
+                            width: '1px',
+                            style: 'solid',
+                            color: $mol_theme.line,
+                        },
+                    },
+                },
+                Main: {
+                    width: '100%',
+                },
+                Graph_panel: {
+                    width: '100%',
+                    padding: {
+                        top: '0.5rem',
+                        bottom: '0.5rem',
+                        left: '0.5rem',
+                        right: '0.5rem',
+                    },
+                },
+                Profile_panel: {
+                    width: '100%',
+                    maxWidth: '100%',
+                    padding: {
+                        top: '0.75rem',
+                        bottom: '0.75rem',
+                        left: '0.75rem',
+                        right: '0.75rem',
+                    },
+                },
+                Permissions_panel: {
+                    width: '100%',
+                    maxWidth: '100%',
+                    padding: {
+                        top: '0.75rem',
+                        bottom: '0.75rem',
+                        left: '0.75rem',
+                        right: '0.75rem',
+                    },
+                },
+                /** Link field, role select and button each take a full row */
+                Permissions_add: {
+                    flex: {
+                        direction: 'column',
+                    },
+                    alignItems: 'stretch',
+                },
+                Permissions_add_input: {
+                    minWidth: 0,
+                },
+            },
         },
     });
     $mol_style_define($bog_wysiwyg_app_registry, {
         flex: {
             direction: 'row',
+            shrink: 0,
         },
         alignItems: 'center',
+        minWidth: 0,
+        maxWidth: '100%',
+        border: {
+            radius: $mol_gap.round,
+        },
         Title_nav: {
+            display: 'block',
             flex: {
                 grow: 1,
+                shrink: 1,
             },
+            minWidth: 0,
             textAlign: 'left',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ':focus-visible': {
+                outline: 'none',
+                box: {
+                    shadow: [
+                        {
+                            inset: true,
+                            x: 0,
+                            y: 0,
+                            blur: 0,
+                            spread: '2px',
+                            color: $mol_theme.focus,
+                        },
+                    ],
+                },
+            },
         },
         '@': {
             'bog_wysiwyg_app_registry_active': {
@@ -37196,13 +40928,40 @@ var $;
     $mol_style_define($bog_wysiwyg_app_page, {
         flex: {
             direction: 'row',
+            shrink: 0,
         },
         alignItems: 'center',
+        minWidth: 0,
+        maxWidth: '100%',
+        border: {
+            radius: $mol_gap.round,
+        },
         Title_nav: {
+            display: 'block',
             flex: {
                 grow: 1,
+                shrink: 1,
             },
+            minWidth: 0,
             textAlign: 'left',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ':focus-visible': {
+                outline: 'none',
+                box: {
+                    shadow: [
+                        {
+                            inset: true,
+                            x: 0,
+                            y: 0,
+                            blur: 0,
+                            spread: '2px',
+                            color: $mol_theme.focus,
+                        },
+                    ],
+                },
+            },
         },
         Rename_trigger: {
             opacity: 0,
@@ -37210,13 +40969,23 @@ var $;
             flex: {
                 shrink: 0,
             },
+            ':focus-visible': {
+                opacity: 1,
+            },
         },
         Title_input: {
             flex: {
                 grow: 1,
+                shrink: 1,
             },
+            minWidth: 0,
         },
         ':hover': {
+            Rename_trigger: {
+                opacity: 1,
+            },
+        },
+        ':focus-within': {
             Rename_trigger: {
                 opacity: 1,
             },
@@ -37230,6 +40999,14 @@ var $;
                     font: {
                         weight: 'bold',
                     },
+                },
+            },
+        },
+        '@media': {
+            '(max-width: 640px)': {
+                /** No hover on touch — the rename pencil has to stay visible */
+                Rename_trigger: {
+                    opacity: 1,
                 },
             },
         },

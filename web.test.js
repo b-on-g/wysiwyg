@@ -106,6 +106,8 @@ var $;
 
 ;
 "use strict";
+/** @jsx $mol_jsx */
+/** @jsxFrag $mol_jsx_frag */
 var $;
 (function ($) {
     $mol_test({
@@ -211,6 +213,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /** Lazy computed lists with native Array interface. $mol_range2_array is mutable but all derived ranges are immutable. */
     function $mol_range2(item = index => index, size = () => Number.POSITIVE_INFINITY) {
         const source = typeof item === 'function' ? new $mol_range2_array() : item;
         if (typeof item !== 'function') {
@@ -259,6 +262,7 @@ var $;
     }
     $.$mol_range2 = $mol_range2;
     class $mol_range2_array extends Array {
+        // Lazy
         concat(...tail) {
             if (tail.length === 0)
                 return this;
@@ -270,6 +274,7 @@ var $;
             }
             return $mol_range2(index => index < this.length ? this[index] : tail[0][index - this.length], () => this.length + tail[0].length);
         }
+        // Lazy
         filter(check, context) {
             const filtered = [];
             let cursor = -1;
@@ -282,13 +287,16 @@ var $;
                 return filtered[index];
             }, () => cursor < this.length ? Number.POSITIVE_INFINITY : filtered.length);
         }
+        // Diligent
         forEach(proceed, context) {
             for (let [key, value] of this.entries())
                 proceed.call(context, value, key, this);
         }
+        // Lazy
         map(proceed, context) {
             return $mol_range2(index => proceed.call(context, this[index], index, this), () => this.length);
         }
+        // Diligent
         reduce(merge, result) {
             let index = 0;
             if (arguments.length === 1) {
@@ -299,12 +307,15 @@ var $;
             }
             return result;
         }
+        // Lazy
         toReversed() {
             return $mol_range2(index => this[this.length - 1 - index], () => this.length);
         }
+        // Lazy
         slice(from = 0, to = this.length) {
             return $mol_range2(index => this[from + index], () => Math.min(to, this.length) - from);
         }
+        // Lazy
         some(check, context) {
             for (let index = 0; index < this.length; ++index) {
                 if (check.call(context, this[index], index, this))
@@ -497,6 +508,7 @@ var $;
 
 ;
 "use strict";
+/** @jsx $mol_jsx */
 var $;
 (function ($) {
     $mol_test({
@@ -558,6 +570,7 @@ var $;
             const obj3_copy = { test: 3, obj2: obj2_copy };
             obj1.obj3 = obj3;
             obj1_copy.obj3 = obj3_copy;
+            // warmup cache
             $mol_assert_not($mol_compare_deep(obj1, {}));
             $mol_assert_not($mol_compare_deep(obj2, {}));
             $mol_assert_not($mol_compare_deep(obj3, {}));
@@ -627,18 +640,34 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Argument must be Truthy
+     * @deprecated use $mol_assert_equal instead
+     */
     function $mol_assert_ok(value) {
         if (value)
             return;
         $mol_fail(new Error(`${value} ≠ true`));
     }
     $.$mol_assert_ok = $mol_assert_ok;
+    /**
+     * Argument must be Falsy
+     * @deprecated use $mol_assert_equal instead
+     */
     function $mol_assert_not(value) {
         if (!value)
             return;
         $mol_fail(new Error(`${value} ≠ false`));
     }
     $.$mol_assert_not = $mol_assert_not;
+    /**
+     * Handler must throw an error.
+     * @example
+     * $mol_assert_fail( ()=>{ throw new Error( 'Parse error' ) } ) // Passes because throws error
+     * $mol_assert_fail( ()=>{ throw new Error( 'Parse error' ) } , 'Parse error' ) // Passes because throws right message
+     * $mol_assert_fail( ()=>{ throw new Error( 'Parse error' ) } , Error ) // Passes because throws right class
+     * @see https://mol.hyoo.ru/#!section=docs/=9q9dv3_fgxjsf
+     */
     function $mol_assert_fail(handler, ErrorRight) {
         const fail = $.$mol_fail;
         try {
@@ -661,10 +690,18 @@ var $;
         $mol_fail(new Error('Not failed', { cause: { expect: ErrorRight } }));
     }
     $.$mol_assert_fail = $mol_assert_fail;
+    /** @deprecated Use $mol_assert_equal */
     function $mol_assert_like(...args) {
         $mol_assert_equal(...args);
     }
     $.$mol_assert_like = $mol_assert_like;
+    /**
+     * All arguments must not be structural equal to each other.
+     * @example
+     * $mol_assert_unique( 1 , 2 , 3 ) // Passes
+     * $mol_assert_unique( 1 , 1 , 2 ) // Fails because 1 === 1
+     * @see https://mol.hyoo.ru/#!section=docs/=9q9dv3_fgxjsf
+     */
     function $mol_assert_unique(...args) {
         for (let i = 0; i < args.length; ++i) {
             for (let j = 0; j < args.length; ++j) {
@@ -677,6 +714,13 @@ var $;
         }
     }
     $.$mol_assert_unique = $mol_assert_unique;
+    /**
+     * All arguments must be structural equal each other.
+     * @example
+     * $mol_assert_like( [1] , [1] , [1] ) // Passes
+     * $mol_assert_like( [1] , [1] , [2] ) // Fails because 1 !== 2
+     * @see https://mol.hyoo.ru/#!section=docs/=9q9dv3_fgxjsf
+     */
     function $mol_assert_equal(...args) {
         for (let i = 1; i < args.length; ++i) {
             if ($mol_compare_deep(args[0], args[i]))
@@ -724,6 +768,9 @@ var $;
         },
     });
 })($ || ($ = {}));
+
+;
+"use strict";
 
 ;
 "use strict";
@@ -893,6 +940,7 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /// @todo right orderinng
     $.$mol_after_mock_queue = [];
     function $mol_after_mock_warp() {
         const queue = $.$mol_after_mock_queue.splice(0);
@@ -1196,6 +1244,7 @@ var $;
 var $;
 (function ($_1) {
     $mol_test({
+        // https://github.com/nin-jin/slides/tree/master/reactivity#component-states
         'Cached channel'($) {
             class App extends $mol_object2 {
                 static $ = $;
@@ -1253,6 +1302,7 @@ var $;
             $mol_assert_equal(App.value(5), 21);
             $mol_assert_equal(App.value(), 21);
         },
+        // https://github.com/nin-jin/slides/tree/master/reactivity#wish-consistency
         'Auto recalculation of cached values'($) {
             class App extends $mol_object2 {
                 static $ = $;
@@ -1280,6 +1330,7 @@ var $;
             App.xxx(5);
             $mol_assert_equal(App.zzz(), 7);
         },
+        // https://github.com/nin-jin/slides/tree/master/reactivity#wish-reasonability
         'Skip recalculation when actually no dependency changes'($) {
             const log = [];
             class App extends $mol_object2 {
@@ -1313,6 +1364,7 @@ var $;
             App.zzz();
             $mol_assert_like(log, ['zzz', 'yyy', 'xxx', 'xxx', 'yyy']);
         },
+        // https://github.com/nin-jin/slides/tree/master/reactivity#flow-auto
         'Flow: Auto'($) {
             class App extends $mol_object2 {
                 static get $() { return $; }
@@ -1350,6 +1402,7 @@ var $;
             $mol_assert_equal(App.result(), 23);
             $mol_assert_equal(App.counter, 4);
         },
+        // https://github.com/nin-jin/slides/tree/master/reactivity#dupes-equality
         'Dupes: Equality'($) {
             let counter = 0;
             class App extends $mol_object2 {
@@ -1373,6 +1426,7 @@ var $;
             App.foo({ numbs: [2] });
             $mol_assert_like(App.bar(), { numbs: [2], count: 2 });
         },
+        // https://github.com/nin-jin/slides/tree/master/reactivity#cycle-fail
         'Cycle: Fail'($) {
             class App extends $mol_object2 {
                 static $ = $;
@@ -1397,6 +1451,29 @@ var $;
             ], App, "test", null);
             App.test();
         },
+        // https://github.com/nin-jin/slides/tree/master/reactivity#wish-stability
+        // 'Update deps on push'( $ ) {
+        // 	class App extends $mol_object2 {
+        // 		static $ = $
+        // 		@ $mol_wire_solo
+        // 		static left( next = false ) {
+        // 			return next
+        // 		}
+        // 		@ $mol_wire_solo
+        // 		static right( next = false ) {
+        // 			return next
+        // 		}
+        // 		@ $mol_wire_solo
+        // 		static res( next?: boolean ) {
+        // 			return this.left( next ) && this.right()
+        // 		}
+        // 	}
+        // 	$mol_assert_equal( App.res(), false )
+        // 	$mol_assert_equal( App.res( true ), false )
+        // 	$mol_assert_equal( App.right( true ), true )
+        // 	$mol_assert_equal( App.res(), true )
+        // } ,
+        // https://github.com/nin-jin/slides/tree/master/reactivity#wish-stability
         'Different order of pull and push'($) {
             class App extends $mol_object2 {
                 static $ = $;
@@ -1408,7 +1485,7 @@ var $;
                 }
                 static slow(next) {
                     if (next !== undefined)
-                        this.slow();
+                        this.slow(); // enforce pull before push
                     return this.store(next);
                 }
             }
@@ -1427,6 +1504,7 @@ var $;
             App.store(777);
             $mol_assert_equal(App.fast(), App.slow(), 777);
         },
+        // https://github.com/nin-jin/slides/tree/master/reactivity#wish-stability
         'Actions inside invariant'($) {
             class App extends $mol_object2 {
                 static $ = $;
@@ -1466,6 +1544,7 @@ var $;
                 static toggle() {
                     const prev = this.checked();
                     $mol_assert_unique(this.checked(!prev), prev);
+                    // $mol_assert_equal( this.checked() , prev )
                 }
                 static res() {
                     return this.checked();
@@ -1490,6 +1569,39 @@ var $;
             ], App, "test", null);
             await $mol_wire_async(App).test();
         },
+        // // https://github.com/nin-jin/slides/tree/master/reactivity#wish-stability
+        // 'Stable order of multiple root'( $ ) {
+        // 	class App extends $mol_object2 {
+        // 		static $ = $
+        // 		static counter = 0
+        // 		@ $mol_wire_solo
+        // 		static left_trigger( next = 0 ) {
+        // 			return next
+        // 		}
+        // 		@ $mol_wire_solo
+        // 		static left_root() {
+        // 			this.left_trigger()
+        // 			return ++ this.counter
+        // 		}
+        // 		@ $mol_wire_solo
+        // 		static right_trigger( next = 0 ) {
+        // 			return next
+        // 		}
+        // 		@ $mol_wire_solo
+        // 		static right_root() {
+        // 			this.right_trigger()
+        // 			return ++ this.counter
+        // 		}
+        // 	}
+        // 	$mol_assert_equal( App.left_root(), 1 )
+        // 	$mol_assert_equal( App.right_root(), 2 )
+        // 	App.right_trigger( 1 )
+        // 	App.left_trigger( 1 )
+        // 	$mol_wire_fiber.sync()
+        // 	$mol_assert_equal( App.right_root(), 4 )
+        // 	$mol_assert_equal( App.left_root(), 3 )
+        // } ,
+        // https://github.com/nin-jin/slides/tree/master/reactivity#error-store
         'Restore after error'($) {
             class App extends $mol_object2 {
                 static get $() { return $; }
@@ -1587,6 +1699,7 @@ var $;
             App.showing(true);
             $mol_assert_unique(App.render(), details);
         },
+        // https://github.com/nin-jin/slides/tree/master/reactivity#wish-stability
         async 'Hold pubs while wait async task'($) {
             class App extends $mol_object2 {
                 static $ = $;
@@ -1802,180 +1915,7 @@ var $;
 
 ;
 "use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'local get set delete'() {
-            var key = '$mol_state_local_test:' + Math.random();
-            $mol_assert_equal($mol_state_local.value(key), null);
-            $mol_state_local.value(key, 123);
-            $mol_assert_equal($mol_state_local.value(key), 123);
-            $mol_state_local.value(key, null);
-            $mol_assert_equal($mol_state_local.value(key), null);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test_mocks.push(context => {
-        class $mol_state_local_mock extends $mol_state_local {
-            static state = {};
-            static value(key, next = this.state[key]) {
-                return this.state[key] = (next || null);
-            }
-        }
-        __decorate([
-            $mol_mem_key
-        ], $mol_state_local_mock, "value", null);
-        context.$mol_state_local = $mol_state_local_mock;
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'const returns stored value'() {
-            const foo = { bar: $mol_const(Math.random()) };
-            $mol_assert_equal(foo.bar(), foo.bar());
-            $mol_assert_equal(foo.bar(), foo.bar['()']);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'return result without errors'() {
-            $mol_assert_equal($mol_try(() => false), false);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    $mol_test_mocks.push($ => $.$mol_fail_log = () => false);
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    class TestClass extends Uint8Array {
-    }
-    $mol_test({
-        'Uint8Array vs itself'() {
-            $mol_assert_ok($mol_compare_array(new Uint8Array, new Uint8Array));
-            $mol_assert_ok($mol_compare_array(new Uint8Array([0]), new Uint8Array([0])));
-            $mol_assert_not($mol_compare_array(new Uint8Array([0]), new Uint8Array([1])));
-        },
-        'Uint8Array vs subclassed array'() {
-            $mol_assert_not($mol_compare_array(new Uint8Array, new TestClass));
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'decode utf8 string'() {
-            const str = 'Hello, ΧΨΩЫ';
-            const encoded = new Uint8Array([72, 101, 108, 108, 111, 44, 32, 206, 167, 206, 168, 206, 169, 208, 171]);
-            $mol_assert_equal($mol_charset_decode(encoded), str);
-            $mol_assert_equal($mol_charset_decode(encoded, 'utf8'), str);
-        },
-        'decode empty string'() {
-            const encoded = new Uint8Array([]);
-            $mol_assert_equal($mol_charset_decode(encoded), '');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'encode empty'() {
-            $mol_assert_equal($mol_charset_encode(''), new Uint8Array([]));
-        },
-        'encode 1 octet'() {
-            $mol_assert_equal($mol_charset_encode('F'), new Uint8Array([0x46]));
-        },
-        'encode 2 octet'() {
-            $mol_assert_equal($mol_charset_encode('Б'), new Uint8Array([0xd0, 0x91]));
-        },
-        'encode 3 octet'() {
-            $mol_assert_equal($mol_charset_encode('ह'), new Uint8Array([0xe0, 0xa4, 0xb9]));
-        },
-        'encode 4 octet'() {
-            $mol_assert_equal($mol_charset_encode('𐍈'), new Uint8Array([0xf0, 0x90, 0x8d, 0x88]));
-        },
-        'encode surrogate pair'() {
-            $mol_assert_equal($mol_charset_encode('😀'), new Uint8Array([0xf0, 0x9f, 0x98, 0x80]));
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'auto name'() {
-            class Invalid extends $mol_error_mix {
-            }
-            const mix = new Invalid('foo');
-            $mol_assert_equal(mix.name, 'Invalid_Error');
-        },
-        'simpe mix'() {
-            const mix = new $mol_error_mix('foo', {}, new Error('bar'), new Error('lol'));
-            $mol_assert_equal(mix.message, 'foo');
-            $mol_assert_equal(mix.errors.map(e => e.message), ['bar', 'lol']);
-        },
-        'provide additional info'() {
-            class Invalid extends $mol_error_mix {
-            }
-            const mix = new $mol_error_mix('Wrong password', {}, new Invalid('Too short', { value: 'p@ssw0rd', hint: '> 8 letters' }), new Invalid('Too simple', { value: 'p@ssw0rd', hint: 'need capital letter' }));
-            const hints = [];
-            if (mix instanceof $mol_error_mix) {
-                for (const er of mix.errors) {
-                    if (er instanceof Invalid) {
-                        hints.push(er.cause?.hint ?? '');
-                    }
-                }
-            }
-            $mol_assert_equal(hints, ['> 8 letters', 'need capital letter']);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            async "Get and parse"($) {
-                $mol_assert_equal(await $mol_wire_async($mol_fetch).text('data:text/plain,foo'), 'foo');
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
+/** @jsx $mol_jsx */
 var $;
 (function ($) {
     $mol_test({
@@ -2057,6 +1997,31 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    $mol_test({
+        'return result without errors'() {
+            $mol_assert_equal($mol_try(() => false), false);
+        },
+        //'return error if thrown'() {
+        //	
+        //	const error = new Error( '$mol_try test error' )
+        //	$mol_assert_equal( $mol_try( ()=> { throw error } ) , error )
+        //	
+        //} ,
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test_mocks.push($ => $.$mol_fail_log = () => false);
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    /** Watch and logs reactive states. Logger automatically added to test bundle which is adding to `test.html`. */
     class $mol_wire_log extends $mol_object2 {
         static watch(task) {
             return task;
@@ -2124,27 +2089,6 @@ var $;
 var $;
 (function ($) {
     $mol_wire_log.active();
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    $mol_test_mocks.push($ => {
-        class $mol_locale_mock extends $mol_locale {
-            lang(next = 'en') { return next; }
-            static source(lang) {
-                return {};
-            }
-        }
-        __decorate([
-            $mol_mem
-        ], $mol_locale_mock.prototype, "lang", null);
-        __decorate([
-            $mol_mem_key
-        ], $mol_locale_mock, "source", null);
-        $.$mol_locale = $mol_locale_mock;
-    });
 })($ || ($ = {}));
 
 ;
@@ -2309,6 +2253,22 @@ var $;
 ;
 "use strict";
 var $;
+(function ($) {
+    $mol_test({
+        'const returns stored value'() {
+            const foo = { bar: $mol_const(Math.random()) };
+            $mol_assert_equal(foo.bar(), foo.bar());
+            $mol_assert_equal(foo.bar(), foo.bar['()']);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+
+;
+"use strict";
+var $;
 (function ($_1) {
     $mol_test({
         'id auto generation'($) {
@@ -2416,6 +2376,132 @@ var $;
 
 ;
 "use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'local get set delete'() {
+            var key = '$mol_state_local_test:' + Math.random();
+            $mol_assert_equal($mol_state_local.value(key), null);
+            $mol_state_local.value(key, 123);
+            $mol_assert_equal($mol_state_local.value(key), 123);
+            $mol_state_local.value(key, null);
+            $mol_assert_equal($mol_state_local.value(key), null);
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test_mocks.push(context => {
+        class $mol_state_local_mock extends $mol_state_local {
+            static state = {};
+            static value(key, next = this.state[key]) {
+                return this.state[key] = (next || null);
+            }
+        }
+        __decorate([
+            $mol_mem_key
+        ], $mol_state_local_mock, "value", null);
+        context.$mol_state_local = $mol_state_local_mock;
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    class TestClass extends Uint8Array {
+    }
+    $mol_test({
+        'Uint8Array vs itself'() {
+            $mol_assert_ok($mol_compare_array(new Uint8Array, new Uint8Array));
+            $mol_assert_ok($mol_compare_array(new Uint8Array([0]), new Uint8Array([0])));
+            $mol_assert_not($mol_compare_array(new Uint8Array([0]), new Uint8Array([1])));
+        },
+        'Uint8Array vs subclassed array'() {
+            $mol_assert_not($mol_compare_array(new Uint8Array, new TestClass));
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'decode utf8 string'() {
+            const str = 'Hello, ΧΨΩЫ';
+            const encoded = new Uint8Array([72, 101, 108, 108, 111, 44, 32, 206, 167, 206, 168, 206, 169, 208, 171]);
+            $mol_assert_equal($mol_charset_decode(encoded), str);
+            $mol_assert_equal($mol_charset_decode(encoded, 'utf8'), str);
+        },
+        'decode empty string'() {
+            const encoded = new Uint8Array([]);
+            $mol_assert_equal($mol_charset_decode(encoded), '');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'encode empty'() {
+            $mol_assert_equal($mol_charset_encode(''), new Uint8Array([]));
+        },
+        'encode 1 octet'() {
+            $mol_assert_equal($mol_charset_encode('F'), new Uint8Array([0x46]));
+        },
+        'encode 2 octet'() {
+            $mol_assert_equal($mol_charset_encode('Б'), new Uint8Array([0xd0, 0x91]));
+        },
+        'encode 3 octet'() {
+            $mol_assert_equal($mol_charset_encode('ह'), new Uint8Array([0xe0, 0xa4, 0xb9]));
+        },
+        'encode 4 octet'() {
+            $mol_assert_equal($mol_charset_encode('𐍈'), new Uint8Array([0xf0, 0x90, 0x8d, 0x88]));
+        },
+        'encode surrogate pair'() {
+            $mol_assert_equal($mol_charset_encode('😀'), new Uint8Array([0xf0, 0x9f, 0x98, 0x80]));
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'auto name'() {
+            class Invalid extends $mol_error_mix {
+            }
+            const mix = new Invalid('foo');
+            $mol_assert_equal(mix.name, 'Invalid_Error');
+        },
+        'simpe mix'() {
+            const mix = new $mol_error_mix('foo', {}, new Error('bar'), new Error('lol'));
+            $mol_assert_equal(mix.message, 'foo');
+            $mol_assert_equal(mix.errors.map(e => e.message), ['bar', 'lol']);
+        },
+        'provide additional info'() {
+            class Invalid extends $mol_error_mix {
+            }
+            const mix = new $mol_error_mix('Wrong password', {}, new Invalid('Too short', { value: 'p@ssw0rd', hint: '> 8 letters' }), new Invalid('Too simple', { value: 'p@ssw0rd', hint: 'need capital letter' }));
+            const hints = [];
+            if (mix instanceof $mol_error_mix) {
+                for (const er of mix.errors) {
+                    if (er instanceof Invalid) {
+                        hints.push(er.cause?.hint ?? '');
+                    }
+                }
+            }
+            $mol_assert_equal(hints, ['> 8 letters', 'need capital letter']);
+        },
+    });
+})($ || ($ = {}));
 
 ;
 "use strict";
@@ -2424,44 +2510,36 @@ var $;
     var $$;
     (function ($$) {
         $mol_test({
-            'handle clicks by default'($) {
-                let clicked = false;
-                const clicker = $mol_button.make({
-                    $,
-                    click: (event) => { clicked = true; },
-                });
-                const element = clicker.dom_tree();
-                const event = $mol_dom_context.document.createEvent('mouseevent');
-                event.initEvent('click', true, true);
-                element.dispatchEvent(event);
-                $mol_assert_ok(clicked);
-            },
-            'no handle clicks if disabled'($) {
-                let clicked = false;
-                const clicker = $mol_button.make({
-                    $,
-                    click: (event) => { clicked = true; },
-                    enabled: () => false,
-                });
-                const element = clicker.dom_tree();
-                const event = $mol_dom_context.document.createEvent('mouseevent');
-                event.initEvent('click', true, true);
-                element.dispatchEvent(event);
-                $mol_assert_not(clicked);
-            },
-            async 'Store error'($) {
-                const clicker = $mol_button.make({
-                    $,
-                    click: (event) => $.$mol_fail(new Error('Test error')),
-                });
-                const event = $mol_dom_context.document.createEvent('mouseevent');
-                $mol_assert_fail(() => clicker.event_activate(event), 'Test error');
-                await Promise.resolve();
-                $mol_assert_equal(clicker.status()[0].message, 'Test error');
+            async "Get and parse"($) {
+                $mol_assert_equal(await $mol_wire_async($mol_fetch).text('data:text/plain,foo'), 'foo');
             },
         });
     })($$ = $_1.$$ || ($_1.$$ = {}));
 })($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test_mocks.push($ => {
+        class $mol_locale_mock extends $mol_locale {
+            lang(next = 'en') { return next; }
+            static source(lang) {
+                return {};
+            }
+        }
+        __decorate([
+            $mol_mem
+        ], $mol_locale_mock.prototype, "lang", null);
+        __decorate([
+            $mol_mem_key
+        ], $mol_locale_mock, "source", null);
+        $.$mol_locale = $mol_locale_mock;
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
 
 ;
 "use strict";
@@ -2750,107 +2828,7 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
-        const locale_en = {
-            '$bog_wysiwyg_menu_command_paragraph': 'Text',
-            '$bog_wysiwyg_menu_command_heading1': 'Heading 1',
-            '$bog_wysiwyg_menu_command_heading2': 'Heading 2',
-            '$bog_wysiwyg_menu_command_heading3': 'Heading 3',
-            '$bog_wysiwyg_menu_command_code': 'Code',
-            '$bog_wysiwyg_menu_command_quote': 'Quote',
-            '$bog_wysiwyg_menu_command_list': 'List',
-            '$bog_wysiwyg_menu_command_divider': 'Divider',
-            '$bog_wysiwyg_menu_command_image': 'Image',
-        };
-        function menu_make() {
-            $mol_locale.texts('en', locale_en);
-            return new $bog_wysiwyg_menu();
-        }
-        $mol_test({
-            'Menu commands returns builtin commands'() {
-                const menu = menu_make();
-                const cmds = menu.commands();
-                $mol_assert_ok(cmds.length >= 9);
-                $mol_assert_equal(cmds[0].id, 'paragraph');
-                $mol_assert_equal(cmds[1].id, 'heading1');
-                $mol_assert_equal(cmds[2].id, 'heading2');
-                $mol_assert_equal(cmds[3].id, 'heading3');
-                $mol_assert_equal(cmds[4].id, 'code');
-                $mol_assert_equal(cmds[5].id, 'quote');
-                $mol_assert_equal(cmds[6].id, 'list');
-                $mol_assert_equal(cmds[7].id, 'divider');
-                $mol_assert_equal(cmds[8].id, 'image');
-            },
-            'Menu option_rows returns views matching commands length'() {
-                const menu = menu_make();
-                const rows = menu.option_rows();
-                $mol_assert_equal(rows.length, menu.commands().length);
-            },
-            'Menu option_title returns title for known command id'() {
-                const menu = menu_make();
-                const title = menu.option_title('paragraph');
-                $mol_assert_ok(title.length > 0);
-            },
-            'Menu option_title returns empty string for unknown id'() {
-                const menu = menu_make();
-                const title = menu.option_title('nonexistent');
-                $mol_assert_equal(title, '');
-            },
-            'Menu option_active returns true when index matches'() {
-                const menu = menu_make();
-                menu.index(0);
-                const first_id = menu.commands()[0].id;
-                $mol_assert_equal(menu.option_active(first_id), true);
-            },
-            'Menu option_active returns false for non-matching id'() {
-                const menu = menu_make();
-                menu.index(0);
-                $mol_assert_equal(menu.option_active('nonexistent'), false);
-            },
-            'Menu option_active tracks index changes'() {
-                const menu = menu_make();
-                menu.index(2);
-                const cmd = menu.commands()[2];
-                $mol_assert_equal(menu.option_active(cmd.id), true);
-                $mol_assert_equal(menu.option_active(menu.commands()[0].id), false);
-            },
-            'Menu option_click calls picked and hides menu'() {
-                const menu = menu_make();
-                menu.showed(true);
-                let picked_val = '';
-                menu.picked = (next) => {
-                    if (next !== undefined)
-                        picked_val = next;
-                    return picked_val;
-                };
-                const event = { type: 'click' };
-                menu.option_click('heading1', event);
-                $mol_assert_equal(picked_val, 'heading1');
-                $mol_assert_equal(menu.showed(), false);
-            },
-            'Menu option_click without event returns null'() {
-                const menu = menu_make();
-                $mol_assert_equal(menu.option_click('paragraph'), null);
-            },
-            'Menu pos_y_str returns pixel string'() {
-                const menu = menu_make();
-                menu.pos_y(200);
-                $mol_assert_equal(menu.pos_y_str(), '200px');
-            },
-            'Menu pos_x_str returns pixel string'() {
-                const menu = menu_make();
-                menu.pos_x(350);
-                $mol_assert_equal(menu.pos_x_str(), '350px');
-            },
-        });
-    })($$ = $.$$ || ($.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    var $$;
-    (function ($$) {
+        /** Helper: create a contenteditable div with text, place cursor at end, run try_markdown */
         function apply_markdown(input) {
             const doc = $mol_dom_context.document;
             const div = doc.createElement('div');
@@ -2881,7 +2859,7 @@ var $;
             doc.body.appendChild(div);
             div.focus();
             if (select_text) {
-                const walker = doc.createTreeWalker(div, 4);
+                const walker = doc.createTreeWalker(div, 4 /* NodeFilter.SHOW_TEXT */);
                 let node;
                 while (node = walker.nextNode()) {
                     const idx = (node.textContent ?? '').indexOf(select_text);
@@ -2898,7 +2876,472 @@ var $;
             }
             return div;
         }
+        /** Editable node plus a block view bound to it */
+        function make_block(html) {
+            const doc = $mol_dom_context.document;
+            const node = doc.createElement('div');
+            node.contentEditable = 'true';
+            // jsdom only tracks activeElement for focusable areas
+            node.tabIndex = 0;
+            node.innerHTML = html;
+            doc.body.appendChild(node);
+            const block = new $bog_wysiwyg_block();
+            block.dom_node = () => node;
+            block.html = (next) => next ?? node.innerHTML;
+            const calls = [];
+            for (const name of ['on_enter', 'on_remove', 'on_split', 'on_merge_prev', 'on_merge_next', 'on_nav', 'on_input', 'on_slash']) {
+                block[name] = (arg) => {
+                    calls.push({ name, arg });
+                    return arg ?? null;
+                };
+            }
+            return { block, node, calls, drop: () => node.remove() };
+        }
+        function set_caret(node, offset) {
+            const doc = $mol_dom_context.document;
+            const point = $bog_wysiwyg_point_at(node, offset);
+            const range = doc.createRange();
+            range.setStart(point.node, point.offset);
+            range.collapse(true);
+            const sel = doc.defaultView.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        function set_range(node, from, to) {
+            const doc = $mol_dom_context.document;
+            const start = $bog_wysiwyg_point_at(node, from);
+            const end = $bog_wysiwyg_point_at(node, to);
+            const range = doc.createRange();
+            range.setStart(start.node, start.offset);
+            range.setEnd(end.node, end.offset);
+            const sel = doc.defaultView.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        function key(name, mods = {}) {
+            return new KeyboardEvent('keydown', { key: name, cancelable: true, ...mods });
+        }
         $mol_test({
+            // === Text offsets ===
+            'point_at walks through nested inline tags'() {
+                const { node, drop } = make_block('ab<b>cd</b>ef');
+                try {
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 0).offset, 0);
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 3).node.data, 'cd');
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 3).offset, 1);
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 6).node.data, 'ef');
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 6).offset, 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'point_at clamps beyond the end'() {
+                const { node, drop } = make_block('abc');
+                try {
+                    $mol_assert_equal($bog_wysiwyg_point_at(node, 100).offset, 3);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'offset_of is inverse of point_at'() {
+                const { node, drop } = make_block('ab<b>cd</b>ef');
+                try {
+                    for (let i = 0; i <= 6; i++) {
+                        const point = $bog_wysiwyg_point_at(node, i);
+                        $mol_assert_equal($bog_wysiwyg_offset_of(node, point.node, point.offset), i);
+                    }
+                }
+                finally {
+                    drop();
+                }
+            },
+            'offset_of rejects a node outside the block'() {
+                const { node, drop } = make_block('abc');
+                const other = $mol_dom_context.document.createElement('div');
+                try {
+                    $mol_assert_equal($bog_wysiwyg_offset_of(node, other, 0), -1);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'html_text strips markup'() {
+                $mol_assert_equal($bog_wysiwyg_html_text($mol_dom_context.document, 'a<b>b</b><i>c</i>'), 'abc');
+            },
+            'escape_html protects angle brackets'() {
+                $mol_assert_equal($bog_wysiwyg_escape_html('<&>'), '&lt;&amp;&gt;');
+            },
+            // === Caret ===
+            'caret_offset counts through inline tags'() {
+                const { block, node, drop } = make_block('ab<b>cd</b>ef');
+                try {
+                    set_caret(node, 5);
+                    $mol_assert_equal(block.caret_offset(), 5);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'caret_offset is -1 when the caret is in another block'() {
+                const one = make_block('first');
+                const two = make_block('second');
+                try {
+                    set_caret(two.node, 2);
+                    $mol_assert_equal(one.block.caret_offset(), -1);
+                }
+                finally {
+                    one.drop();
+                    two.drop();
+                }
+            },
+            'caret survives an innerHTML rewrite'() {
+                const { block, node, drop } = make_block('hello world');
+                try {
+                    set_caret(node, 5);
+                    const offset = block.caret_offset();
+                    // Nodes are recreated, the old Range would be lost
+                    node.innerHTML = 'hello <b>world</b>';
+                    block.caret_place(offset);
+                    $mol_assert_equal(block.caret_offset(), 5);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'auto keeps the caret when the focused block is resynced'() {
+                const { block, node, drop } = make_block('hello world');
+                try {
+                    node.focus();
+                    set_caret(node, 5);
+                    block.html = (next) => next ?? 'hello <b>world</b>';
+                    block.auto();
+                    $mol_assert_equal(node.innerHTML, 'hello <b>world</b>');
+                    $mol_assert_equal(block.caret_offset(), 5);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'auto rewrites an unfocused block without touching the selection'() {
+                const { block, node, drop } = make_block('old');
+                const other = make_block('elsewhere');
+                try {
+                    set_caret(other.node, 3);
+                    block.html = (next) => next ?? 'new';
+                    block.auto();
+                    $mol_assert_equal(node.innerHTML, 'new');
+                    $mol_assert_equal(other.block.caret_offset(), 3);
+                }
+                finally {
+                    drop();
+                    other.drop();
+                }
+            },
+            'focus_at clamps the offset to the text length'() {
+                const { block, node, drop } = make_block('abc');
+                try {
+                    block.focus_at(100);
+                    $mol_assert_equal(block.caret_offset(), 3);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Splitting content ===
+            'html_before and html_after keep markup'() {
+                const { block, drop } = make_block('ab<b>cdef</b>gh');
+                try {
+                    $mol_assert_equal(block.html_before(4), 'ab<b>cd</b>');
+                    $mol_assert_equal(block.html_after(4), '<b>ef</b>gh');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'html_before at zero is empty and html_after at zero is everything'() {
+                const { block, drop } = make_block('a<i>b</i>');
+                try {
+                    $mol_assert_equal(block.html_before(0), '');
+                    $mol_assert_equal(block.html_after(0), 'a<i>b</i>');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter in the middle asks the page to split the block'() {
+                const { block, node, calls, drop } = make_block('hello world');
+                try {
+                    set_caret(node, 5);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls.length, 1);
+                    $mol_assert_equal(calls[0].name, 'on_split');
+                    $mol_assert_equal(calls[0].arg, { head: 'hello', tail: ' world' });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter at the end appends a fresh block'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 5);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls.length, 1);
+                    $mol_assert_equal(calls[0].name, 'on_enter');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter at the start pushes the whole text into a new block'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 0);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls[0].name, 'on_split');
+                    $mol_assert_equal(calls[0].arg, { head: '', tail: 'hello' });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter on an empty block appends a fresh block'() {
+                const { block, node, calls, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls[0].name, 'on_enter');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Enter over a selection inside the block wipes it and splits there'() {
+                const { block, node, calls, drop } = make_block('hello world');
+                try {
+                    set_range(node, 5, 8);
+                    block.keydown_event(key('Enter'));
+                    $mol_assert_equal(calls[0].name, 'on_split');
+                    $mol_assert_equal(calls[0].arg, { head: 'hello', tail: 'rld' });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'delete_range drops the selected content and keeps the caret'() {
+                const { block, node, drop } = make_block('hello world');
+                try {
+                    set_range(node, 5, 8);
+                    $mol_assert_equal(block.delete_range(), true);
+                    $mol_assert_equal(node.textContent, 'hellorld');
+                    $mol_assert_equal(block.caret_offset(), 5);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'delete_range refuses a selection reaching outside the block'() {
+                const one = make_block('first');
+                const two = make_block('second');
+                try {
+                    const doc = $mol_dom_context.document;
+                    const range = doc.createRange();
+                    range.setStart(one.node.firstChild, 1);
+                    range.setEnd(two.node.firstChild, 1);
+                    const sel = doc.defaultView.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    $mol_assert_equal(one.block.delete_range(), false);
+                    $mol_assert_equal(one.node.textContent, 'first');
+                }
+                finally {
+                    one.drop();
+                    two.drop();
+                }
+            },
+            'Shift+Enter is left to the browser'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 2);
+                    const event = key('Enter', { shiftKey: true });
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls.length, 0);
+                    $mol_assert_equal(event.defaultPrevented, false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Block boundaries ===
+            'Backspace at the start of a filled block asks to merge with the previous'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 0);
+                    const event = key('Backspace');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls[0].name, 'on_merge_prev');
+                    $mol_assert_equal(event.defaultPrevented, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Backspace in the middle is left to the browser'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 3);
+                    const event = key('Backspace');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls.length, 0);
+                    $mol_assert_equal(event.defaultPrevented, false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Backspace on an empty block still removes it'() {
+                const { block, node, calls, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    block.keydown_event(key('Backspace'));
+                    $mol_assert_equal(calls[0].name, 'on_remove');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Backspace over a selection is left to the browser'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_range(node, 0, 3);
+                    block.keydown_event(key('Backspace'));
+                    $mol_assert_equal(calls.length, 0);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Delete at the end asks to pull the next block in'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 5);
+                    const event = key('Delete');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls[0].name, 'on_merge_next');
+                    $mol_assert_equal(event.defaultPrevented, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Delete in the middle is left to the browser'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 2);
+                    const event = key('Delete');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls.length, 0);
+                    $mol_assert_equal(event.defaultPrevented, false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Vertical navigation ===
+            'caret_lines reports both edges without a layout engine'() {
+                const { block, node, drop } = make_block('hello');
+                try {
+                    set_caret(node, 2);
+                    const lines = block.caret_lines();
+                    $mol_assert_equal(lines.first, true);
+                    $mol_assert_equal(lines.last, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'caret_lines reports both edges for an empty block'() {
+                const { block, node, drop } = make_block('');
+                try {
+                    set_caret(node, 0);
+                    $mol_assert_equal(block.caret_lines(), { first: true, last: true });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'ArrowUp on the first line asks to step up'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 3);
+                    const event = key('ArrowUp');
+                    block.keydown_event(event);
+                    $mol_assert_equal(calls[0].name, 'on_nav');
+                    $mol_assert_equal(calls[0].arg, { dir: 'up', x: 0, offset: 3 });
+                    $mol_assert_equal(event.defaultPrevented, true);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'ArrowDown on the last line asks to step down'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 1);
+                    block.keydown_event(key('ArrowDown'));
+                    $mol_assert_equal(calls[0].name, 'on_nav');
+                    $mol_assert_equal(calls[0].arg, { dir: 'down', x: 0, offset: 1 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Shift+ArrowUp extends the selection instead of stepping'() {
+                const { block, node, calls, drop } = make_block('hello');
+                try {
+                    set_caret(node, 3);
+                    block.keydown_event(key('ArrowUp', { shiftKey: true }));
+                    $mol_assert_equal(calls.length, 0);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'focus_column falls back to the text offset without a layout engine'() {
+                const { block, node, drop } = make_block('hello world');
+                try {
+                    block.focus_column(0, 4, true);
+                    $mol_assert_equal(block.caret_offset(), 4);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'focus_column clamps the offset to a shorter block'() {
+                const { block, node, drop } = make_block('ab');
+                try {
+                    block.focus_column(0, 9, false);
+                    $mol_assert_equal(block.caret_offset(), 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Input notification ===
+            'input_event notifies the page'() {
+                const { block, node, calls, drop } = make_block('hi');
+                try {
+                    const event = new Event('input');
+                    Object.defineProperty(event, 'target', { value: node });
+                    block.input_event(event);
+                    $mol_assert_equal(calls.some(call => call.name === 'on_input'), true);
+                }
+                finally {
+                    drop();
+                }
+            },
             'bold markdown converts to HTML'() {
                 $mol_assert_equal(apply_markdown('hello **world** end'), 'hello <b>world</b> end');
             },
@@ -2936,6 +3379,7 @@ var $;
                 $mol_assert_equal(result, '<b>bold text</b> end');
             },
             'multiple patterns in one block: only first converts per pass'() {
+                // First pass converts the first match
                 const first = apply_markdown('**bold** and *italic*');
                 $mol_assert_equal(first, '<b>bold</b> and *italic*');
             },
@@ -3039,6 +3483,7 @@ var $;
                 const div = make_block_with_selection('hello world');
                 try {
                     div.focus();
+                    // Place cursor at end without selecting
                     const sel = $mol_dom_context.document.defaultView.getSelection();
                     const range = $mol_dom_context.document.createRange();
                     range.selectNodeContents(div);
@@ -3060,6 +3505,7 @@ var $;
                     div.remove();
                 }
             },
+            // === Image block ===
             'paste_event without event returns null'() {
                 const block = new $bog_wysiwyg_block();
                 $mol_assert_equal(block.paste_event(), null);
@@ -3112,6 +3558,7 @@ var $;
                 block.type = () => 'paragraph';
                 $mol_assert_equal(block.is_image(), false);
             },
+            // === parse_markdown ===
             'parse_markdown: single paragraph'() {
                 const blocks = $bog_wysiwyg_parse_markdown('hello world');
                 $mol_assert_equal(blocks.length, 1);
@@ -3206,6 +3653,153 @@ var $;
                 $mol_assert_equal(blocks.length, 1);
                 $mol_assert_equal(blocks[0].type, 'code');
                 $mol_assert_equal(blocks[0].content, 'code without closing');
+            },
+        });
+    })($$ = $.$$ || ($.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            'handle clicks by default'($) {
+                let clicked = false;
+                const clicker = $mol_button.make({
+                    $,
+                    click: (event) => { clicked = true; },
+                });
+                const element = clicker.dom_tree();
+                const event = $mol_dom_context.document.createEvent('mouseevent');
+                event.initEvent('click', true, true);
+                element.dispatchEvent(event);
+                $mol_assert_ok(clicked);
+            },
+            'no handle clicks if disabled'($) {
+                let clicked = false;
+                const clicker = $mol_button.make({
+                    $,
+                    click: (event) => { clicked = true; },
+                    enabled: () => false,
+                });
+                const element = clicker.dom_tree();
+                const event = $mol_dom_context.document.createEvent('mouseevent');
+                event.initEvent('click', true, true);
+                element.dispatchEvent(event);
+                $mol_assert_not(clicked);
+            },
+            async 'Store error'($) {
+                const clicker = $mol_button.make({
+                    $,
+                    click: (event) => $.$mol_fail(new Error('Test error')),
+                });
+                const event = $mol_dom_context.document.createEvent('mouseevent');
+                $mol_assert_fail(() => clicker.event_activate(event), 'Test error');
+                await Promise.resolve();
+                $mol_assert_equal(clicker.status()[0].message, 'Test error');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    var $$;
+    (function ($$) {
+        const locale_en = {
+            '$bog_wysiwyg_menu_command_paragraph': 'Text',
+            '$bog_wysiwyg_menu_command_heading1': 'Heading 1',
+            '$bog_wysiwyg_menu_command_heading2': 'Heading 2',
+            '$bog_wysiwyg_menu_command_heading3': 'Heading 3',
+            '$bog_wysiwyg_menu_command_code': 'Code',
+            '$bog_wysiwyg_menu_command_quote': 'Quote',
+            '$bog_wysiwyg_menu_command_list': 'List',
+            '$bog_wysiwyg_menu_command_divider': 'Divider',
+            '$bog_wysiwyg_menu_command_image': 'Image',
+        };
+        function menu_make() {
+            $mol_locale.texts('en', locale_en);
+            return new $bog_wysiwyg_menu();
+        }
+        $mol_test({
+            'Menu commands returns builtin commands'() {
+                const menu = menu_make();
+                const cmds = menu.commands();
+                $mol_assert_ok(cmds.length >= 9);
+                $mol_assert_equal(cmds[0].id, 'paragraph');
+                $mol_assert_equal(cmds[1].id, 'heading1');
+                $mol_assert_equal(cmds[2].id, 'heading2');
+                $mol_assert_equal(cmds[3].id, 'heading3');
+                $mol_assert_equal(cmds[4].id, 'code');
+                $mol_assert_equal(cmds[5].id, 'quote');
+                $mol_assert_equal(cmds[6].id, 'list');
+                $mol_assert_equal(cmds[7].id, 'divider');
+                $mol_assert_equal(cmds[8].id, 'image');
+            },
+            'Menu option_rows returns views matching commands length'() {
+                const menu = menu_make();
+                const rows = menu.option_rows();
+                $mol_assert_equal(rows.length, menu.commands().length);
+            },
+            'Menu option_title returns title for known command id'() {
+                const menu = menu_make();
+                const title = menu.option_title('paragraph');
+                $mol_assert_ok(title.length > 0);
+            },
+            'Menu option_title returns empty string for unknown id'() {
+                const menu = menu_make();
+                const title = menu.option_title('nonexistent');
+                $mol_assert_equal(title, '');
+            },
+            'Menu option_active returns true when index matches'() {
+                const menu = menu_make();
+                menu.index(0);
+                const first_id = menu.commands()[0].id;
+                $mol_assert_equal(menu.option_active(first_id), true);
+            },
+            'Menu option_active returns false for non-matching id'() {
+                const menu = menu_make();
+                menu.index(0);
+                $mol_assert_equal(menu.option_active('nonexistent'), false);
+            },
+            'Menu option_active tracks index changes'() {
+                const menu = menu_make();
+                menu.index(2);
+                const cmd = menu.commands()[2];
+                $mol_assert_equal(menu.option_active(cmd.id), true);
+                $mol_assert_equal(menu.option_active(menu.commands()[0].id), false);
+            },
+            'Menu option_click calls picked and hides menu'() {
+                const menu = menu_make();
+                menu.showed(true);
+                let picked_val = '';
+                menu.picked = (next) => {
+                    if (next !== undefined)
+                        picked_val = next;
+                    return picked_val;
+                };
+                const event = { type: 'click' };
+                menu.option_click('heading1', event);
+                $mol_assert_equal(picked_val, 'heading1');
+                $mol_assert_equal(menu.showed(), false);
+            },
+            'Menu option_click without event returns null'() {
+                const menu = menu_make();
+                $mol_assert_equal(menu.option_click('paragraph'), null);
+            },
+            'Menu pos_y_str returns pixel string'() {
+                const menu = menu_make();
+                menu.pos_y(200);
+                $mol_assert_equal(menu.pos_y_str(), '200px');
+            },
+            'Menu pos_x_str returns pixel string'() {
+                const menu = menu_make();
+                menu.pos_x(350);
+                $mol_assert_equal(menu.pos_x_str(), '350px');
             },
         });
     })($$ = $.$$ || ($.$$ = {}));
@@ -3650,6 +4244,117 @@ var $;
             $mol_assert_equal($mol_crypto2_hash(data), new Uint8Array(await $mol_crypto_native.subtle.digest('SHA-1', data)));
         },
     });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Float schema"($) {
+                $mol_assert_equal('$mol_schema_float', $mol_schema_float + '', $mol_key($mol_schema_float));
+                $mol_assert_equal(true, $mol_schema_float.check(0));
+                $mol_assert_equal(true, $mol_schema_float.check(Number.NaN));
+                $mol_assert_equal(true, $mol_schema_float.check(Number.POSITIVE_INFINITY));
+                $mol_assert_equal(false, $mol_schema_float.check(null));
+                $mol_assert_equal(1.5, $mol_schema_float.cast(1.5));
+                $mol_assert_equal(Number.NaN, $mol_schema_float.cast('0'));
+                $mol_assert_equal(Number.EPSILON, $mol_schema_float.guard(Number.EPSILON));
+                $mol_assert_fail(() => $mol_schema_float.guard('0'), 'Wrong type');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "String schema"($) {
+                $mol_assert_equal('$mol_schema_string', $mol_schema_string + '', $mol_key($mol_schema_string));
+                $mol_assert_equal(true, $mol_schema_string.check('foo'));
+                $mol_assert_equal(false, $mol_schema_string.check(123));
+                $mol_assert_equal('foo', $mol_schema_string.cast('foo'));
+                $mol_assert_equal('', $mol_schema_string.cast(123));
+                $mol_assert_equal('foo', $mol_schema_string.guard('foo'));
+                $mol_assert_fail(() => $mol_schema_string.guard(123), 'Wrong type');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Cache of maybe schema"($) {
+                $mol_assert_equal($mol_schema_maybe($mol_schema_float), $mol_schema_maybe($mol_schema_float));
+                $mol_assert_unique($mol_schema_maybe($mol_schema_float), $mol_schema_maybe($mol_schema_string));
+            },
+            "Optional value"($) {
+                const Config = $mol_schema_maybe($mol_schema_string);
+                $mol_assert_equal('$mol_schema_maybe<$mol_schema_string>', Config + '');
+                $mol_assert_equal(true, Config.check('foo'));
+                $mol_assert_equal(true, Config.check(undefined));
+                $mol_assert_equal(true, Config.check(null));
+                $mol_assert_equal(false, Config.check(0));
+                $mol_assert_equal('foo', Config.cast('foo'));
+                $mol_assert_equal(undefined, Config.cast(undefined));
+                $mol_assert_equal(null, Config.cast(null));
+                $mol_assert_equal(null, Config.cast(0));
+                $mol_assert_equal('foo', Config.guard('foo'));
+                $mol_assert_fail(() => Config.guard(123), 'Wrong type');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Cache of instance schema"($) {
+                $mol_assert_equal($mol_schema_instance(Uint8Array), $mol_schema_instance(Uint8Array));
+                $mol_assert_unique($mol_schema_instance(Uint8Array), $mol_schema_instance(Int8Array));
+            },
+            "Class instance schema"($) {
+                const Blob = $mol_schema_instance(Uint8Array);
+                $mol_assert_equal('$mol_schema_instance<Uint8Array>', Blob + '', $mol_key(Blob));
+                $mol_assert_equal(true, Blob.check(new Uint8Array));
+                $mol_assert_equal(false, Blob.check(new Int8Array));
+                $mol_assert_equal(false, Blob.check(null));
+                $mol_assert_equal(new Uint8Array([0, 1]), Blob.cast(new Uint8Array([0, 1])));
+                $mol_assert_fail(() => Blob.cast(new Int8Array), 'Wrong class');
+                $mol_assert_equal(new Uint8Array, Blob.guard(new Uint8Array));
+                $mol_assert_fail(() => Blob.guard(new Int8Array), 'Wrong class');
+            },
+            "Boxed instance schema"($) {
+                const Str = $mol_schema_instance(String);
+                $mol_assert_equal('$mol_schema_instance<String>', Str + '', $mol_key(Str));
+                $mol_assert_equal(true, Str.check(Object('')));
+                $mol_assert_equal(true, Str.check(''));
+                $mol_assert_equal(true, Object('') instanceof Str);
+            },
+            "Schema instance schema"($) {
+                const Str = $mol_schema_instance($mol_schema_instance(String));
+                $mol_assert_equal('$mol_schema_instance<String>', Str + '', $mol_key(Str));
+                $mol_assert_equal(true, Str.check(Object('')));
+                $mol_assert_equal(true, Str.check(''));
+                $mol_assert_equal(true, Object('') instanceof Str);
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
 })($ || ($ = {}));
 
 ;
@@ -4123,11 +4828,14 @@ var $;
                 Weight: $mol_data_integer,
                 Length: $mol_data_integer,
             });
-            Length(20);
-            let len = Length(10);
-            len = 20;
-            let num = len;
-            len = Length(Weight(20));
+            Length(20); // Validate
+            let len = Length(10); // Inferred type
+            len = 20; // Explicit type
+            let num = len; // Implicit cast
+            len = Length(Weight(20)); // Explicit cast
+            // len = 20 // Compile time error
+            // len = Weight( 20 ) // Compile time error
+            // len = Length( 20.1 ) // Run time error
         },
     });
 })($ || ($ = {}));
@@ -4183,6 +4891,14 @@ var $;
 var $;
 (function ($) {
     $mol_test({
+        // @todo enable on strict
+        // 'no functions'() {
+        // 	const stringify = $mol_data_pipe()
+        // 	type Type = $mol_type_assert<
+        // 		typeof stringify,
+        // 		( input : never )=> never
+        // 	>
+        // },
         'single function'() {
             const stringify = $mol_data_pipe((input) => input.toString());
             $mol_assert_equal(stringify(5), '5');
@@ -4741,10 +5457,10 @@ var $;
             },
             "Mixed scripts"($) {
                 check('allô 美しい мир, 🏴‍☠\n', [
-                    0x61, 0x6C, 0x6C, 0x6F, 0xEA, 0x20,
-                    0xF9, 0x0E, 0x63, 0xE7, 0x57, 0x44, 0x20,
-                    0xA8, 0x3C, 0xE2, 0x40, 0x2C, 0x20,
-                    0xF7, 0x74, 0x4B, 0xC1, 0x0D, 0x8C, 0xA9, 0x0A,
+                    0x61, 0x6C, 0x6C, 0x6F, 0xEA, 0x20, // allô 
+                    0xF9, 0x0E, 0x63, 0xE7, 0x57, 0x44, 0x20, // 美しい 
+                    0xA8, 0x3C, 0xE2, 0x40, 0x2C, 0x20, // мир, 
+                    0xF7, 0x74, 0x4B, 0xC1, 0x0D, 0x8C, 0xA9, 0x0A, // 🏴‍☠\n
                     0xB4,
                 ]);
             },
@@ -4826,6 +5542,7 @@ var $;
 
 ;
 "use strict";
+/** @jsx $mol_jsx */
 var $;
 (function ($_1) {
     var $$;
@@ -5005,8 +5722,11 @@ var $;
                     lean: foo => [foo.a + foo.b, foo.a - foo.b],
                     rich: ([summ, diff]) => new Foo((summ + diff) / 2, (summ - diff) / 2),
                 });
+                // restore
                 check([new Foo(4, 2)], [tupl | 2, list | 2, text | 4, ...str('summ'), text | 4, ...str('diff'), 6, 2], Vary);
+                // isolated
                 $mol_assert_equal($mol_vary.take($mol_vary.pack([new Foo(4, 2)])), [{ a: 4, b: 2 }]);
+                // inherited
                 $mol_assert_equal(Vary.take(Vary.pack([new Map([[1, 2]])])), [new Map([[1, 2]])]);
             },
             "vary pack sequences"($) {
@@ -5021,6 +5741,7 @@ var $;
 
 ;
 "use strict";
+/** @jsx $mol_jsx */
 var $;
 (function ($_1) {
     var $$;
@@ -5094,264 +5815,6 @@ var $;
 ;
 "use strict";
 var $;
-(function ($) {
-    $mol_test({
-        'empty array'() {
-            $mol_assert_equal($mol_array_chunks([], () => true), []);
-        },
-        'one chunk'() {
-            $mol_assert_equal($mol_array_chunks([1, 2, 3, 4, 5], () => false), [[1, 2, 3, 4, 5]]);
-        },
-        'fixed size chunk'() {
-            $mol_assert_equal($mol_array_chunks([1, 2, 3, 4, 5], 3), [[1, 2, 3], [4, 5]]);
-        },
-        'first empty chunk'() {
-            $mol_assert_equal($mol_array_chunks([1, 2, 3, 4, 5], (_, i) => i === 0), [[1, 2, 3, 4, 5]]);
-        },
-        'chunk for every item'() {
-            $mol_assert_equal($mol_array_chunks([1, 2, 3, 4, 5], () => true), [[1], [2], [3], [4], [5]]);
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'fromJSON'() {
-            $mol_assert_equal($mol_tree2_from_json([]).toString(), '/\n');
-            $mol_assert_equal($mol_tree2_from_json([false, true]).toString(), '/\n\tfalse\n\ttrue\n');
-            $mol_assert_equal($mol_tree2_from_json([0, 1, 2.3]).toString(), '/\n\t0\n\t1\n\t2.3\n');
-            $mol_assert_equal($mol_tree2_from_json(new Uint16Array([1, 10, 255, 256, 65535])).toString(), '\\01 00 0A 00 FF 00 00 01\n\\FF FF\n');
-            $mol_assert_equal($mol_tree2_from_json(['', 'foo', 'bar\nbaz']).toString(), '/\n\t\\\n\t\\foo\n\t\\\n\t\t\\bar\n\t\t\\baz\n');
-            $mol_assert_equal($mol_tree2_from_json({ 'foo': false, 'bar\nbaz': 'lol' }).toString(), '*\n\tfoo false\n\t\\\n\t\t\\bar\n\t\t\\baz\n\t\t\\lol\n');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            "Cast from blob"($) {
-                const vary = new Uint8Array([1, 2, 3]);
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), vary);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), true);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), 3n);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), 3);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), 'AQID');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), [1, 2, 3]);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>AQID</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), '\\01\n\\02\n\\03\n');
-            },
-            "Cast from false"($) {
-                const vary = false;
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), false);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), 0n);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), 0);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), 'false');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), [false]);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>false</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), 'false\n');
-            },
-            "Cast from true"($) {
-                const vary = true;
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), true);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), 1n);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), 1);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), 'true');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), [true]);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>true</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), 'true\n');
-            },
-            "Cast from 0n"($) {
-                const vary = 0n;
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), false);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), 0n);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), 0);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), '0');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary)?.toOffset(0).toString(), '1970-01-01T00:00:00+00:00');
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary)?.toString(), 'PT');
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), ['0']);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>0</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), '0\n');
-            },
-            "Cast from big int"($) {
-                const vary = 4611686018427387903n;
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), true);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), 4611686018427387903n);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), 4611686018427388000);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), '4611686018427387903');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary)?.toOffset(0).toString(), '10889-08-02T05:31:50.655+00:00');
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary)?.toString(), 'PT281474976710.655S');
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), ['4611686018427387903']);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>4611686018427387903</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), '4611686018427387903\n');
-            },
-            "Cast from 0"($) {
-                const vary = 0;
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), false);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), 0n);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), 0);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), '0');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary)?.toOffset(0).toString(), '1970-01-01T00:00:00+00:00');
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary)?.toString(), 'PT');
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), [0]);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>0</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), '0\n');
-            },
-            "Cast from PI"($) {
-                const vary = Math.PI;
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), true);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), 3n);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), Math.PI);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), '3.141592653589793');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary)?.toOffset(0).toString(), '1970-01-01T00:00:00.003+00:00');
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary)?.toString(), "PT0.0031415926535897933S");
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), [Math.PI]);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>3.141592653589793</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), '3.141592653589793\n');
-            },
-            "Cast from NaN"($) {
-                const vary = Number.NaN;
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), false);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), Number.NaN);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), 'NaN');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>NaN</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), 'NaN\n');
-            },
-            "Cast from Infinity"($) {
-                const vary = Number.POSITIVE_INFINITY;
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), true);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), Number.POSITIVE_INFINITY);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), 'Infinity');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>Infinity</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), 'Infinity\n');
-            },
-            "Cast from empty string"($) {
-                const vary = '';
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), false);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), '');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary), null);
-            },
-            "Cast from number string"($) {
-                const vary = '123456789012345678901234567890123456789';
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), true);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), 123456789012345678901234567890123456789n);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), 1.2345678901234568e+38);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), '123456789012345678901234567890123456789');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), [1.2345678901234568e+38]);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>123456789012345678901234567890123456789</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), '\\123456789012345678901234567890123456789\n');
-            },
-            "Cast from wild string"($) {
-                const vary = 'foo';
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), true);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), Number.NaN);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), 'foo');
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), ['foo']);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>foo</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), '\\foo\n');
-            },
-            "Cast from Link"($) {
-                const vary = new $giper_baza_link('qwertyui_asdfghjk_zxcvbnm0');
-                $mol_assert_equal($giper_baza_vary_cast_blob(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_bool(vary), true);
-                $mol_assert_equal($giper_baza_vary_cast_bint(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_real(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_link(vary), vary);
-                $mol_assert_equal($giper_baza_vary_cast_text(vary), vary.str);
-                $mol_assert_equal($giper_baza_vary_cast_time(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dura(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_span(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_dict(vary), null);
-                $mol_assert_equal($giper_baza_vary_cast_list(vary), ['qwertyui_asdfghjk_zxcvbnm0']);
-                $mol_assert_equal($giper_baza_vary_cast_elem(vary)?.outerHTML, '<body>qwertyui_asdfghjk_zxcvbnm0</body>');
-                $mol_assert_equal($giper_baza_vary_cast_tree(vary)?.toString(), 'qwertyui_asdfghjk_zxcvbnm0\n');
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
 (function ($_1) {
     $mol_test_mocks.push($ => {
         class $mol_bus extends $.$mol_bus {
@@ -5412,6 +5875,29 @@ var $;
             $mol_assert_equal(Nested.value('xxx'), '123');
             Nested.value('foo', 'lol');
             $mol_assert_equal($.$mol_state_arg.href().replace(/.*#/, '#'), '#!foo=bar/nested.xxx=123/nested.foo=lol');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
+        'empty array'() {
+            $mol_assert_equal($mol_array_chunks([], () => true), []);
+        },
+        'one chunk'() {
+            $mol_assert_equal($mol_array_chunks([1, 2, 3, 4, 5], () => false), [[1, 2, 3, 4, 5]]);
+        },
+        'fixed size chunk'() {
+            $mol_assert_equal($mol_array_chunks([1, 2, 3, 4, 5], 3), [[1, 2, 3], [4, 5]]);
+        },
+        'first empty chunk'() {
+            $mol_assert_equal($mol_array_chunks([1, 2, 3, 4, 5], (_, i) => i === 0), [[1, 2, 3, 4, 5]]);
+        },
+        'chunk for every item'() {
+            $mol_assert_equal($mol_array_chunks([1, 2, 3, 4, 5], () => true), [[1], [2], [3], [4], [5]]);
         },
     });
 })($ || ($ = {}));
@@ -5497,26 +5983,26 @@ var $;
         'Land fork & merge': $mol_wire_async(($) => {
             const home = $.$giper_baza_glob.home().land();
             const left = home.fork();
-            home.Data($giper_baza_list_vary).items_vary(['foo', 'xxx']);
-            $mol_assert_equal(home.Data($giper_baza_list_vary).items_vary(), ['foo', 'xxx']);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), ['foo', 'xxx']);
+            home.Data($giper_baza_list).items_vary(['foo', 'xxx']);
+            $mol_assert_equal(home.Data($giper_baza_list).items_vary(), ['foo', 'xxx']);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), ['foo', 'xxx']);
             left.faces.sync(home.faces);
-            left.Data($giper_baza_list_vary).items_vary(['foo', 'yyy']);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), ['foo', 'yyy']);
+            left.Data($giper_baza_list).items_vary(['foo', 'yyy']);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), ['foo', 'yyy']);
             const right = home.fork();
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary(['foo', 'zzz']);
-            $mol_assert_equal(right.Data($giper_baza_list_vary).items_vary(), ['foo', 'zzz']);
+            right.Data($giper_baza_list).items_vary(['foo', 'zzz']);
+            $mol_assert_equal(right.Data($giper_baza_list).items_vary(), ['foo', 'zzz']);
             const both = home.fork();
-            $mol_assert_equal(both.Data($giper_baza_list_vary).items_vary(), ['foo', 'xxx']);
+            $mol_assert_equal(both.Data($giper_baza_list).items_vary(), ['foo', 'xxx']);
             both.Tine().items_vary([right.link()]);
-            $mol_assert_equal(both.Data($giper_baza_list_vary).items_vary(), ['foo', 'zzz']);
+            $mol_assert_equal(both.Data($giper_baza_list).items_vary(), ['foo', 'zzz']);
             both.Tine().items_vary([left.link()]);
-            $mol_assert_equal(both.Data($giper_baza_list_vary).items_vary(), ['foo', 'yyy']);
+            $mol_assert_equal(both.Data($giper_baza_list).items_vary(), ['foo', 'yyy']);
             both.Tine().items_vary([right.link(), left.link()]);
-            $mol_assert_equal(both.Data($giper_baza_list_vary).items_vary(), ['foo', 'yyy']);
+            $mol_assert_equal(both.Data($giper_baza_list).items_vary(), ['foo', 'yyy']);
             both.Tine().items_vary([left.link(), right.link()]);
-            $mol_assert_equal(both.Data($giper_baza_list_vary).items_vary(), ['foo', 'zzz']);
+            $mol_assert_equal(both.Data($giper_baza_list).items_vary(), ['foo', 'zzz']);
         }),
         'Inner Links are relative to forked Land': $mol_wire_async(($) => {
             const Alice = $.$giper_baza_glob.home().land();
@@ -5541,6 +6027,66 @@ var $;
             $mol_assert_equal(area.pass_rank(area.auth().pass()), $giper_baza_rank_rule);
             $mol_assert_equal(area.lord_rank($giper_baza_link.hole), $giper_baza_rank_post('just'));
         },
+        // async 'Merge text changes'() {
+        // 	const base = new $giper_baza_land( 1n, 1 )
+        // 	base.chief.as( $hyoo_crowd_text ).str( 'Hello World and fun!' )
+        // 	const left = base.fork( await $hyoo_crowd_peer.generate() )
+        // 	const right = base.fork( await $hyoo_crowd_peer.generate() )
+        // 	right.clock_data.tick( right.peer().id )
+        // 	left.chief.as( $hyoo_crowd_text ).str( 'Hello Alice and fun!' )
+        // 	right.chief.as( $hyoo_crowd_text ).str( 'Bye World and fun!' )
+        // 	const left_delta = left.delta()
+        // 	const right_delta = right.delta()
+        // 	left.apply( right_delta )
+        // 	right.apply( left_delta )
+        // 	$mol_assert_equal(
+        // 		left.chief.as( $hyoo_crowd_text ).str(),
+        // 		right.chief.as( $hyoo_crowd_text ).str(),
+        // 		'Bye Alice and fun!',
+        // 	)
+        // },
+        // async 'Write into token'() {
+        // 	const store = new $giper_baza_land( 1n, 1 )
+        // 	store.chief.as( $hyoo_crowd_text ).str( 'foobar' )
+        // 	store.chief.as( $hyoo_crowd_text ).write( 'xyz', 3 )
+        // 	$mol_assert_equal( store.chief.as( $hyoo_crowd_list ).list(), [ 'fooxyzbar' ] )
+        // },
+        // async 'Write into token with split'() {
+        // 	const store = new $giper_baza_land( 1n, 1 )
+        // 	store.chief.as( $hyoo_crowd_text ).str( 'foobar' )
+        // 	store.chief.as( $hyoo_crowd_text ).write( 'XYZ', 2, 4 )
+        // 	$mol_assert_equal( store.chief.as( $hyoo_crowd_list ).list(), [ 'fo', 'XYZar' ] )
+        // },
+        // async 'Write over few tokens'() {
+        // 	const store = new $giper_baza_land( 1n, 1 )
+        // 	store.chief.as( $hyoo_crowd_text ).str( 'xxx foo bar yyy' )
+        // 	store.chief.as( $hyoo_crowd_text ).write( 'X Y Z', 6, 9 )
+        // 	$mol_assert_equal( store.chief.as( $hyoo_crowd_list ).list(), [ 'xxx', ' fo', 'X', ' Y', ' Zar', ' yyy' ] )
+        // },
+        // async 'Write whole token'() {
+        // 	const store = new $giper_baza_land( 1n, 1 )
+        // 	store.chief.as( $hyoo_crowd_text ).str( 'xxxFoo yyy' )
+        // 	store.chief.as( $hyoo_crowd_text ).write( 'bar', 3, 7 )
+        // 	$mol_assert_equal( store.chief.as( $hyoo_crowd_list ).list(), [ 'xxxbaryyy' ] )
+        // },
+        // async 'Write whole text'() {
+        // 	const store = new $giper_baza_land( 1n, 1 )
+        // 	store.chief.as( $hyoo_crowd_text ).str( 'foo bar' )
+        // 	store.chief.as( $hyoo_crowd_text ).write( 'xxx', 0, 7 )
+        // 	$mol_assert_equal( store.chief.as( $hyoo_crowd_list ).list(), [ 'xxx' ] )
+        // },
+        // async 'Write at the end'() {
+        // 	const store = new $giper_baza_land( 1n, 1 )
+        // 	store.chief.as( $hyoo_crowd_text ).str( 'foo' )
+        // 	store.chief.as( $hyoo_crowd_text ).write( 'bar' )
+        // 	$mol_assert_equal( store.chief.as( $hyoo_crowd_list ).list(), [ 'foobar' ] )
+        // },
+        // async 'Write between tokens'() {
+        // 	const store = new $giper_baza_land( 1n, 1 )
+        // 	store.chief.as( $hyoo_crowd_text ).str( 'foo bar' )
+        // 	store.chief.as( $hyoo_crowd_text ).write( 'xxx', 4 )
+        // 	$mol_assert_equal( store.chief.as( $hyoo_crowd_list ).list(), [ 'foo', ' xxxbar' ] )
+        // },
     });
 })($ || ($ = {}));
 
@@ -5760,6 +6306,8 @@ var $;
 
 ;
 "use strict";
+/** @jsx $mol_jsx */
+/** @jsxFrag $mol_jsx_frag */
 var $;
 (function ($) {
     $mol_test({
@@ -5923,6 +6471,302 @@ var $;
 "use strict";
 var $;
 (function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Boolean schema"($) {
+                $mol_assert_equal('$mol_schema_boolean', $mol_schema_boolean + '', $mol_key($mol_schema_boolean));
+                $mol_assert_equal(true, $mol_schema_boolean.check(false));
+                $mol_assert_equal(true, $mol_schema_boolean.check(true));
+                $mol_assert_equal(false, $mol_schema_boolean.check('true'));
+                $mol_assert_equal(false, $mol_schema_boolean.check(0));
+                $mol_assert_equal(false, $mol_schema_boolean.cast(false));
+                $mol_assert_equal(false, $mol_schema_boolean.cast('true'));
+                $mol_assert_equal(false, $mol_schema_boolean.guard(false));
+                $mol_assert_fail(() => $mol_schema_boolean.guard(null), 'Wrong type');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Integer schema"($) {
+                $mol_assert_equal('$mol_schema_integer', $mol_schema_integer + '', $mol_key($mol_schema_integer));
+                $mol_assert_equal(true, $mol_schema_integer.check(Number.MAX_SAFE_INTEGER));
+                $mol_assert_equal(true, $mol_schema_integer.check(Number.MIN_SAFE_INTEGER));
+                $mol_assert_equal(true, $mol_schema_integer.check(0));
+                $mol_assert_equal(false, $mol_schema_integer.check(Number.EPSILON));
+                $mol_assert_equal(false, $mol_schema_integer.check(Number.POSITIVE_INFINITY));
+                $mol_assert_equal(false, $mol_schema_integer.check(Number.NEGATIVE_INFINITY));
+                $mol_assert_equal(Number.MAX_SAFE_INTEGER, $mol_schema_integer.cast(Number.MAX_SAFE_INTEGER));
+                $mol_assert_equal(0, $mol_schema_integer.cast(Number.EPSILON));
+                $mol_assert_equal(0, $mol_schema_integer.cast(1.5));
+                $mol_assert_equal(0, $mol_schema_integer.guard(0));
+                $mol_assert_fail(() => $mol_schema_integer.guard(''), 'Wrong type');
+                $mol_assert_fail(() => $mol_schema_integer.guard(Number.NaN), 'Non finite');
+                $mol_assert_fail(() => $mol_schema_integer.guard(1.5), 'Non integer');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "BigInt schema"($) {
+                $mol_assert_equal('$mol_schema_bigint', $mol_schema_bigint + '', $mol_key($mol_schema_bigint));
+                $mol_assert_equal(true, $mol_schema_bigint.check(0n));
+                $mol_assert_equal(false, $mol_schema_bigint.check(0));
+                $mol_assert_equal(1n, $mol_schema_bigint.cast(1n));
+                $mol_assert_equal(1n, $mol_schema_bigint.cast(1));
+                $mol_assert_equal(0n, $mol_schema_bigint.guard(0n));
+                $mol_assert_fail(() => $mol_schema_bigint.guard(1), 'Wrong type');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $.$mol_schema_pattern = $mol_memo_key.func(function $mol_schema_pattern(Pattern) {
+        return class $mol_schema_pattern_ extends $mol_schema_string {
+            static Pattern = Pattern;
+            static toString() {
+                if (this !== $mol_schema_pattern_)
+                    return super.toString();
+                return '$mol_schema_pattern<' + $mol_key(Pattern) + '>';
+            }
+            static guard(value) {
+                if (Pattern.test(super.guard(value)))
+                    return value;
+                return $mol_fail(new TypeError('Wrong string', { cause: { value, schema: this } }));
+            }
+            static cast(value) {
+                return super.cast(value);
+            }
+            static default = '';
+        };
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Cache of pattern schema"($) {
+                $mol_assert_equal($mol_schema_pattern(/foo/), $mol_schema_pattern(/foo/));
+                $mol_assert_unique($mol_schema_pattern(/foo/), $mol_schema_pattern(/bar/));
+            },
+            "String pattern schema"($) {
+                const Email = $mol_schema_pattern(/^.*@.*$/);
+                $mol_assert_equal('$mol_schema_pattern</^.*@.*$/>', Email + '', $mol_key(Email));
+                $mol_assert_equal(true, Email.check('foo@bar'));
+                $mol_assert_equal(false, Email.check('foo'));
+                $mol_assert_equal(false, Email.check(123));
+                $mol_assert_equal('foo@bar', Email.cast('foo@bar'));
+                $mol_assert_equal('', Email.cast('foo'));
+                $mol_assert_equal('', Email.cast(123));
+                $mol_assert_equal('foo@bar', Email.guard('foo@bar'));
+                $mol_assert_fail(() => Email.guard('foo'), 'Wrong string');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    $mol_test({
+        "Cache of dict schema"($) {
+            $mol_assert_equal($mol_schema_dict([$mol_schema_string, $mol_schema_float]), $mol_schema_dict([$mol_schema_string, $mol_schema_float]));
+            $mol_assert_unique($mol_schema_dict([$mol_schema_string, $mol_schema_float]), $mol_schema_dict([$mol_schema_string, $mol_schema_string]));
+        },
+        "Dictionary schema"($) {
+            const Flags = $mol_schema_dict([$mol_schema_pattern(/^[a-z]+$/), $mol_schema_boolean]);
+            $mol_assert_equal(true, Flags.check({}));
+            $mol_assert_equal(true, Flags.check({ foo: false }));
+            $mol_assert_equal(false, Flags.check({ f00: false }));
+            $mol_assert_equal(false, Flags.check([]));
+            $mol_assert_equal(false, Flags.check({ foo: 0 }));
+            $mol_assert_equal({ foo: false }, Flags.cast({ foo: false, f00: true }));
+            $mol_assert_equal({ foo: false }, Flags.cast({ foo: 123 }));
+            $mol_assert_equal({}, Flags.guard({}));
+            $mol_assert_equal({ foo: false }, Flags.guard({ foo: false }));
+            $mol_assert_fail(() => Flags.guard({ foo: 123 }), 'Wrong val');
+            $mol_assert_fail(() => Flags.guard({ f00: 123 }), 'Wrong key');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Cache of list schema"($) {
+                $mol_assert_equal($mol_schema_list($mol_schema_float), $mol_schema_list($mol_schema_float));
+                $mol_assert_unique($mol_schema_list($mol_schema_float), $mol_schema_list($mol_schema_string));
+            },
+            "Array schema"($) {
+                const Vector = $mol_schema_list($mol_schema_float);
+                $mol_assert_equal('$mol_schema_list<$mol_schema_float>', Vector + '');
+                $mol_assert_equal(true, Vector.check([]));
+                $mol_assert_equal(true, Vector.check([123]));
+                $mol_assert_equal(false, Vector.check(['foo']));
+                $mol_assert_equal([123], Vector.cast([123]));
+                $mol_assert_equal([123, Number.NaN], Vector.cast([123, 'foo']));
+                $mol_assert_equal([], Vector.guard([]));
+                $mol_assert_equal([123], Vector.guard([123]));
+                $mol_assert_fail(() => Vector.guard(0), 'Non array');
+                $mol_assert_fail(() => Vector.guard([false]), 'Wrong item');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $.$mol_schema_enum = $mol_memo_key.func(function $mol_schema_enum(Options) {
+        return class $mol_schema_enum_ extends $mol_schema_any {
+            static Options = Options;
+            static toString() {
+                if (this !== $mol_schema_enum_)
+                    return super.toString();
+                return '$mol_schema_enum<' + $mol_key(Options) + '>';
+            }
+            static guard(value) {
+                if (Options.some(Option => Object.is(Option, value)))
+                    return value;
+                return $mol_fail(new TypeError('Wrong option', { cause: { value, schema: this } }));
+            }
+            static cast(value) {
+                if (this.check(value))
+                    return value;
+                return Options[0];
+            }
+            static default = Options[0];
+        };
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Cache of enum schema"($) {
+                $mol_assert_equal($mol_schema_enum(['foo']), $mol_schema_enum(['foo']));
+                $mol_assert_unique($mol_schema_enum(['foo']), $mol_schema_enum(['bar']));
+            },
+            "Enum options"($) {
+                const Config = $mol_schema_enum([123, 'foo']);
+                $mol_assert_equal('$mol_schema_enum<[123,"foo"]>', Config + '', $mol_key(Config));
+                $mol_assert_equal(true, Config.check(123));
+                $mol_assert_equal(true, Config.check('foo'));
+                $mol_assert_equal(false, Config.check(true));
+                $mol_assert_equal(false, Config.check(321));
+                $mol_assert_equal(false, Config.check('bar'));
+                $mol_assert_equal(Config.cast(123), 123);
+                $mol_assert_equal(Config.cast('foo'), 'foo');
+                $mol_assert_equal(Config.cast('bar'), 123);
+                $mol_assert_equal(123, Config.guard(123));
+                $mol_assert_fail(() => Config.guard(321), 'Wrong option');
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
+    var $$;
+    (function ($$) {
+        $mol_test({
+            "Empty representation"($) {
+                const land = $giper_baza_land.make({ $ });
+                const reg = land.Pawn($giper_baza_atom_time).Data();
+                $mol_assert_equal(reg.val(), null);
+                reg.vary(null);
+                $mol_assert_equal(reg.val(), null);
+            },
+            "Validation on set, cast on get"($) {
+                const land = $.$giper_baza_glob.home().land();
+                const head = new $giper_baza_link('22222222');
+                const str = land.Pawn($giper_baza_atom.of($mol_schema_maybe($mol_schema_string))).Head(head);
+                const mail = land.Pawn($giper_baza_atom.of($mol_schema_pattern(/.+@.+/))).Head(head);
+                $mol_assert_equal(str.val(), null);
+                $mol_assert_equal(mail.val(), null);
+                $mol_assert_fail(() => str.val(123), 'Wrong type');
+                $mol_assert_fail(() => mail.val('foo'), 'Wrong string');
+                $mol_assert_equal(str.val(), null);
+                $mol_assert_equal(mail.val(), null);
+                str.val('foo');
+                $mol_assert_equal(str.val(), 'foo');
+                $mol_assert_equal(mail.val(), null);
+                mail.val('foo@bar');
+                $mol_assert_equal(str.val(), 'foo@bar');
+                $mol_assert_equal(mail.val(), 'foo@bar');
+            },
+            "Hyper link to another land"($) {
+                const land = $.$giper_baza_glob.home().land();
+                const reg = land.Pawn($giper_baza_atom_link.to(() => $giper_baza_atom)).Head(new $giper_baza_link('11111111'));
+                const remote = reg.ensure(land);
+                $mol_assert_unique(reg.land(), remote.land());
+                $mol_assert_equal(reg.vary(), remote.link());
+                $mol_assert_equal(reg.remote(), remote);
+            },
+            "Register with linked Pawns"($) {
+                const land = $.$giper_baza_glob.home().land();
+                const str = land.Pawn($giper_baza_atom_text).Head(new $giper_baza_link('11111111'));
+                const link = land.Pawn($giper_baza_atom_link.to(() => $giper_baza_atom_text)).Head(new $giper_baza_link('11111111'));
+                $mol_assert_equal(link.remote(), null);
+                link.remote(str);
+                $mol_assert_equal(link.vary(), link.remote().link(), str.link());
+            },
+            "Enumerated reg type"($) {
+                class FileType extends $giper_baza_atom.of($mol_schema_maybe($mol_schema_enum(['file', 'dir', 'link']))) {
+                }
+                const land = $.$giper_baza_glob.home().land();
+                const type = land.Data(FileType);
+                $mol_assert_equal(type.val(), null);
+                type.val('file');
+                $mol_assert_equal(type.val(), 'file');
+                $mol_assert_fail(() => type.val('drive'), 'Wrong option');
+                $mol_assert_equal(type.val(), 'file');
+                type.vary('drive');
+                $mol_assert_equal(type.val(), null);
+            },
+        });
+    })($$ = $_1.$$ || ($_1.$$ = {}));
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($_1) {
     function clone(base) {
         const land = $mol_wire_sync(base.$.$giper_baza_land).make({ $: base.$ });
         land.units_steal(base);
@@ -5935,7 +6779,7 @@ var $;
     $mol_test({
         'Basic list ops'($) {
             const land = $.$giper_baza_land.make({ $ });
-            const list = land.Pawn($giper_baza_list_vary).Data();
+            const list = land.Pawn($giper_baza_list).Data();
             $mol_assert_equal(list.items_vary(), []);
             list.items_vary([2, 3]);
             $mol_assert_equal(list.items_vary(), [2, 3]);
@@ -5963,7 +6807,7 @@ var $;
         },
         'Different types'($) {
             const land = $.$giper_baza_land.make({ $ });
-            const list = land.Pawn($.$giper_baza_list_vary).Data();
+            const list = land.Pawn($.$giper_baza_list).Data();
             list.items_vary([
                 null,
                 false,
@@ -6001,8 +6845,8 @@ var $;
         async 'List merge'($) {
             const land1 = $.$giper_baza_land.make({ $ });
             const land2 = $.$giper_baza_land.make({ $ });
-            const list1 = land1.Pawn($giper_baza_list_vary).Data();
-            const list2 = land2.Pawn($giper_baza_list_vary).Data();
+            const list1 = land1.Pawn($giper_baza_list).Data();
+            const list2 = land2.Pawn($giper_baza_list).Data();
             list1.items_vary(['foo', 'xxx']);
             land2.faces.tick();
             list2.items_vary(['foo', 'yyy']);
@@ -6011,7 +6855,7 @@ var $;
         },
         'Insert before removed before changed'($) {
             const land = $.$giper_baza_land.make({ $ });
-            const list = land.Pawn($giper_baza_list_vary).Data();
+            const list = land.Pawn($giper_baza_list).Data();
             list.items_vary(['foo', 'bar']);
             list.items_vary(['xxx', 'foo', 'bar']);
             list.items_vary(['xxx', 'bars']);
@@ -6019,7 +6863,7 @@ var $;
         },
         'Many moves'($) {
             const land = $.$giper_baza_land.make({ $ });
-            const list = land.Pawn($giper_baza_list_vary).Data();
+            const list = land.Pawn($giper_baza_list).Data();
             list.items_vary(['foo', 'bar', 'lol']);
             list.move(2, 1);
             list.move(2, 1);
@@ -6029,7 +6873,7 @@ var $;
         },
         'Reorder separated sublists'($) {
             const land = $.$giper_baza_land.make({ $ });
-            const list = land.Pawn($giper_baza_list_vary).Data();
+            const list = land.Pawn($giper_baza_list).Data();
             list.items_vary([1, 2, 3, 4, 5, 6]);
             list.move(3, 5);
             list.move(3, 5);
@@ -6041,171 +6885,171 @@ var $;
         },
         'Insert after moved right': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 7, 2, 3, 4]);
+            left.Data($giper_baza_list).items_vary([1, 7, 2, 3, 4]);
             const right = clone(base);
-            right.Data($giper_baza_list_vary).move(0, 2);
+            right.Data($giper_baza_list).move(0, 2);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [2, 1, 7, 3, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [2, 1, 7, 3, 4]);
         }),
         'Insert before moved left': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).move(1, 0);
+            left.Data($giper_baza_list).move(1, 0);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 7, 2, 3, 4]);
+            right.Data($giper_baza_list).items_vary([1, 7, 2, 3, 4]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [2, 1, 7, 3, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [2, 1, 7, 3, 4]);
         }),
         'Move left after inserted': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 7, 2, 3, 4]);
+            left.Data($giper_baza_list).items_vary([1, 7, 2, 3, 4]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).move(1, 0);
+            right.Data($giper_baza_list).move(1, 0);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [2, 1, 3, 7, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [2, 1, 3, 7, 4]);
         }),
         'Insert before moved right': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).move(1, 4);
+            left.Data($giper_baza_list).move(1, 4);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 7, 2, 3, 4]);
+            right.Data($giper_baza_list).items_vary([1, 7, 2, 3, 4]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 7, 3, 4, 2]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 7, 3, 4, 2]);
         }),
         'Move right after inserted': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 7, 2, 3, 4]);
+            left.Data($giper_baza_list).items_vary([1, 7, 2, 3, 4]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).move(1, 4);
+            right.Data($giper_baza_list).move(1, 4);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 3, 7, 4, 2]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 3, 7, 4, 2]);
         }),
         'Insert after wiped': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 3, 4]);
+            left.Data($giper_baza_list).items_vary([1, 3, 4]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 2, 7, 3, 4]);
+            right.Data($giper_baza_list).items_vary([1, 2, 7, 3, 4]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 7, 3, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 7, 3, 4]);
         }),
         'Wiped before inserted': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 2, 7, 3, 4]);
+            left.Data($giper_baza_list).items_vary([1, 2, 7, 3, 4]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 3, 4]);
+            right.Data($giper_baza_list).items_vary([1, 3, 4]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 7, 3, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 7, 3, 4]);
         }),
         'Insert before wiped': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).wipe(2);
+            left.Data($giper_baza_list).wipe(2);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 2, 7, 3, 4]);
+            right.Data($giper_baza_list).items_vary([1, 2, 7, 3, 4]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 2, 7, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 2, 7, 4]);
         }),
         'Wiped after inserted': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 2, 7, 3, 4]);
+            left.Data($giper_baza_list).items_vary([1, 2, 7, 3, 4]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).wipe(2);
+            right.Data($giper_baza_list).wipe(2);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 2, 7, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 2, 7, 4]);
         }),
         'Insert after moved out': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.sand_move(left.Data($giper_baza_list_vary).units()[1], new $giper_baza_link('11111111'), 0);
+            left.sand_move(left.Data($giper_baza_list).units()[1], new $giper_baza_link('11111111'), 0);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 2, 7, 3, 4]);
+            right.Data($giper_baza_list).items_vary([1, 2, 7, 3, 4]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 7, 3, 4]);
-            $mol_assert_equal(left.Pawn($giper_baza_list_vary).Head(new $giper_baza_link('11111111')).items_vary(), right.Pawn($giper_baza_list_vary).Head(new $giper_baza_link('11111111')).items_vary(), [2]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 7, 3, 4]);
+            $mol_assert_equal(left.Pawn($giper_baza_list).Head(new $giper_baza_link('11111111')).items_vary(), right.Pawn($giper_baza_list).Head(new $giper_baza_link('11111111')).items_vary(), [2]);
         }),
         'Move out before inserted': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 2, 7, 3, 4]);
+            left.Data($giper_baza_list).items_vary([1, 2, 7, 3, 4]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.sand_move(right.Data($giper_baza_list_vary).units()[1], new $giper_baza_link('11111111'), 0);
+            right.sand_move(right.Data($giper_baza_list).units()[1], new $giper_baza_link('11111111'), 0);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 7, 3, 4]);
-            $mol_assert_equal(left.Pawn($giper_baza_list_vary).Head(new $giper_baza_link('11111111')).items_vary(), right.Pawn($giper_baza_list_vary).Head(new $giper_baza_link('11111111')).items_vary(), [2]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 7, 3, 4]);
+            $mol_assert_equal(left.Pawn($giper_baza_list).Head(new $giper_baza_link('11111111')).items_vary(), right.Pawn($giper_baza_list).Head(new $giper_baza_link('11111111')).items_vary(), [2]);
         }),
         'Insert before changed': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 2, 7, 4]);
+            left.Data($giper_baza_list).items_vary([1, 2, 7, 4]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 2, 13, 3, 4]);
+            right.Data($giper_baza_list).items_vary([1, 2, 13, 3, 4]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 2, 13, 7, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 2, 13, 7, 4]);
         }),
         'Change after inserted': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 2, 13, 3, 4]);
+            left.Data($giper_baza_list).items_vary([1, 2, 13, 3, 4]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 2, 7, 4]);
+            right.Data($giper_baza_list).items_vary([1, 2, 7, 4]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 2, 7, 13, 4]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 2, 7, 13, 4]);
         }),
         'Insert between moved': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4, 5, 6]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4, 5, 6]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).move(1, 5);
-            left.Data($giper_baza_list_vary).move(1, 5);
+            left.Data($giper_baza_list).move(1, 5);
+            left.Data($giper_baza_list).move(1, 5);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).items_vary([1, 2, 7, 3, 4, 5, 6]);
+            right.Data($giper_baza_list).items_vary([1, 2, 7, 3, 4, 5, 6]);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 4, 5, 2, 7, 3, 6]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 4, 5, 2, 7, 3, 6]);
         }),
         'Move near inserted': $mol_wire_async(($) => {
             const base = $mol_wire_sync($.$giper_baza_land).make({ $ });
-            base.Data($giper_baza_list_vary).items_vary([1, 2, 3, 4, 5, 6]);
+            base.Data($giper_baza_list).items_vary([1, 2, 3, 4, 5, 6]);
             const left = clone(base);
-            left.Data($giper_baza_list_vary).items_vary([1, 2, 7, 3, 4, 5, 6]);
+            left.Data($giper_baza_list).items_vary([1, 2, 7, 3, 4, 5, 6]);
             const right = clone(base);
             right.faces.sync(left.faces);
-            right.Data($giper_baza_list_vary).move(1, 5);
-            right.Data($giper_baza_list_vary).move(1, 5);
+            right.Data($giper_baza_list).move(1, 5);
+            right.Data($giper_baza_list).move(1, 5);
             sync(left, right);
-            $mol_assert_equal(left.Data($giper_baza_list_vary).items_vary(), right.Data($giper_baza_list_vary).items_vary(), [1, 4, 5, 2, 3, 7, 6]);
+            $mol_assert_equal(left.Data($giper_baza_list).items_vary(), right.Data($giper_baza_list).items_vary(), [1, 4, 5, 2, 3, 7, 6]);
         }),
     });
 })($ || ($ = {}));
@@ -6221,18 +7065,18 @@ var $;
                 const land = $giper_baza_land.make({ $ });
                 const dict = land.Pawn($giper_baza_dict).Data();
                 $mol_assert_equal(dict.keys(), []);
-                dict.dive(123, $giper_baza_atom_vary, null);
-                dict.dive('xxx', $giper_baza_atom_vary, null);
+                dict.dive(123, $giper_baza_atom, null);
+                dict.dive('xxx', $giper_baza_atom, null);
                 $mol_assert_equal(dict.keys(), ['xxx', 123]);
                 $mol_assert_equal(dict.has(123), true);
                 $mol_assert_equal(dict.has('xxx'), true);
                 $mol_assert_equal(dict.has('yyy'), false);
-                $mol_assert_equal(dict.dive(123, $giper_baza_atom_vary).vary(), null);
-                $mol_assert_equal(dict.dive('xxx', $giper_baza_atom_vary).vary(), null);
-                dict.dive(123, $giper_baza_atom_vary).vary(777);
-                $mol_assert_equal(dict.dive(123, $giper_baza_atom_vary).vary(), 777);
-                dict.dive('xxx', $giper_baza_list_vary).items_vary(['foo', 'bar']);
-                $mol_assert_equal(dict.dive('xxx', $giper_baza_list_vary).items_vary(), ['foo', 'bar']);
+                $mol_assert_equal(dict.dive(123, $giper_baza_atom).vary(), null);
+                $mol_assert_equal(dict.dive('xxx', $giper_baza_atom).vary(), null);
+                dict.dive(123, $giper_baza_atom).vary(777);
+                $mol_assert_equal(dict.dive(123, $giper_baza_atom).vary(), 777);
+                dict.dive('xxx', $giper_baza_list).items_vary(['foo', 'bar']);
+                $mol_assert_equal(dict.dive('xxx', $giper_baza_list).items_vary(), ['foo', 'bar']);
                 dict.has(123, false);
                 $mol_assert_equal(dict.keys(), ['xxx']);
             },
@@ -6241,32 +7085,32 @@ var $;
                 const land2 = $giper_baza_land.make({ $ });
                 const dict1 = land1.Pawn($giper_baza_dict).Data();
                 const dict2 = land2.Pawn($giper_baza_dict).Data();
-                dict1.dive(123, $giper_baza_atom_vary, null).vary(666);
+                dict1.dive(123, $giper_baza_atom, null).vary(666);
                 land2.faces.tick();
-                dict2.dive(123, $giper_baza_atom_vary, null).vary(777);
+                dict2.dive(123, $giper_baza_atom, null).vary(777);
                 await $mol_wire_async(land1).units_steal(land2);
-                $mol_assert_equal(dict1.dive(123, $giper_baza_atom_vary).vary(), 777);
-                dict1.dive('xxx', $giper_baza_list_vary, null).items_vary(['foo']);
+                $mol_assert_equal(dict1.dive(123, $giper_baza_atom).vary(), 777);
+                dict1.dive('xxx', $giper_baza_list, null).items_vary(['foo']);
                 land2.faces.tick();
-                dict2.dive('xxx', $giper_baza_list_vary, null).items_vary(['bar']);
+                dict2.dive('xxx', $giper_baza_list, null).items_vary(['bar']);
                 await $mol_wire_async(land1).units_steal(land2);
-                $mol_assert_equal(dict1.dive('xxx', $giper_baza_list_vary).items_vary(), ['bar', 'foo']);
+                $mol_assert_equal(dict1.dive('xxx', $giper_baza_list).items_vary(), ['bar', 'foo']);
             },
             async "Narrowed Dictionary with linked Dictionaries and others"($) {
                 class User extends $giper_baza_dict.with({
                     Title: $giper_baza_atom_text,
-                    Account: $giper_baza_atom_link_to(() => Account),
-                    Articles: $giper_baza_list_link_to(() => Article),
+                    Account: $giper_baza_atom_link.to(() => Account),
+                    Articles: $giper_baza_list_link.to(() => Article),
                 }) {
                 }
                 class Account extends $giper_baza_dict.with({
                     Title: $giper_baza_atom_text,
-                    User: $giper_baza_atom_link_to(() => User),
+                    User: $giper_baza_atom_link.to(() => User),
                 }) {
                 }
                 class Article extends $giper_baza_dict.with({
                     Title: $giper_baza_dict_to($giper_baza_atom_text),
-                    Author: $giper_baza_atom_link_to(() => User),
+                    Author: $giper_baza_atom_link.to(() => User),
                 }) {
                 }
                 const land = $.$giper_baza_glob.home().land();
@@ -6291,162 +7135,6 @@ var $;
                 $mol_assert_equal(articles[1].Title()?.key('ru')?.val() ?? null, null);
                 $mol_assert_equal(articles[1].Title()?.key('ru')?.val() ?? null, null);
                 $mol_assert_unique(user.land(), account.land(), ...articles.map(article => article.land()));
-            },
-        });
-    })($$ = $_1.$$ || ($_1.$$ = {}));
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is string'() {
-            $mol_data_string('');
-        },
-        'Is not string'() {
-            $mol_assert_fail(() => {
-                $mol_data_string(0);
-            }, '0 is not a string');
-        },
-        'Is object string'() {
-            $mol_assert_fail(() => {
-                $mol_data_string(new String('x'));
-            }, 'x is not a string');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    function $mol_data_pattern(pattern) {
-        return $mol_data_setup((val) => {
-            const val2 = $mol_data_string(val);
-            if (pattern.test(val2))
-                return val2;
-            return $mol_fail(new $mol_data_error(`${val} is not a ${pattern}`));
-        }, pattern);
-    }
-    $.$mol_data_pattern = $mol_data_pattern;
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is fit'() {
-            $mol_data_pattern(/^-$/)('-');
-        },
-        'Is not fit'() {
-            $mol_assert_fail(() => {
-                $mol_data_pattern(/^-$/)('+');
-            }, '+ is not a /^-$/');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $.$mol_data_email = $mol_data_pattern(/.+@.+/);
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($) {
-    $mol_test({
-        'Is email'() {
-            $mol_data_email('foo@bar');
-        },
-        'Has not host'() {
-            $mol_assert_fail(() => {
-                $mol_data_email('foo@');
-            }, 'foo@ is not a /.+@.+/');
-        },
-        'Has not name'() {
-            $mol_assert_fail(() => {
-                $mol_data_email('@bar');
-            }, '@bar is not a /.+@.+/');
-        },
-        'Has not @'() {
-            $mol_assert_fail(() => {
-                $mol_data_email('foo.bar');
-            }, 'foo.bar is not a /.+@.+/');
-        },
-    });
-})($ || ($ = {}));
-
-;
-"use strict";
-var $;
-(function ($_1) {
-    var $$;
-    (function ($$) {
-        $mol_test({
-            "Empty representation"($) {
-                const land = $giper_baza_land.make({ $ });
-                const reg = land.Pawn($giper_baza_atom_time).Data();
-                $mol_assert_equal(reg.val(), null);
-                reg.vary(null);
-                $mol_assert_equal(reg.val(), null);
-            },
-            "Narrow registers"($) {
-                const land = $.$giper_baza_glob.home().land();
-                const bin = land.Pawn($giper_baza_atom_blob).Head(new $giper_baza_link('11111111'));
-                $mol_assert_equal(bin.val(), null);
-                bin.val(new Uint8Array([1, 2, 3]));
-                $mol_assert_equal(bin.val(), new Uint8Array([1, 2, 3]));
-                const str = land.Pawn($giper_baza_atom_text).Head(new $giper_baza_link('22222222'));
-                $mol_assert_equal(str.val(), null);
-                str.val('foo');
-                $mol_assert_equal(str.val(), 'foo');
-            },
-            "Store custom types"($) {
-                class Email extends $giper_baza_atom($mol_data_email) {
-                }
-                const land = $giper_baza_land.make({ $ });
-                const reg = land.Pawn(Email).Data();
-                $mol_assert_equal(reg.val(), null);
-                reg.val('foo@exaple.org');
-                $mol_assert_equal(reg.val(), 'foo@exaple.org');
-                $mol_assert_fail(() => reg.val('xxx'), 'xxx is not a /.+@.+/');
-                $mol_assert_equal(reg.val(), 'foo@exaple.org');
-                reg.vary('xxx');
-                $mol_assert_equal(reg.val(), null);
-            },
-            "Hyper link to another land"($) {
-                const land = $.$giper_baza_glob.home().land();
-                const reg = land.Pawn($giper_baza_atom_link_to(() => $giper_baza_atom_vary)).Head(new $giper_baza_link('11111111'));
-                const remote = reg.ensure(land);
-                $mol_assert_unique(reg.land(), remote.land());
-                $mol_assert_equal(reg.vary(), remote.link());
-                $mol_assert_equal(reg.remote(), remote);
-            },
-            "Register with linked Pawns"($) {
-                const land = $.$giper_baza_glob.home().land();
-                const str = land.Pawn($giper_baza_atom_text).Head(new $giper_baza_link('11111111'));
-                const link = land.Pawn($giper_baza_atom_link_to(() => $giper_baza_atom_text)).Head(new $giper_baza_link('11111111'));
-                $mol_assert_equal(link.remote(), null);
-                link.remote(str);
-                $mol_assert_equal(link.vary(), link.remote().link(), str.link());
-            },
-            "Enumerated reg type"($) {
-                class FileType extends $giper_baza_atom_enum(['file', 'dir', 'link']) {
-                }
-                const land = $.$giper_baza_glob.home().land();
-                const type = land.Data(FileType);
-                $mol_assert_equal(type.val(), null);
-                type.val('file');
-                $mol_assert_equal(type.val(), 'file');
-                $mol_assert_fail(() => type.val('drive'), 'Wrong value (drive)');
-                $mol_assert_equal(type.val(), 'file');
-                type.vary('drive');
-                $mol_assert_equal(type.val(), null);
             },
         });
     })($$ = $_1.$$ || ($_1.$$ = {}));
@@ -6638,7 +7326,7 @@ var $;
         'Change sequences'($) {
             const land = $giper_baza_land.make({ $ });
             const text = land.Data($giper_baza_text);
-            const list = land.Data($giper_baza_list_vary);
+            const list = land.Data($giper_baza_list);
             $mol_assert_equal(text.str(), '');
             $mol_assert_equal(list.items_vary(), []);
             text.str('foo');
@@ -7074,6 +7762,27 @@ var $;
 var $;
 (function ($) {
     $mol_test({
+        'Is string'() {
+            $mol_data_string('');
+        },
+        'Is not string'() {
+            $mol_assert_fail(() => {
+                $mol_data_string(0);
+            }, '0 is not a string');
+        },
+        'Is object string'() {
+            $mol_assert_fail(() => {
+                $mol_data_string(new String('x'));
+            }, 'x is not a string');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
+var $;
+(function ($) {
+    $mol_test({
         'Is first'() {
             $mol_data_variant($mol_data_number, $mol_data_string)(0);
         },
@@ -7126,6 +7835,21 @@ var $;
             const User = $mol_data_record({ age: $mol_data_number });
             User({ age: 0, name: 'Jin' });
         },
+        // 'Recursive record' () {
+        // 	const User = $mol_data_record({
+        // 		name : $mol_data_string ,
+        // 		get kids() { return $mol_data_array( User ) } ,
+        // 	})
+        // 	User({
+        // 		name : 'Jin' ,
+        // 		kids : [
+        // 			{
+        // 				name : 'John' ,
+        // 				kids : [] ,
+        // 			}
+        // 		] ,
+        // 	})
+        // } ,
         'Shrinks record'() {
             $mol_assert_fail(() => {
                 const User = $mol_data_record({ age: $mol_data_number, name: $mol_data_string });
@@ -7198,6 +7922,10 @@ var $;
 "use strict";
 var $;
 (function ($) {
+    /**
+     * Checks for value of given enum and returns expected type.
+     * @see https://mol.hyoo.ru/#!section=demos/demo=mol_data_enum_demo
+     */
     function $mol_data_enum(name, dict) {
         const index = {};
         for (let key in dict) {
@@ -7229,6 +7957,9 @@ var $;
         gender["bisexual"] = "bisexual";
         gender["trans"] = "transgender";
     })(gender || (gender = {}));
+    // Test disabled due https://github.com/microsoft/TypeScript/issues/46112
+    // const Sex = $mol_data_enum( 'sex' , sex )
+    // type sex_value =  $mol_type_assert< typeof Sex.Value , sex >
     $mol_test({
         'config of enum'() {
             const Sex = $mol_data_enum('sex', sex);
@@ -7258,6 +7989,8 @@ var $;
             $mol_assert_fail(() => Sex('__proto__'), `__proto__ is not value of sex enum`);
         },
     });
+    // Test disabled due https://github.com/microsoft/TypeScript/issues/46112
+    // type gender_value =  $mol_type_assert< typeof Gender.Value , gender >
     $mol_test({
         'config of enum'() {
             const Gender = $mol_data_enum('gender', gender);
@@ -7302,6 +8035,7 @@ var $;
             const Repository = $hyoo_harp_scheme({
                 name: $mol_data_optional(Str),
                 isPrivate: $mol_data_optional(Bool),
+                // pullRequests: PullRequest,
             });
             const PullRequest = $hyoo_harp_scheme({
                 state: $mol_data_optional(State),
@@ -7314,13 +8048,13 @@ var $;
             const uri = 'pullRequest(state=closed=;-updated_at;repository(name;isPrivate);_num=0@100=)';
             let query = Request({
                 pullRequest: {
-                    state: { '=': [[States.closed]] },
-                    updated_at: { '+': false },
+                    state: { '=': [[States.closed]] }, // filter
+                    updated_at: { '+': false }, // order
                     repository: {
                         name: {},
                         isPrivate: {},
                     },
-                    _num: { '=': [[0, 100]] },
+                    _num: { '=': [[0, 100]] }, // slice
                 }
             });
             $mol_assert_like(uri, Request.build(query));
@@ -7588,6 +8322,7 @@ var $;
                 $mol_assert_equal(session.Paused_at().val(), 0);
                 session.Paused_at(null).val(1500);
                 $mol_assert_equal(session.Paused_at().val() > 0, true);
+                // Resume: shift round_start and clear paused_at
                 const pause_duration = 500;
                 session.Round_start(null).val(1000 + pause_duration);
                 session.Paused_at(null).val(0);
@@ -7599,8 +8334,10 @@ var $;
                 const session = land.Data($bog_blitz_session);
                 session.Reveal_correct(null).val('');
                 $mol_assert_equal(session.Reveal_correct().val(), '');
+                // Host publishes correct indices during reveal
                 session.Reveal_correct(null).val('0,2');
                 $mol_assert_equal(session.Reveal_correct().val(), '0,2');
+                // Cleared on next question
                 session.Reveal_correct(null).val('');
                 $mol_assert_equal(session.Reveal_correct().val(), '');
             },
@@ -7627,6 +8364,7 @@ var $;
                 $mol_assert_equal(all_keys.includes('host_lord'), true);
                 $mol_assert_equal(all_keys.includes('player_1'), true);
                 $mol_assert_equal(all_keys.includes('player_2'), true);
+                // Read back via same refs
                 $mol_assert_equal(host.IsHost().val(), true);
                 $mol_assert_equal(p1.Name().val(), 'Alice');
                 $mol_assert_equal(p1.Score().val(), 200);
@@ -7636,32 +8374,40 @@ var $;
             async 'Player name writable without profile dependency'($) {
                 const land = $giper_baza_land.make({ $ });
                 const dict = land.Data(Players_dict);
+                // Simulate join: create player and write name immediately
                 const player = dict.key('new_player', null);
                 const join_name = 'TestUser';
+                // Name must be writable directly — no profile/home land needed
                 player.Name(null).val(join_name);
                 $mol_assert_equal(player.Name().val(), 'TestUser');
+                // Avatar file link also writable without external deps
                 player.Answer_land(null).val('some_answer_land');
                 $mol_assert_equal(player.Answer_land().val(), 'some_answer_land');
             },
             async 'Player answers live in separate land from session'($) {
                 const session_land = $giper_baza_land.make({ $ });
                 const answer_land = $giper_baza_land.make({ $ });
+                // Player registered in session land
                 const dict = session_land.Data(Players_dict);
                 const player = dict.key('player_lord', null);
                 player.Name(null).val('Alice');
                 player.Answer_land(null).val(answer_land.link().str);
+                // Answers written to player's own land
                 const answers = answer_land.Data($bog_blitz_player_answers);
                 answers.Answer(null).val('1,3');
                 answers.Answer_time(null).val(5000);
                 answers.React_fire(null).val(2);
+                // Session land player has no answer data — it's in the separate land
                 $mol_assert_equal(player.Name().val(), 'Alice');
                 $mol_assert_equal(player.Answer_land().val(), answer_land.link().str);
+                // Answers readable from the answer land
                 $mol_assert_equal(answers.Answer().val(), '1,3');
                 $mol_assert_equal(answers.React_fire().val(), 2);
             },
             async 'Multi_correct published to session, not read from encrypted land'($) {
                 const session_land = $giper_baza_land.make({ $ });
                 const key_land = $giper_baza_land.make({ $ });
+                // Host writes answer keys to encrypted land
                 const keys_data = [
                     { type: 'choice', correct: '0,2' },
                     { type: 'choice', correct: '1' },
@@ -7669,10 +8415,12 @@ var $;
                 key_land.Data($bog_blitz_answers_key).Data(null).val(JSON.stringify(keys_data));
                 const session = session_land.Data($bog_blitz_session);
                 session.Answers_key_land(null).val(key_land.link().str);
+                // Host publishes Multi_correct for question 0 (has 2 correct)
                 const q0 = keys_data[0];
                 const multi0 = q0.type !== 'text_input' && q0.correct.split(',').length >= 2;
                 session.Multi_correct(null).val(multi0);
                 $mol_assert_equal(session.Multi_correct().val(), true);
+                // Host publishes Multi_correct for question 1 (single correct)
                 const q1 = keys_data[1];
                 const multi1 = q1.type !== 'text_input' && q1.correct.split(',').length >= 2;
                 session.Multi_correct(null).val(multi1);
@@ -7687,15 +8435,19 @@ var $;
                 ];
                 key_land.Data($bog_blitz_answers_key).Data(null).val(JSON.stringify(keys_data));
                 const session = session_land.Data($bog_blitz_session);
+                // During reveal, host reads from encrypted land and publishes to session
                 const parsed = JSON.parse(key_land.Data($bog_blitz_answers_key).Data().val());
+                // Question 0: choice
                 session.Reveal_correct(null).val(parsed[0].correct);
                 $mol_assert_equal(session.Reveal_correct().val(), '1,3');
+                // Players can check their answer against revealed correct
                 const my_answer = '1,3';
                 const correct_set = new Set(session.Reveal_correct().val().split(','));
                 const answer_set = new Set(my_answer.split(','));
                 const is_correct = correct_set.size === answer_set.size &&
                     [...correct_set].every(k => answer_set.has(k));
                 $mol_assert_equal(is_correct, true);
+                // Question 1: text
                 session.Reveal_correct(null).val(parsed[1].correct);
                 $mol_assert_equal(session.Reveal_correct().val(), 'Paris, paris');
             },
@@ -7707,9 +8459,11 @@ var $;
                 player.Name(null).val('Alice');
                 player.Score(null).val(0);
                 player.Answer_land(null).val(answer_land.link().str);
+                // Player writes answer to own land
                 const answers = answer_land.Data($bog_blitz_player_answers);
                 answers.Answer(null).val('0,2');
                 answers.Answer_time(null).val(3000);
+                // Host reads answer from player's land and calculates score
                 const answer = answers.Answer().val();
                 const correct = '0,2';
                 const correct_set = new Set(correct.split(','));
@@ -7719,6 +8473,7 @@ var $;
                 const points = is_correct ? 175 : -175;
                 const prev_score = player.Score().val();
                 player.Score(null).val(prev_score + points);
+                // Score written to session land, readable by everyone
                 $mol_assert_equal(player.Score().val(), 175);
             },
         });
@@ -7759,6 +8514,7 @@ var $;
             },
             'comment count text is empty when no comments'() {
                 const comment = new $bog_wysiwyg_comment();
+                // Thread has no comment_land_link, so comment_count is 0
                 $mol_assert_equal(comment.comment_count_text(), '');
             },
             'thread draft stores text'() {
@@ -7912,6 +8668,7 @@ var $;
                 ai.pos_x(456);
                 $mol_assert_equal(ai.pos_x_str(), '456px');
             },
+            // === AI integration in wysiwyg ===
             'block_ai opens AI menu and sets context'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['b1']);
@@ -8071,7 +8828,722 @@ var $;
 (function ($) {
     var $$;
     (function ($$) {
+        /** Editor with real DOM behind every block and no Giper Baza at all */
+        function make_editor(blocks) {
+            const doc = $mol_dom_context.document;
+            const root = doc.createElement('div');
+            doc.body.appendChild(root);
+            const editor = new $bog_wysiwyg();
+            const views = new Map();
+            const focused = [];
+            editor.Block = (id) => {
+                let view = views.get(id);
+                if (view)
+                    return view;
+                view = new $bog_wysiwyg_block();
+                const node = doc.createElement('div');
+                node.contentEditable = 'true';
+                node.tabIndex = 0;
+                node.innerHTML = editor.block_html(id);
+                root.appendChild(node);
+                view.dom_node = () => node;
+                view.html = (next) => editor.block_html(id, next);
+                views.set(id, view);
+                return view;
+            };
+            editor.focus_block = (id, offset) => { focused.push({ id, offset }); };
+            editor.block_ids(blocks.map(block => block.id));
+            for (const block of blocks) {
+                if (block.html !== undefined)
+                    editor.block_html(block.id, block.html);
+                if (block.type)
+                    editor.block_type(block.id, block.type);
+                if (block.level)
+                    editor.block_level(block.id, block.level);
+            }
+            // Materialize the DOM so selections can reach into the blocks
+            for (const block of blocks)
+                editor.Block(block.id);
+            return {
+                editor,
+                focused,
+                node: (id) => editor.Block(id).dom_node(),
+                drop: () => root.remove(),
+            };
+        }
+        function select_across(from, from_offset, to, to_offset) {
+            const doc = $mol_dom_context.document;
+            const start = $bog_wysiwyg_point_at(from, from_offset);
+            const end = $bog_wysiwyg_point_at(to, to_offset);
+            const range = doc.createRange();
+            range.setStart(start.node, start.offset);
+            range.setEnd(end.node, end.offset);
+            const sel = doc.defaultView.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        function editor_key(name, mods = {}) {
+            return new KeyboardEvent('keydown', { key: name, cancelable: true, ...mods });
+        }
         $mol_test({
+            // === Splitting ===
+            'block_split moves the tail into a new block'() {
+                const { editor, focused, drop } = make_editor([
+                    { id: 'a', html: 'hello world' },
+                    { id: 'b', html: 'next' },
+                ]);
+                try {
+                    editor.block_split('a', { head: 'hello', tail: ' world' });
+                    const ids = editor.block_ids();
+                    $mol_assert_equal(ids.length, 3);
+                    $mol_assert_equal(ids[0], 'a');
+                    $mol_assert_equal(ids[2], 'b');
+                    $mol_assert_equal(editor.block_html('a'), 'hello');
+                    $mol_assert_equal(editor.block_html(ids[1]), ' world');
+                    $mol_assert_equal(focused.at(-1), { id: ids[1], offset: 0 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_split keeps the type and level of the source block'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'Title text', type: 'heading', level: 2 },
+                ]);
+                try {
+                    editor.block_split('a', { head: 'Title', tail: ' text' });
+                    const tail_id = editor.block_ids()[1];
+                    $mol_assert_equal(editor.block_type(tail_id), 'heading');
+                    $mol_assert_equal(editor.block_level(tail_id), 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_split without parts does nothing'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'text' }]);
+                try {
+                    $mol_assert_equal(editor.block_split('a'), null);
+                    $mol_assert_equal(editor.block_ids().length, 1);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_split is refused in readonly mode'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'text' }]);
+                try {
+                    editor.readonly = () => true;
+                    $mol_assert_equal(editor.block_split('a', { head: 'te', tail: 'xt' }), null);
+                    $mol_assert_equal(editor.block_ids().length, 1);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Merging ===
+            'block_merge_prev glues the block into the previous one'() {
+                const { editor, focused, drop } = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    editor.block_merge_prev('b', new Event('keydown'));
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'onetwo');
+                    $mol_assert_equal(focused.at(-1), { id: 'a', offset: 3 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_merge_prev counts the joint offset over markup'() {
+                const { editor, focused, drop } = make_editor([
+                    { id: 'a', html: '<b>one</b>' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    editor.block_merge_prev('b', new Event('keydown'));
+                    $mol_assert_equal(editor.block_html('a'), '<b>one</b>two');
+                    $mol_assert_equal(focused.at(-1), { id: 'a', offset: 3 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_merge_prev on the first block changes nothing'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    editor.block_merge_prev('a', new Event('keydown'));
+                    $mol_assert_equal(editor.block_ids(), ['a', 'b']);
+                    $mol_assert_equal(editor.block_html('a'), 'one');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_merge_prev drops a previous block that holds no text'() {
+                const { editor, focused, drop } = make_editor([
+                    { id: 'a', html: '<img src="x.png">', type: 'image' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    editor.block_merge_prev('b', new Event('keydown'));
+                    $mol_assert_equal(editor.block_ids(), ['b']);
+                    $mol_assert_equal(editor.block_html('b'), 'two');
+                    $mol_assert_equal(focused.at(-1), { id: 'b', offset: 0 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_merge_next pulls the next block in'() {
+                const { editor, focused, drop } = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    editor.block_merge_next('a', new Event('keydown'));
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'onetwo');
+                    $mol_assert_equal(focused.at(-1), { id: 'a', offset: 3 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_merge_next on the last block changes nothing'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    editor.block_merge_next('b', new Event('keydown'));
+                    $mol_assert_equal(editor.block_ids(), ['a', 'b']);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_merge_next drops a next block that holds no text'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: '', type: 'divider' },
+                ]);
+                try {
+                    editor.block_merge_next('a', new Event('keydown'));
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'one');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'merges are refused in readonly mode'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    editor.readonly = () => true;
+                    $mol_assert_equal(editor.block_merge_prev('b', new Event('keydown')), null);
+                    $mol_assert_equal(editor.block_merge_next('a', new Event('keydown')), null);
+                    $mol_assert_equal(editor.block_ids().length, 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Vertical navigation ===
+            'block_nav moves the caret into the next block'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'hello' },
+                    { id: 'b', html: 'world wide' },
+                ]);
+                try {
+                    editor.block_nav('a', { dir: 'down', x: 0, offset: 3 });
+                    $mol_assert_equal(editor.block_view('b').caret_offset(), 3);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_nav keeps the desired column across several steps'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'first line' },
+                    { id: 'b', html: 'ab' },
+                    { id: 'c', html: 'third line' },
+                ]);
+                try {
+                    // Down through a short block: the caret clamps to its end
+                    editor.block_nav('a', { dir: 'down', x: 0, offset: 7 });
+                    $mol_assert_equal(editor.block_view('b').caret_offset(), 2);
+                    // but the wanted column is remembered and restored in the next block
+                    editor.block_nav('b', { dir: 'down', x: 0, offset: 2 });
+                    $mol_assert_equal(editor.block_view('c').caret_offset(), 7);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'the desired column is dropped by any other key'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'first line' },
+                    { id: 'b', html: 'ab' },
+                    { id: 'c', html: 'third line' },
+                ]);
+                try {
+                    editor.block_nav('a', { dir: 'down', x: 0, offset: 7 });
+                    editor.editor_keydown(editor_key('x'));
+                    $mol_assert_equal(editor.nav_column, null);
+                    editor.block_nav('b', { dir: 'down', x: 0, offset: 2 });
+                    $mol_assert_equal(editor.block_view('c').caret_offset(), 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_nav at the top edge stays put'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'hello' },
+                    { id: 'b', html: 'world' },
+                ]);
+                try {
+                    editor.block_view('a').focus_at(2);
+                    editor.block_nav('a', { dir: 'up', x: 0, offset: 2 });
+                    $mol_assert_equal(editor.block_view('a').caret_offset(), 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'block_nav without a hint returns null'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'hello' }]);
+                try {
+                    $mol_assert_equal(editor.block_nav('a'), null);
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Undo / redo ===
+            'undo and redo walk over typed text'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    editor.block_html('a', 'one two');
+                    editor.history_record();
+                    $mol_assert_equal(editor.history_states.length, 2);
+                    $mol_assert_equal(editor.history_undo(), true);
+                    $mol_assert_equal(editor.block_html('a'), 'one');
+                    $mol_assert_equal(editor.history_redo(), true);
+                    $mol_assert_equal(editor.block_html('a'), 'one two');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'undo restores a block split'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'hello world' }]);
+                try {
+                    editor.block_split('a', { head: 'hello', tail: ' world' });
+                    $mol_assert_equal(editor.block_ids().length, 2);
+                    editor.history_undo();
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'hello world');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'undo restores a merge'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    editor.block_merge_prev('b', new Event('keydown'));
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    editor.history_undo();
+                    $mol_assert_equal(editor.block_ids(), ['a', 'b']);
+                    $mol_assert_equal(editor.block_html('a'), 'one');
+                    $mol_assert_equal(editor.block_html('b'), 'two');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'undo restores the block type'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'text' }]);
+                try {
+                    editor.history_ensure();
+                    editor.block_type('a', 'quote');
+                    editor.history_record();
+                    editor.history_undo();
+                    $mol_assert_equal(editor.block_type('a'), 'paragraph');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'undo at the bottom of the stack reports failure'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    $mol_assert_equal(editor.history_undo(), false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'redo at the top of the stack reports failure'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    $mol_assert_equal(editor.history_redo(), false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a repeated state is not stacked twice'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_record();
+                    editor.history_record();
+                    editor.history_record();
+                    $mol_assert_equal(editor.history_states.length, 1);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a new edit after undo cuts the redo tail'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    editor.block_html('a', 'two');
+                    editor.history_record();
+                    editor.history_undo();
+                    editor.block_html('a', 'three');
+                    editor.history_record();
+                    $mol_assert_equal(editor.history_states.length, 2);
+                    $mol_assert_equal(editor.history_redo(), false);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'redo does not throw away text typed after an undo'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    editor.block_html('a', 'one two');
+                    editor.history_record();
+                    editor.history_undo();
+                    // typed, but the debounce has not fired yet
+                    editor.block_html('a', 'one three');
+                    $mol_assert_equal(editor.history_redo(), false);
+                    $mol_assert_equal(editor.block_html('a'), 'one three');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'the stack is trimmed to its limit'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: '0' }]);
+                try {
+                    editor.history_limit = () => 3;
+                    for (let i = 1; i <= 6; i++) {
+                        editor.block_html('a', String(i));
+                        editor.history_record();
+                    }
+                    $mol_assert_equal(editor.history_states.length, 3);
+                    $mol_assert_equal(editor.history_states[0].blocks[0].content, '4');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'a snapshot carries id, type, level, content and the caret'() {
+                const { editor, drop } = make_editor([
+                    { id: 'a', html: 'Head', type: 'heading', level: 3 },
+                ]);
+                try {
+                    editor.block_view('a').focus_at(2);
+                    const snapshot = editor.history_snapshot();
+                    $mol_assert_equal(snapshot.blocks, [
+                        { id: 'a', type: 'heading', level: 3, content: 'Head' },
+                    ]);
+                    $mol_assert_equal(snapshot.caret, { id: 'a', offset: 2 });
+                }
+                finally {
+                    drop();
+                }
+            },
+            'history stays in memory and never reaches Giper Baza'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    editor.block_html('a', 'two');
+                    editor.history_record();
+                    $mol_assert_equal(editor.has_baza(), false);
+                    $mol_assert_equal(editor.history_states.length, 2);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'the debounce timer is dropped when a snapshot is taken'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.block_input('a', new Event('input'));
+                    $mol_assert_ok(editor.history_timer);
+                    editor.history_record();
+                    $mol_assert_equal(editor.history_timer, null);
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Ctrl+Z undoes and Ctrl+Shift+Z redoes'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    editor.block_html('a', 'one two');
+                    editor.history_record();
+                    editor.editor_keydown(editor_key('z', { ctrlKey: true }));
+                    $mol_assert_equal(editor.block_html('a'), 'one');
+                    editor.editor_keydown(editor_key('z', { ctrlKey: true, shiftKey: true }));
+                    $mol_assert_equal(editor.block_html('a'), 'one two');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'Ctrl+Y redoes as well'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    editor.block_html('a', 'one two');
+                    editor.history_record();
+                    editor.history_undo();
+                    editor.editor_keydown(editor_key('y', { ctrlKey: true }));
+                    $mol_assert_equal(editor.block_html('a'), 'one two');
+                }
+                finally {
+                    drop();
+                }
+            },
+            'undo is not offered in readonly mode'() {
+                const { editor, drop } = make_editor([{ id: 'a', html: 'one' }]);
+                try {
+                    editor.history_ensure();
+                    editor.block_html('a', 'one two');
+                    editor.history_record();
+                    editor.readonly = () => true;
+                    const event = editor_key('z', { ctrlKey: true });
+                    editor.editor_keydown(event);
+                    $mol_assert_equal(event.defaultPrevented, false);
+                    $mol_assert_equal(editor.block_html('a'), 'one two');
+                }
+                finally {
+                    drop();
+                }
+            },
+            // === Selection across blocks ===
+            'block_of_node finds the owning block'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    const { editor } = helper;
+                    $mol_assert_equal(editor.block_of_node(helper.node('b').firstChild), 'b');
+                    $mol_assert_equal(editor.block_of_node(helper.node('a')), 'a');
+                    $mol_assert_equal(editor.block_of_node(null), '');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'selection_spans_blocks is false inside a single block'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    select_across(helper.node('a'), 0, helper.node('a'), 2);
+                    $mol_assert_equal(helper.editor.selection_spans_blocks(), false);
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'selection_spans_blocks is true over a border'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'one' },
+                    { id: 'b', html: 'two' },
+                ]);
+                try {
+                    select_across(helper.node('a'), 1, helper.node('b'), 1);
+                    $mol_assert_equal(helper.editor.selection_spans_blocks(), true);
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'delete_selection keeps the head of the first and the tail of the last block'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'aaa' },
+                    { id: 'b', html: 'bbb' },
+                    { id: 'c', html: 'ccc' },
+                ]);
+                try {
+                    const { editor, focused } = helper;
+                    select_across(helper.node('a'), 1, helper.node('c'), 2);
+                    $mol_assert_equal(editor.delete_selection(), true);
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'ac');
+                    $mol_assert_equal(focused.at(-1), { id: 'a', offset: 1 });
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'delete_selection keeps markup around the cut'() {
+                const helper = make_editor([
+                    { id: 'a', html: '<b>keep</b>drop' },
+                    { id: 'b', html: 'drop<i>rest</i>' },
+                ]);
+                try {
+                    select_across(helper.node('a'), 4, helper.node('b'), 4);
+                    $mol_assert_equal(helper.editor.delete_selection(), true);
+                    $mol_assert_equal(helper.editor.block_html('a'), '<b>keep</b><i>rest</i>');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'delete_selection can put a typed character in place of the selection'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'aaa' },
+                    { id: 'b', html: 'bbb' },
+                ]);
+                try {
+                    const { editor, focused } = helper;
+                    select_across(helper.node('a'), 1, helper.node('b'), 2);
+                    $mol_assert_equal(editor.delete_selection('X'), true);
+                    $mol_assert_equal(editor.block_html('a'), 'aXb');
+                    $mol_assert_equal(focused.at(-1), { id: 'a', offset: 2 });
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'delete_selection escapes the typed character'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'aaa' },
+                    { id: 'b', html: 'bbb' },
+                ]);
+                try {
+                    select_across(helper.node('a'), 1, helper.node('b'), 2);
+                    helper.editor.delete_selection('<');
+                    $mol_assert_equal(helper.editor.block_html('a'), 'a&lt;b');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'delete_selection ignores a selection inside one block'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'aaa' },
+                    { id: 'b', html: 'bbb' },
+                ]);
+                try {
+                    select_across(helper.node('a'), 0, helper.node('a'), 2);
+                    $mol_assert_equal(helper.editor.delete_selection(), false);
+                    $mol_assert_equal(helper.editor.block_ids().length, 2);
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'Backspace over a cross block selection keeps the document sane'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'aaa' },
+                    { id: 'b', html: 'bbb' },
+                    { id: 'c', html: 'ccc' },
+                ]);
+                try {
+                    const { editor } = helper;
+                    select_across(helper.node('a'), 1, helper.node('c'), 1);
+                    const event = editor_key('Backspace');
+                    editor.editor_keydown(event);
+                    $mol_assert_equal(event.defaultPrevented, true);
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'acc');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'typing over a cross block selection replaces it with the character'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'aaa' },
+                    { id: 'b', html: 'bbb' },
+                ]);
+                try {
+                    const { editor } = helper;
+                    select_across(helper.node('a'), 2, helper.node('b'), 1);
+                    const event = editor_key('q');
+                    editor.editor_keydown(event);
+                    $mol_assert_equal(event.defaultPrevented, true);
+                    $mol_assert_equal(editor.block_ids(), ['a']);
+                    $mol_assert_equal(editor.block_html('a'), 'aaqbb');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'a cross block deletion can be undone'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'aaa' },
+                    { id: 'b', html: 'bbb' },
+                    { id: 'c', html: 'ccc' },
+                ]);
+                try {
+                    const { editor } = helper;
+                    select_across(helper.node('a'), 1, helper.node('c'), 1);
+                    editor.delete_selection();
+                    editor.history_undo();
+                    $mol_assert_equal(editor.block_ids(), ['a', 'b', 'c']);
+                    $mol_assert_equal(editor.block_html('a'), 'aaa');
+                    $mol_assert_equal(editor.block_html('c'), 'ccc');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
+            'a printable key with a plain caret is left to the browser'() {
+                const helper = make_editor([
+                    { id: 'a', html: 'aaa' },
+                    { id: 'b', html: 'bbb' },
+                ]);
+                try {
+                    helper.editor.block_view('a').focus_at(1);
+                    const event = editor_key('q');
+                    helper.editor.editor_keydown(event);
+                    $mol_assert_equal(event.defaultPrevented, false);
+                    $mol_assert_equal(helper.editor.block_html('a'), 'aaa');
+                }
+                finally {
+                    helper.drop();
+                }
+            },
             'ArrowDown increments menu_index within bounds'() {
                 const editor = new $bog_wysiwyg();
                 editor.menu_index(0);
@@ -8187,6 +9659,7 @@ var $;
                 editor.block_ids(['b1']);
                 editor.menu_index(5);
                 editor.menu_showed(false);
+                // Mock DOM methods that block_slash uses
                 const fake_rect = { bottom: 100, left: 50, top: 0 };
                 editor.Block = (id) => {
                     const block = new $bog_wysiwyg_block();
@@ -8199,6 +9672,7 @@ var $;
                 $mol_assert_equal(editor.menu_index(), 0);
                 $mol_assert_equal(editor.menu_showed(), true);
             },
+            // === Block management ===
             'block_enter creates new block after current'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['a', 'b']);
@@ -8220,6 +9694,7 @@ var $;
                 $mol_assert_equal(ids.length, 4);
                 $mol_assert_equal(ids[0], 'x');
                 $mol_assert_equal(ids[1], 'y');
+                // ids[2] — new generated id
                 $mol_assert_equal(ids[3], 'z');
             },
             'block_enter without event returns null'() {
@@ -8235,6 +9710,7 @@ var $;
                 const event = new Event('test');
                 editor.block_enter('nonexistent', event);
                 const ids = editor.block_ids();
+                // indexOf returns -1, splice(-1+1=0, 0, new_id) inserts at index 0
                 $mol_assert_equal(ids.length, 3);
             },
             'block_remove removes block'() {
@@ -8263,6 +9739,7 @@ var $;
                 $mol_assert_equal(editor.block_remove('a'), null);
                 $mol_assert_equal(editor.block_ids().length, 2);
             },
+            // === Slash menu → block type integration ===
             'menu_picked with paragraph sets type paragraph'() {
                 const editor = new $bog_wysiwyg();
                 editor.active_block_id('b1');
@@ -8335,6 +9812,7 @@ var $;
                 $mol_assert_equal(editor.block_level('b1'), 3);
                 $mol_assert_equal(editor.menu_showed(), false);
             },
+            // === Block properties ===
             'block_html stores and returns HTML'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['b1']);
@@ -8367,6 +9845,7 @@ var $;
                 $mol_assert_equal(editor.block_level('b1'), 2);
                 $mol_assert_equal(editor.block_level('b2'), 3);
             },
+            // === Edge cases ===
             'active_block_id defaults to empty string'() {
                 const editor = new $bog_wysiwyg();
                 $mol_assert_equal(editor.active_block_id(), '');
@@ -8400,9 +9879,11 @@ var $;
                 editor.block_type('b1', 'paragraph');
                 editor.menu_showed(true);
                 editor.focus_block = () => { };
+                // active_block_id defaults to '', apply_menu_command returns early
                 editor.menu_picked('code');
                 $mol_assert_equal(editor.block_type('b1'), 'paragraph');
             },
+            // === Focus behavior ===
             'block_remove calls focus_block with previous id'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['a', 'b', 'c']);
@@ -8419,8 +9900,10 @@ var $;
                 editor.focus_block = (id) => { focused_id = id; };
                 const event = new Event('test');
                 editor.block_remove('a', event);
+                // index was 0, Math.max(0, 0-1) = 0, focuses ids[0] which is now 'b'
                 $mol_assert_equal(focused_id, 'b');
             },
+            // === Block operations with menu open ===
             'block_enter while menu is open still creates block'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['a', 'b']);
@@ -8439,6 +9922,7 @@ var $;
                 editor.block_remove('b', event);
                 $mol_assert_equal(editor.block_ids().length, 2);
             },
+            // === Multiple sequential operations ===
             'multiple block_enter calls create multiple blocks'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['a']);
@@ -8475,6 +9959,7 @@ var $;
                 editor.menu_picked('code');
                 $mol_assert_equal(editor.block_type('b1'), 'code');
             },
+            // === Image block ===
             'image command exists in slash menu'() {
                 const menu = new $bog_wysiwyg_menu();
                 const cmds = menu.commands();
@@ -8524,6 +10009,7 @@ var $;
                 $mol_assert_equal(editor.menu_showed(), false);
                 ctx.prompt = original_prompt;
             },
+            // === Drag & Drop ===
             'move_block moves block down (after)'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['a', 'b', 'c']);
@@ -8603,6 +10089,7 @@ var $;
                 const rows = editor.block_row_views();
                 $mol_assert_equal(rows.length, 3);
             },
+            // === html_to_md ===
             'html_to_md: bold to markdown'() {
                 $mol_assert_equal($bog_wysiwyg_html_to_md('<b>hello</b>'), '**hello**');
             },
@@ -8642,6 +10129,7 @@ var $;
             'html_to_md: plain text unchanged'() {
                 $mol_assert_equal($bog_wysiwyg_html_to_md('just text'), 'just text');
             },
+            // === block_paste_blocks ===
             'block_paste_blocks replaces current and inserts new blocks'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['a', 'b']);
@@ -8691,6 +10179,254 @@ var $;
 
 ;
 "use strict";
+var $;
+(function ($) {
+    const base = 'https://baza.test/';
+    const md = (blocks, config) => $bog_wysiwyg_export_markdown(blocks, config);
+    $mol_test({
+        // === Block types ===
+        'paragraph keeps inline formatting'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'Hello <b>bold</b> and <i>italic</i>' }]), 'Hello **bold** and *italic*');
+        },
+        'paragraph turns br into a hard line break'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'one<br>two' }]), 'one  \ntwo');
+        },
+        'paragraph turns div soup into lines'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: '<div>one</div><div>two</div>' }]), 'one  \ntwo');
+        },
+        'heading levels 1 to 3'() {
+            $mol_assert_equal(md([{ type: 'heading', level: 1, content: 'One' }]), '# One');
+            $mol_assert_equal(md([{ type: 'heading', level: 2, content: 'Two' }]), '## Two');
+            $mol_assert_equal(md([{ type: 'heading', level: 3, content: 'Three' }]), '### Three');
+        },
+        'heading without a level falls back to the first one'() {
+            $mol_assert_equal(md([{ type: 'heading', content: 'One' }]), '# One');
+        },
+        'code block is fenced and unescaped'() {
+            $mol_assert_equal(md([{ type: 'code', content: 'if( a &lt; b ) {\n\treturn 1\n}' }]), '```\nif( a < b ) {\n\treturn 1\n}\n```');
+        },
+        'code block with its own fence gets a longer one'() {
+            $mol_assert_equal(md([{ type: 'code', content: '```\nnested\n```' }]), '````\n```\nnested\n```\n````');
+        },
+        'quote prefixes every line'() {
+            $mol_assert_equal(md([{ type: 'quote', content: 'Wise<br>words' }]), '> Wise  \n> words');
+        },
+        'neighbour list blocks make one list'() {
+            $mol_assert_equal(md([
+                { type: 'list', content: 'one' },
+                { type: 'list', content: 'two' },
+                { type: 'paragraph', content: 'tail' },
+            ]), '- one\n- two\n\ntail');
+        },
+        'list block with its own markup keeps nesting'() {
+            $mol_assert_equal(md([{ type: 'list', content: '<ul><li>a</li><li>b<ul><li>c</li></ul></li></ul>' }]), '- a\n- b\n  - c');
+        },
+        'ordered list is numbered'() {
+            $mol_assert_equal(md([{ type: 'list', content: '<ol><li>a</li><li>b</li></ol>' }]), '1. a\n2. b');
+        },
+        'divider'() {
+            $mol_assert_equal(md([{ type: 'divider', content: '' }]), '---');
+        },
+        'unknown block type is rendered as a paragraph'() {
+            $mol_assert_equal(md([{ type: 'callout', content: 'Beware of <b>dogs</b>' }]), 'Beware of **dogs**');
+        },
+        'empty blocks are dropped'() {
+            $mol_assert_equal(md([
+                { type: 'paragraph', content: '' },
+                { type: 'paragraph', content: '<br>' },
+                { type: 'paragraph', content: 'alone' },
+                { type: 'heading', level: 1, content: '   ' },
+            ]), 'alone');
+        },
+        'no blocks means no markdown'() {
+            $mol_assert_equal(md([]), '');
+        },
+        // === Inline ===
+        'link'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'see <a href="https://mol.hyoo.ru/">mol</a>' }]), 'see [mol](https://mol.hyoo.ru/)');
+        },
+        'link with parens in the address is percent encoded'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: '<a href="https://x.dev/a(b)">l</a>' }]), '[l](https://x.dev/a%28b%29)');
+        },
+        'wiki link stays an anchor'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: '<a data-wiki-link="page_1" href="#page_1">page_1</a>' }], { base }), '[page\\_1](#page_1)');
+        },
+        'inline code with a backtick gets a double fence'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: '<code>a`b</code>' }]), '``a`b``');
+        },
+        'strike'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: '<s>gone</s> <del>too</del>' }]), '~~gone~~ ~~too~~');
+        },
+        'html entities are decoded'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'a &amp; b &nbsp; &mdash; &#65;&#x42;' }]), 'a & b — AB');
+        },
+        'unbalanced markup still closes'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'a <b>bold' }]), 'a **bold**');
+        },
+        // === Escaping ===
+        'markdown punctuation in plain text is escaped'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'a * b _ c [d] ~e~ \\f' }]), 'a \\* b \\_ c \\[d\\] \\~e\\~ \\\\f');
+        },
+        'line openers are escaped only at the line start'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: '# not a heading' }]), '\\# not a heading');
+            $mol_assert_equal(md([{ type: 'paragraph', content: '> not a quote' }]), '\\> not a quote');
+            $mol_assert_equal(md([{ type: 'paragraph', content: '- not a list' }]), '\\- not a list');
+            $mol_assert_equal(md([{ type: 'paragraph', content: '1. not a list' }]), '1\\. not a list');
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'and 1. not a list' }]), 'and 1. not a list');
+        },
+        'telegram never escapes, because clients show the backslashes'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'a * b _ c [d] # e' }], { dialect: 'telegram' }), 'a * b _ c [d] # e');
+        },
+        // === Habr ===
+        'habr shifts headings down, the article title already owns h1'() {
+            $mol_assert_equal(md([{ type: 'heading', level: 1, content: 'One' }], { dialect: 'habr' }), '## One');
+            $mol_assert_equal(md([{ type: 'heading', level: 3, content: 'Three' }], { dialect: 'habr' }), '#### Three');
+        },
+        'habr drops underline, there is no markdown for it'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'a <u>b</u> c' }], { dialect: 'habr' }), 'a b c');
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'a <u>b</u> c' }]), 'a <u>b</u> c');
+        },
+        'habr renders a table as a nested list'() {
+            $mol_assert_equal(md([{
+                    type: 'table',
+                    content: '<table><tr><th>Name</th><th>Age</th></tr><tr><td>Ann</td><td>3</td></tr><tr><td>Bob</td><td>4</td></tr></table>',
+                }], { dialect: 'habr' }), '- **Ann**\n  - Age: 3\n- **Bob**\n  - Age: 4');
+        },
+        'habr flattens a headless table into one bullet per row'() {
+            $mol_assert_equal(md([{
+                    type: 'table',
+                    content: '<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>',
+                }], { dialect: 'habr' }), '- a — b\n- c — d');
+        },
+        'a table pasted as markdown text is reformatted too'() {
+            $mol_assert_equal(md([{ type: 'table', content: '| a | b |<br>| --- | --- |<br>| 1 | 2 |' }], { dialect: 'habr' }), '- **1**\n  - b: 2');
+        },
+        // === Common and dev.to tables ===
+        'gfm table for dialects that render tables'() {
+            const table = {
+                type: 'table',
+                content: '<table><tr><th>Name</th><th>Age</th></tr><tr><td>Ann</td><td>3</td></tr></table>',
+            };
+            $mol_assert_equal(md([table]), '| Name | Age |\n| --- | --- |\n| Ann | 3 |');
+            $mol_assert_equal(md([table], { dialect: 'devto' }).split('---\n\n')[1], '| Name | Age |\n| --- | --- |\n| Ann | 3 |');
+        },
+        'pipes inside cells are escaped'() {
+            $mol_assert_equal(md([{ type: 'table', content: '<table><tr><td>a|b</td><td>c</td></tr></table>' }]), '| a\\|b | c |\n| --- | --- |');
+        },
+        // === dev.to ===
+        'devto prepends a front matter'() {
+            $mol_assert_equal(md([{ type: 'paragraph', content: 'Body' }], {
+                dialect: 'devto',
+                title: 'My post',
+                tags: ['mol', 'javascript'],
+                published: true,
+            }), '---\ntitle: "My post"\npublished: true\ntags: mol, javascript\n---\n\nBody');
+        },
+        'devto tags are sanitized down to four'() {
+            $mol_assert_equal(md([], { dialect: 'devto', tags: ['Java Script', '#ts', '', 'a', 'b', 'c'] }), '---\ntitle: ""\npublished: false\ntags: javascript, ts, a, b\n---');
+        },
+        'devto quotes the title and absolutizes the cover'() {
+            $mol_assert_equal(md([], {
+                dialect: 'devto',
+                title: 'A "quoted": title',
+                cover: '?BAZA:file=cov;name=c.png',
+                base,
+            }), '---\ntitle: "A \\"quoted\\": title"\npublished: false\ntags: \ncover_image: "https://baza.test/?BAZA:file=cov;name=c.png"\n---');
+        },
+        // === Telegram ===
+        'telegram turns headings into bold lines'() {
+            $mol_assert_equal(md([{ type: 'heading', level: 2, content: 'Sub' }], { dialect: 'telegram' }), '**Sub**');
+        },
+        'telegram uses its own italic, bullet and divider'() {
+            $mol_assert_equal(md([
+                { type: 'paragraph', content: '<i>slanted</i>' },
+                { type: 'list', content: 'item' },
+                { type: 'divider', content: '' },
+            ], { dialect: 'telegram' }), '__slanted__\n\n• item\n\n————————');
+        },
+        'telegram cannot embed images, so a bare address is left'() {
+            $mol_assert_equal(md([{ type: 'image', content: '<img src="?BAZA:file=abc;name=pic.png" alt="Pic">' }], {
+                dialect: 'telegram',
+                base,
+            }), 'https://baza.test/?BAZA:file=abc;name=pic.png');
+        },
+        'telegram has a message limit'() {
+            $mol_assert_equal($bog_wysiwyg_export_limit('telegram'), 4096);
+            $mol_assert_equal($bog_wysiwyg_export_limit('common'), Infinity);
+            $mol_assert_equal($bog_wysiwyg_export_limit('habr'), Infinity);
+            $mol_assert_equal($bog_wysiwyg_export_limit('devto'), Infinity);
+        },
+        // === Splitting ===
+        'short text is a single message'() {
+            $mol_assert_equal($bog_wysiwyg_export_split('hello', 4096).length, 1);
+            $mol_assert_equal($bog_wysiwyg_export_split('', 4096).length, 0);
+        },
+        'split prefers block boundaries'() {
+            const parts = $bog_wysiwyg_export_split('aaaa\n\nbbbb\n\ncccc', 10);
+            $mol_assert_equal(parts.length, 2);
+            $mol_assert_equal(parts[0], 'aaaa\n\nbbbb');
+            $mol_assert_equal(parts[1], 'cccc');
+        },
+        'split falls back to lines and then to hard cuts'() {
+            $mol_assert_equal($bog_wysiwyg_export_split('aa\nbb\ncc', 5), ['aa\nbb', 'cc']);
+            $mol_assert_equal($bog_wysiwyg_export_split('abcdefgh', 3), ['abc', 'def', 'gh']);
+        },
+        'every telegram message fits the limit'() {
+            const blocks = Array.from({ length: 60 }, (_, i) => ({
+                type: 'paragraph',
+                content: 'Paragraph number ' + i + ' ' + 'x'.repeat(100),
+            }));
+            const text = md(blocks, { dialect: 'telegram' });
+            const parts = $bog_wysiwyg_export_split(text, $bog_wysiwyg_export_limit('telegram'));
+            $mol_assert_ok(parts.length > 1);
+            for (const part of parts)
+                $mol_assert_ok(part.length <= 4096);
+        },
+        // === Images ===
+        'baza file address is resolved against the master node'() {
+            $mol_assert_equal(md([{ type: 'image', content: '<img src="?BAZA:file=abc;name=pic.png" alt="Pic">' }], { base }), '![Pic](https://baza.test/?BAZA:file=abc;name=pic.png)');
+        },
+        'image without an alt'() {
+            $mol_assert_equal(md([{ type: 'image', content: '<img src="https://x.dev/p.png">' }]), '![](https://x.dev/p.png)');
+        },
+        'absolute and data addresses are left alone'() {
+            $mol_assert_equal($bog_wysiwyg_export_uri('https://a/b.png', base), 'https://a/b.png');
+            $mol_assert_equal($bog_wysiwyg_export_uri('data:image/png;base64,AAA', base), 'data:image/png;base64,AAA');
+            $mol_assert_equal($bog_wysiwyg_export_uri('//a/b.png', base), '//a/b.png');
+            $mol_assert_equal($bog_wysiwyg_export_uri('#anchor', base), '#anchor');
+            $mol_assert_equal($bog_wysiwyg_export_uri('/x.png', base), 'https://baza.test/x.png');
+            $mol_assert_equal($bog_wysiwyg_export_uri('?BAZA:file=x;name=y', base), 'https://baza.test/?BAZA:file=x;name=y');
+            $mol_assert_equal($bog_wysiwyg_export_uri('?BAZA:file=x', 'https://baza.test'), 'https://baza.test/?BAZA:file=x');
+            $mol_assert_equal($bog_wysiwyg_export_uri('?BAZA:file=x', ''), '?BAZA:file=x');
+            $mol_assert_equal($bog_wysiwyg_export_uri('', base), '');
+        },
+        'images apart are numbered in place and listed at the end'() {
+            $mol_assert_equal(md([
+                { type: 'paragraph', content: 'before <img src="https://x.dev/a.png" alt="A"> after' },
+                { type: 'image', content: '<img src="?BAZA:file=b;name=b.png">' },
+            ], {
+                base,
+                images_apart: true,
+                labels: { image: 'Picture', images: 'Pictures' },
+            }), 'before [Picture 1] after\n\n[Picture 2]'
+                + '\n\n## Pictures\n\n1. A — https://x.dev/a.png\n2. https://baza.test/?BAZA:file=b;name=b.png');
+        },
+        'telegram lists images under a bold title'() {
+            $mol_assert_equal(md([{ type: 'image', content: '<img src="https://x.dev/a.png">' }], {
+                dialect: 'telegram',
+                images_apart: true,
+                labels: { image: 'Pic', images: 'Pics' },
+            }), '[Pic 1]\n\n**Pics**\n\n1. https://x.dev/a.png');
+        },
+        // === Plain text helper ===
+        'plain strips tags and decodes entities'() {
+            $mol_assert_equal($bog_wysiwyg_export_plain('<p>a<br>b &lt;c&gt;</p>'), 'a\nb <c>');
+        },
+    });
+})($ || ($ = {}));
+
+;
+"use strict";
 
 ;
 "use strict";
@@ -8707,6 +10443,7 @@ var $;
                     title: 'Test Plugin',
                 });
                 $mol_assert_equal(registry.all().length, before + 1);
+                // cleanup
                 registry.plugins.delete('_test_plugin_1');
             },
             'all() returns all registered plugins'() {
@@ -8717,6 +10454,7 @@ var $;
                 const ids = all.map(p => p.id);
                 $mol_assert_ok(ids.includes('_test_a'));
                 $mol_assert_ok(ids.includes('_test_b'));
+                // cleanup
                 registry.plugins.delete('_test_a');
                 registry.plugins.delete('_test_b');
             },
@@ -8727,6 +10465,7 @@ var $;
                 $mol_assert_ok(plugin !== null);
                 $mol_assert_equal(plugin.id, '_test_get');
                 $mol_assert_equal(plugin.title, 'Get Test');
+                // cleanup
                 registry.plugins.delete('_test_get');
             },
             'get() returns null for non-existent plugin'() {
@@ -8740,6 +10479,7 @@ var $;
                 const cmds = menu.commands();
                 const ids = cmds.map(c => c.id);
                 $mol_assert_ok(ids.includes('_test_menu'));
+                // cleanup
                 registry.plugins.delete('_test_menu');
             },
             'apply_menu_command calls plugin on_select'() {
@@ -8758,6 +10498,7 @@ var $;
                 editor.focus_block = () => { };
                 editor.apply_menu_command('_test_select');
                 $mol_assert_equal(called_with_id, 'b1');
+                // cleanup
                 registry.plugins.delete('_test_select');
             },
             'apply_menu_command for plugin without on_select sets type'() {
@@ -8772,6 +10513,7 @@ var $;
                 editor.focus_block = () => { };
                 editor.apply_menu_command('_test_noop');
                 $mol_assert_equal(editor.block_type('b1'), '_test_noop');
+                // cleanup
                 registry.plugins.delete('_test_noop');
             },
         });
