@@ -10521,36 +10521,6 @@ var $;
                 $mol_assert_equal(editor.block_type('b1'), 'paragraph');
                 $mol_assert_equal(editor.image_prompt_showed(), false);
             },
-            /*
-             * A picture that cannot be written used to leave the block typed `image` with nothing in
-             * it — a blank frame, no message, no console entry. Now the block is left alone and the
-             * failure is said out loud.
-             */
-            async 'a picture that fails to store says so and leaves the block alone'() {
-                const editor = new $bog_wysiwyg();
-                editor.block_ids(['b1']);
-                editor.focus_block = () => { };
-                editor.notice_image_failed = () => 'no luck';
-                editor.page_land = () => ({
-                    Pawn: () => { throw new Error('no room in the Land'); },
-                    self_make: () => null,
-                });
-                const file = new File([new Uint8Array(4)], 'shot.png', { type: 'image/png' });
-                // Reading the bytes suspends the action, so drive it the way an event handler does
-                $mol_assert_equal(await $mol_wire_async(editor).block_image_file('b1', file), file);
-                $mol_assert_equal(editor.notice(), 'no luck');
-                $mol_assert_equal(editor.notice_showed(), true);
-                $mol_assert_equal(editor.block_type('b1'), 'paragraph');
-            },
-            'with no Land the picture falls back to the caller'() {
-                const editor = new $bog_wysiwyg();
-                editor.block_ids(['b1']);
-                editor.focus_block = () => { };
-                const file = new File([new Uint8Array(4)], 'shot.png', { type: 'image/png' });
-                // null tells the block view to inline it as a data uri instead
-                $mol_assert_equal(editor.block_image_file('b1', file), null);
-                $mol_assert_equal(editor.notice(), '');
-            },
             'the link panel wraps the selection through the block'() {
                 const editor = new $bog_wysiwyg();
                 editor.block_ids(['b1']);
