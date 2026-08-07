@@ -54,7 +54,7 @@ namespace $.$$ {
 				const home_land = this.$.$giper_baza_glob.Land(
 					new $giper_baza_link( lord_id )
 				)
-				const profile = home_land.Data( $bog_blitz_profile )
+				const profile = home_land.Data( $bog_wysiwyg_model_user_name )
 				const name = profile.Name()?.val()
 				if( name ) return name
 			} catch {}

@@ -1,14 +1,41 @@
-$bog_wysiwyg_profile $bog_blitz_profile_page
-	Stats null
-	Fun_card null
-	Games_section null
-	Avatar_label $mol_paragraph
-		title @ \Change photo
+- Своя страница профиля, без наследования от викторины.
+-
+- Раньше здесь стояло страница профиля из bog/blitz. Ради аватара и поля имени в
+- сборку приезжал весь Blitz Quiz, а с ним его статический
+- `$bog_ui_router_path.activate()`, подменявший `$mol_state_arg`. Редактор —
+- отдельная библиотека, зависеть от викторины ему незачем.
+$bog_wysiwyg_profile $mol_page
+	title @ \Profile
+	player_id \
+	avatar_uri \
+	profile_name? \
+	avatar_files? /File
 	body /
-		<= Card
+		<= Card $mol_view
+			sub /
+				<= Avatar_circle $mol_view
+					sub /
+						<= avatar_preview null
+				<= Avatar $mol_button_open
+					sub /
+						<= Avatar_label $mol_paragraph
+							title @ \Change photo
+						<= Avatar_native $mol_button_open_native
+							files? <=> avatar_files? /File
+							accept \image/*
+							multiple false
+				<= Name_row $mol_view
+					sub /
+						<= Name_input $mol_string_button
+							hint @ \Your name
+							value? <=> profile_name? \
 		<= Id_row $mol_view
 			sub /
 				<= Id_label $mol_paragraph
 					title \ID:
 				<= Id_value $mol_paragraph
 					title <= id_display \
+	Avatar_image $mol_image
+		uri <= avatar_uri \
+	Avatar_icon $mol_avatar
+		id <= player_id \
