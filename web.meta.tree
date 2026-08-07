@@ -90,6 +90,8 @@
 	deploy \/giper/baza/diagram/crus-jepsen.png
 	deploy \/giper/baza/docker/deploy.sh
 	deploy \/giper/baza/docker/autopull_and_restart.sh
+\/bog/ui
+	namespace \bog\ui
 \/hyoo
 	pack about git \https://github.com/hyoo-ru/about.hyoo.ru.git
 	pack artist git \https://github.com/hyoo-ru/artist.hyoo.ru.git
@@ -157,14 +159,6 @@
 	pack intern git \https://github.com/hyoo-ru/intern.hyoo.ru.git
 \/giper/baza/file
 	include \/mol/offline/install
-\/giper/bot
-	deploy \/giper/bot/logo
-	include \/mol/offline/install
-\/bog/ui
-	namespace \bog\ui
-\/bog/blitz
-	include \/mol/offline/install
-	deploy \/bog/blitz/assets
 \/bog/wysiwyg/app
 	include \/mol/offline/install
 	include \/bog/wysiwyg/plugin/callout
